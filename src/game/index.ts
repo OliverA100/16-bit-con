@@ -170,11 +170,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const level = new Level1(assets);
   const real = new Arrival(assets);
   const dissolve = new Dissolve();
+  dissolve.warm(vp.bw, vp.bh, impactPoint(vp.bw, F));
   // The city set (and the arrival's art) loads right behind the field; city-far first enters at world x 300.
   loadCity()
     .then((c) => {
       level.city = c;
-      real.city = c;
+      real.warm(c);
       level.prepareNight();
     })
     .catch((err) => console.error('[world] city assets failed to load', err));
@@ -204,6 +205,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       timeline.jumpTo(self.progress * T_MAX);
     },
   });
+  // A link to a section (/#register) was resolved by the browser before the pin added its scroll
+  // length: jump there again now that the page has its real height, and snap the world to match.
+  const target = location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+  if (target && !section.contains(target)) {
+    window.scrollTo({ top: Math.round(target.getBoundingClientRect().top + window.scrollY), behavior: 'instant' });
+    ScrollTrigger.update();
+  }
   timeline.jumpTo(trigger.progress * T_MAX);
 
   const io = new IntersectionObserver((entries) => {
@@ -215,6 +223,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     'resize',
     () => {
       fit();
+      dissolve.warm(vp.bw, vp.bh, impactPoint(vp.bw, F));
       ScrollTrigger.refresh();
     },
     { passive: true },
@@ -349,10 +358,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
       if (shown > 0) {
         // The real frame, Sam back at the left margin: drawn straight once the dissolve is through.
-        real.draw(shown >= 64 ? bctx : rctx, { ...view, samX: X });
+        real.draw(shown >= 64 ? bctx : rctx, { ...view, samX: X }, shown < 64);
         if (shown < 64) dissolve.apply(bctx, realBuf, rctx, shown, vp.bw, vp.bh, impactPoint(vp.bw, F));
       }
-      sctx.clearRect(0, 0, o.canvas.width, o.canvas.height);
+      // The far sky at device resolution (clouds glide), then the buffer over it.
+      if (shown < 64) level.drawFar(sctx, { ...view, samX: X }, vp.k);
+      else real.drawFar(sctx, { ...view, samX: X }, vp.k);
       sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
 
       // The title overlay is a pure function of the scroll position (not the eased visual, so a

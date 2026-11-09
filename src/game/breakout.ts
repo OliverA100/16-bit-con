@@ -130,31 +130,61 @@ export class Dissolve {
   private maskData: ImageData | null = null;
   private maskLevel = -1;
 
-  private prepare(bw: number, bh: number, impact: { x: number; y: number }): void {
+  private rowsDone = 0;
+  private maxDist = 1;
+  private impact = { x: 0, y: 0 };
+  private bw = 0;
+
+  /** Start (or restart) the threshold map for this buffer; rows are filled by `fill`. */
+  private begin(bw: number, bh: number, impact: { x: number; y: number }): boolean {
     const key = `${bw}x${bh}@${impact.x},${impact.y}`;
-    if (key === this.key) return;
+    if (key === this.key) return false;
     this.key = key;
-    const corners = [
-      [0, 0],
-      [bw, 0],
-      [0, bh],
-      [bw, bh],
-    ].map(([x, y]) => Math.hypot(x! - impact.x, y! - impact.y));
-    const maxDist = Math.max(...corners);
-    const thr = new Uint8Array(bw * bh);
-    for (let y = 0; y < bh; y++) {
-      const row = BAYER[y & 7]!;
-      for (let x = 0; x < bw; x++) {
-        const v = (row[x & 7]! / 64) * DITHER_WEIGHT + (Math.hypot(x - impact.x, y - impact.y) / maxDist) * (1 - DITHER_WEIGHT);
-        thr[y * bw + x] = Math.min(255, Math.floor(v * 256));
-      }
-    }
-    this.thresholds = thr;
+    this.bw = bw;
+    this.impact = impact;
+    this.maxDist = Math.max(...[[0, 0], [bw, 0], [0, bh], [bw, bh]].map(([x, y]) => Math.hypot(x! - impact.x, y! - impact.y)));
+    this.thresholds = new Uint8Array(bw * bh);
+    this.rowsDone = 0;
     this.mask = document.createElement('canvas');
     this.mask.width = bw;
     this.mask.height = bh;
     this.maskData = this.mask.getContext('2d')!.createImageData(bw, bh);
     this.maskLevel = -1;
+    return true;
+  }
+
+  /** Fill threshold rows until `deadline` (performance.now ms), or all of them. */
+  private fill(deadline = Infinity): boolean {
+    const thr = this.thresholds!;
+    const bw = this.bw;
+    const bh = thr.length / bw;
+    const { x: ix, y: iy } = this.impact;
+    while (this.rowsDone < bh) {
+      const y = this.rowsDone++;
+      const row = BAYER[y & 7]!;
+      for (let x = 0; x < bw; x++) {
+        const v = (row[x & 7]! / 64) * DITHER_WEIGHT + (Math.hypot(x - ix, y - iy) / this.maxDist) * (1 - DITHER_WEIGHT);
+        thr[y * bw + x] = Math.min(255, Math.floor(v * 256));
+      }
+      if ((y & 7) === 7 && performance.now() > deadline) return false;
+    }
+    return true;
+  }
+
+  /** Build the threshold map ahead of the breakout in idle slices of ≤ 8 ms. */
+  warm(bw: number, bh: number, impact: { x: number; y: number }): void {
+    this.begin(bw, bh, impact);
+    const w = window as Window & { requestIdleCallback?: (cb: (d: { timeRemaining(): number }) => void) => number };
+    const step = (d?: { timeRemaining(): number }) => {
+      const budget = Math.min(8, d ? d.timeRemaining() : 8);
+      if (!this.fill(performance.now() + budget)) (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 16)))(step);
+    };
+    (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 16)))(step);
+  }
+
+  private prepare(bw: number, bh: number, impact: { x: number; y: number }): void {
+    this.begin(bw, bh, impact);
+    this.fill();
   }
 
   /** Keep only the real frame's pixels the level shows, then lay them over the game frame. */

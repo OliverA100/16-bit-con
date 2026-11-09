@@ -11,7 +11,7 @@ import type { Drawable } from './sprites';
 import { FOOT_SINK, type Sam } from './sam';
 import type { Coins } from './coins';
 import type { Dust } from './dust';
-import { Lights, NIGHT_STEPS, Stepper, nightTokens, rankMap, type NightTokens } from './night';
+import { Lights, NIGHT_STEPS, Stepper, nightTokens, rank, type NightTokens } from './night';
 import { makeStrip, type Strip } from './sprites';
 import { CLOUD_ROLES, RANGE_ROLES, Tinted } from './tint';
 import { board, letter } from './lettering';
@@ -200,10 +200,10 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
     near: ['#3A7DE7', '#5C98F9', '#386DD2', '#59A9FF', '#F2C185', '#E38E44', '#F2C6B6', '#F0CAA8', '#F2D2A1', '#DFA67C'],
   };
   const to = (hexes: string[], token: string) => Object.fromEntries(hexes.map((h) => [h, token]));
-  const farMap = rankMap(c.far, [T.n9], [1], to(glass.far, T.k));
-  const towersMap = rankMap(c.towers, [T.n9, T.g7], [1, 1], to(glass.towers, T.k));
-  const midMap = rankMap(c.mid, [T.n9, T.g7, T.g5], [2, 2, 1], to([...glass.mid, '#B3D0FF'], T.k));
-  const nearMap = rankMap(c.near, [T.n9, T.g7, T.g5], [35, 40, 25], {
+  const farMap = rank([T.n9], [1], to(glass.far, T.k));
+  const towersMap = rank([T.n9, T.g7], [1, 1], to(glass.towers, T.k));
+  const midMap = rank([T.n9, T.g7, T.g5], [2, 2, 1], to([...glass.mid, '#B3D0FF'], T.k));
+  const nearMap = rank([T.n9, T.g7, T.g5], [35, 40, 25], {
     ...to([...glass.near, '#7796DC', '#95ACDC', '#B5D1FF', '#ACC6F2', '#AAC2E0'], T.k),
     '#E06B4E': T.g7,
     '#2D4365': T.k,
@@ -212,24 +212,24 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
   const greens = { '#224100': T.n9, '#2E5700': T.n9, '#1F3B00': T.n9, '#457D07': T.n7, '#75A70D': T.n7 };
   const strips = new Map<Strip, Stepper>();
   for (const st of [c.molePhone, c.moleCoffee, c.molesChess, c.molesSofa, c.molePizza, c.dogBark, c.dog]) {
-    strips.set(st, new Stepper(st.image, rankMap(st.image, [T.k, T.g7, T.g5], [1, 1, 1])));
+    strips.set(st, new Stepper(st.image, rank([T.k, T.g7, T.g5], [1, 1, 1])));
   }
   return {
     far: new Stepper(c.far, farMap),
-    javits: new Stepper(c.javits, rankMap(c.javits, [T.n9, T.g7], [1, 1], { '#5487E2': T.k, '#629EFB': T.k })),
+    javits: new Stepper(c.javits, rank([T.n9, T.g7], [1, 1], { '#5487E2': T.k, '#629EFB': T.k })),
     towers: new Stepper(c.towers, towersMap),
     mid: new Stepper(c.mid, midMap),
     near: new Stepper(c.near, nearMap),
-    fence: new Stepper(c.fence, { '#353535': T.k, '#444444': T.k, '#565656': T.g7, '#777777': T.g7 }),
-    sidewalk: new Stepper(c.sidewalk, pave),
-    kerb: new Stepper(c.kerb, pave),
-    road: new Stepper(c.road, pave),
-    seam: new Stepper(c.seam, rankMap(c.seam, [T.k, T.n9, T.g7, T.g5])),
-    subway: new Stepper(c.subway, { ...greens, '#282828': T.k, '#464646': T.g7, '#FFCF3B': T.y1, '#FFF15B': T.y1, '#FFFFFF': T.y1 }),
-    arcade: new Stepper(c.arcade, rankMap(c.arcade, [T.k, T.g7], [1, 1], { ...greens, '#5DB3FF': T.y1, '#70A736': T.y4, '#FFCF3B': T.y4, '#FFD11B': T.y4, '#F0A125': T.y4 })),
-    plant: new Stepper(c.plant, rankMap(c.plant, [T.n9, T.n7], [1, 1], { '#834622': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
-    poster: new Stepper(c.poster, rankMap(c.poster, [T.k, T.g7, T.g5])),
-    tree: new Stepper(a.tree, rankMap(a.tree, [T.n9, T.n7], [1, 1], { '#58311B': T.k, '#834622': T.k, '#AE6228': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
+    fence: new Stepper(c.fence, { map: { '#353535': T.k, '#444444': T.k, '#565656': T.g7, '#777777': T.g7 } }),
+    sidewalk: new Stepper(c.sidewalk, { map: pave }),
+    kerb: new Stepper(c.kerb, { map: pave }),
+    road: new Stepper(c.road, { map: pave }),
+    seam: new Stepper(c.seam, rank([T.k, T.n9, T.g7, T.g5])),
+    subway: new Stepper(c.subway, { map: { ...greens, '#282828': T.k, '#464646': T.g7, '#FFCF3B': T.y1, '#FFF15B': T.y1, '#FFFFFF': T.y1 } }),
+    arcade: new Stepper(c.arcade, rank([T.k, T.g7], [1, 1], { ...greens, '#5DB3FF': T.y1, '#70A736': T.y4, '#FFCF3B': T.y4, '#FFD11B': T.y4, '#F0A125': T.y4 })),
+    plant: new Stepper(c.plant, rank([T.n9, T.n7], [1, 1], { '#834622': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
+    poster: new Stepper(c.poster, rank([T.k, T.g7, T.g5])),
+    tree: new Stepper(a.tree, rank([T.n9, T.n7], [1, 1], { '#58311B': T.k, '#834622': T.k, '#AE6228': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
     strips,
     lights: {
       far: new Lights(c.far, glass.far, T.y1),
@@ -281,6 +281,23 @@ function alignOpening(
 }
 const nearestEdge = (col: number) => Math.min(...MID_EDGES.map((e) => Math.abs(e - col)));
 const insideClear = (col: number) => Math.min(...TOWER_CLEAR.map(([a, b]) => (col >= a && col <= b ? 0 : Math.min(Math.abs(col - a), Math.abs(col - b)))));
+
+/** A tiled far layer on the screen canvas: positions snap to device pixels, tiles abut exactly (k · width is whole). */
+export function farTiled(ctx: CanvasRenderingContext2D, img: Drawable, scroll: number, y: number, bw: number, snap: (v: number) => number, mirror: boolean): void {
+  const w = img.width;
+  const first = Math.floor(scroll / w);
+  const last = Math.floor((scroll + bw) / w);
+  for (let n = first; n <= last; n++) {
+    const x = snap(n * w - scroll);
+    if (mirror && n & 1) {
+      ctx.save();
+      ctx.translate(x + w, Math.round(y));
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+    } else ctx.drawImage(img, x, Math.round(y));
+  }
+}
 
 export function drawTiled(
   ctx: CanvasRenderingContext2D,
@@ -340,19 +357,71 @@ export class Level1 {
     const c = this.city;
     const T = nightTokens();
     this.night = buildNight(this.a, c, T);
-    for (const l of Object.values(this.night.lights)) l.prepare();
+    // Queue the night images and window lists in the order the night reaches them:
+    // the worker builds them one after another from load, long before dusk.
+    const n = this.night;
+    n.far.prepare();
+    n.javits.prepare();
+    n.towers.prepare();
+    n.mid.prepare();
+    n.lights.far.prepare();
+    n.near.prepare();
+    n.lights.towers.prepare();
+    for (const st of [n.sidewalk, n.kerb, n.road, n.seam, n.fence, n.subway, n.tree, n.plant, n.arcade, n.poster]) st.prepare();
+    for (const st of n.strips.values()) st.prepare();
+    n.lights.mid.prepare();
+    n.lights.near.prepare();
+  }
+
+  /**
+   * The far sky: the flat sky, the small and medium clouds, Vega's pale silhouette, the
+   * cloud bank and the big lobes, drawn straight onto the screen canvas at k device px per art px.
+   * The sprites stay whole-number scaled and crisp, but their positions round to device pixels
+   * instead of art pixels, so a cloud drifting 1 art px a second glides instead of jumping k device
+   * px at a time. Everything nearer is drawn in the buffer over it.
+   */
+  drawFar(sctx: CanvasRenderingContext2D, f: Frame, k: number): void {
+    const { t, camLeft, F, bw, bh, now } = f;
+    const a = this.a;
+    const tint = (img: Drawable) => this.tints.get(img)!.at(t);
+    const snap = (v: number) => Math.round(v * k) / k;
+    sctx.save();
+    sctx.setTransform(k, 0, 0, k, 0, 0);
+    sctx.imageSmoothingEnabled = false;
+    sctx.fillStyle = f.sky;
+    sctx.fillRect(0, 0, bw, bh);
+    sctx.beginPath();
+    sctx.rect(0, 0, bw, F);
+    sctx.clip();
+    const skyTop = Math.max(40, F - 300);
+    const drift = (s: Seed, p: number) => s.u + s.drift * (now / 1000) - p * camLeft;
+    for (const s of SMALL) {
+      const img = tint(a.small[s.i]!);
+      sctx.drawImage(img, snap(mod(drift(s, STACK.small.p), bw + img.width) - img.width), Math.round(skyTop * s.yFrac));
+    }
+    for (const s of MEDIUM) {
+      const img = tint(a.medium[s.i]!);
+      sctx.drawImage(img, snap(mod(drift(s, STACK.medium.p), bw + img.width) - img.width), Math.round(skyTop * s.yFrac));
+    }
+    farTiled(sctx, tint(a.silhouette), STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, bw, snap, false);
+    farTiled(sctx, tint(a.cloudBank), STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - a.cloudBank.height, bw, snap, true);
+    const period = Math.max(STACK.cumulus.period, bw + 400);
+    for (const s of CUMULUS) {
+      const img = tint(a.cumulus[s.i]!);
+      const x = mod(drift(s, STACK.cumulus.p), period) - img.width;
+      if (x < bw) sctx.drawImage(img, snap(x), Math.round(skyTop * s.yFrac));
+    }
+    sctx.restore();
   }
 
   draw(ctx: CanvasRenderingContext2D, f: Frame): void {
-    const { t, X, camLeft, sx, F, bw, bh, now } = f;
+    const { t, camLeft, sx, F, bw, bh, now } = f;
     const a = this.a;
     const c = this.city;
     const nt = this.night;
     const stepOf = (start: number) => Math.min(NIGHT_STEPS, Math.max(0, Math.floor(((t - start) / NIGHT.span) * NIGHT_STEPS)));
     const streetStep = stepOf(NIGHT.street);
     const lit = (l: Lights, range: readonly [number, number, number]) => l.at(clamp01((t - range[0]) / (range[1] - range[0])), range[2]);
-    /** A cloud (or the range) in its colours at t: the file itself through the morning. */
-    const tint = (img: Drawable) => this.tints.get(img)!.at(t);
     /** Layer-space u of the right edge of the screen when Sam is at world x — where a layer begins or ends. */
     const edgeAt = (p: number, x: number) => p * (x - sx) + bw;
     const place = (img: Drawable, p: number, u: number, bottom: number) => {
@@ -360,38 +429,14 @@ export class Level1 {
       if (x > -img.width && x < bw) ctx.drawImage(img, x, Math.round(bottom - img.height));
     };
 
-    // ── Sky: one flat colour ──────────────────────────────────────────────
-    ctx.fillStyle = f.sky;
-    ctx.fillRect(0, 0, bw, bh);
+    // The sky and the clouds are drawn on the screen canvas behind this buffer (drawFar); the buffer
+    // starts transparent so they show through wherever nothing nearer covers them.
+    ctx.clearRect(0, 0, bw, bh);
 
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, bw, F);
     ctx.clip();
-
-    // ── Clouds at every height: small and high, medium, the bank above the hills, big lobes mid sky ──
-    const skyTop = Math.max(40, F - 300);
-    for (const s of SMALL) {
-      const img = tint(a.small[s.i]!);
-      const span = bw + img.width;
-      const u = s.u + s.drift * (now / 1000) - STACK.small.p * camLeft;
-      ctx.drawImage(img, Math.round(mod(u, span) - img.width), Math.round(skyTop * s.yFrac));
-    }
-    for (const s of MEDIUM) {
-      const img = tint(a.medium[s.i]!);
-      const span = bw + img.width;
-      const u = s.u + s.drift * (now / 1000) - STACK.medium.p * camLeft;
-      ctx.drawImage(img, Math.round(mod(u, span) - img.width), Math.round(skyTop * s.yFrac));
-    }
-    drawTiled(ctx, tint(a.silhouette), STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, bw);
-    drawTiled(ctx, tint(a.cloudBank), STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - a.cloudBank.height, bw, { mirror: true });
-    const period = Math.max(STACK.cumulus.period, bw + 400);
-    for (const s of CUMULUS) {
-      const img = tint(a.cumulus[s.i]!);
-      const u = s.u + s.drift * (now / 1000) - STACK.cumulus.p * camLeft;
-      const x = Math.round(mod(u, period) - img.width);
-      if (x < bw) ctx.drawImage(img, x, Math.round(skyTop * s.yFrac));
-    }
 
     // ── Hills: full saturation, plain tiling, ending at a tile boundary and scrolling off ──
     const hillsEnd = edgeAt(STACK.hills.p, SEQ.hillsEnd);

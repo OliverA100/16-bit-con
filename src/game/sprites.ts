@@ -3,7 +3,7 @@
  * other strips pass their own frame size (and a `pitch` when frames are spaced apart).
  * Drawing always uses integer coordinates and never resamples.
  */
-export type Drawable = HTMLImageElement | HTMLCanvasElement;
+export type Drawable = HTMLImageElement | HTMLCanvasElement | ImageBitmap;
 
 export interface Strip {
   image: Drawable;
@@ -19,7 +19,8 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => resolve(img);
+    // Decode off the main thread before first use, so cropping and the first draw never decode on a frame.
+    img.onload = () => img.decode().then(() => resolve(img), () => resolve(img));
     img.onerror = () => reject(new Error(`Could not load sprite ${url}`));
     img.src = url;
   });

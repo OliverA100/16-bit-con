@@ -65,3 +65,86 @@ export function board(lines: HTMLCanvasElement[], opts: { pad?: number; frame?: 
   }
   return canvas;
 }
+
+/** The 5×7 glyphs as on/off cells, read once from the small day row of the letter sheet. */
+let glyphs: Map<string, Uint8Array> | null = null;
+function glyphsOf(sheet: Drawable): Map<string, Uint8Array> {
+  if (glyphs) return glyphs;
+  const c = document.createElement('canvas');
+  c.width = CHARS.length * ROWS.small.w;
+  c.height = ROWS.small.h;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(sheet, 0, 0, c.width, c.height, 0, 0, c.width, c.height);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  glyphs = new Map();
+  [...CHARS].forEach((ch, i) => {
+    const cells = new Uint8Array(35);
+    for (let y = 0; y < 7; y++) {
+      for (let x = 0; x < 5; x++) {
+        const j = ((y + 2) * c.width + i * ROWS.small.w + x + 2) * 4;
+        cells[y * 5 + x] = d[j + 3]! > 0 && d[j]! < 64 ? 1 : 0; // Outline Black letter pixels
+      }
+    }
+    glyphs!.set(ch, cells);
+  });
+  return glyphs;
+}
+
+/**
+ * An LED board: each glyph cell is one LED, `pitch` px apart — lit LEDs Yellow 400 with
+ * a Yellow 100 highlight, unlit ones a dim Grey 700 dot — on an Outline Black board with a Grey 700
+ * inner frame. Lines are centred; one character column between letters, three for a space.
+ */
+export function ledBoard(sheet: Drawable, lines: string[], pitch = 6, pad = 2): HTMLCanvasElement {
+  const g = glyphsOf(sheet);
+  const colsOf = (s: string) => [...s].reduce((n, ch, i) => n + (ch === ' ' ? 3 : 5) + (i ? 1 : 0), 0);
+  const cols = Math.max(...lines.map(colsOf)) + 2 * pad;
+  const rows = lines.length * 7 + (lines.length - 1) * 3 + 2 * pad;
+  const frame = 3;
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * pitch + 2 * frame;
+  canvas.height = rows * pitch + 2 * frame;
+  const ctx = canvas.getContext('2d')!;
+  const tok = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const [k, g7, y4, y1] = ['--color-outline-black', '--color-grey-700', '--color-yellow-400', '--color-yellow-100'].map(tok);
+  ctx.fillStyle = k!;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = g7!;
+  ctx.fillRect(1, 1, canvas.width - 2, 1);
+  ctx.fillRect(1, canvas.height - 2, canvas.width - 2, 1);
+  ctx.fillRect(1, 1, 1, canvas.height - 2);
+  ctx.fillRect(canvas.width - 2, 1, 1, canvas.height - 2);
+  const on = new Uint8Array(cols * rows);
+  lines.forEach((line, li) => {
+    let x = pad + Math.floor((cols - 2 * pad - colsOf(line)) / 2);
+    const y0 = pad + li * 10;
+    [...line.toUpperCase()].forEach((ch, i) => {
+      if (i) x++;
+      if (ch === ' ') {
+        x += 3;
+        return;
+      }
+      const cells = g.get(ch);
+      if (cells) for (let y = 0; y < 7; y++) for (let cx = 0; cx < 5; cx++) if (cells[y * 5 + cx]) on[(y0 + y) * cols + x + cx] = 1;
+      x += 5;
+    });
+  });
+  const led = pitch - 1;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const px = frame + c * pitch;
+      const py = frame + r * pitch;
+      if (on[r * cols + c]) {
+        ctx.fillStyle = y4!;
+        ctx.fillRect(px + 1, py, led - 2, led);
+        ctx.fillRect(px, py + 1, led, led - 2);
+        ctx.fillStyle = y1!;
+        ctx.fillRect(px + 1, py + 1, 1, 1);
+      } else {
+        ctx.fillStyle = g7!;
+        ctx.fillRect(px + (led >> 1) - 1, py + (led >> 1) - 1, 2, 2);
+      }
+    }
+  }
+  return canvas;
+}
