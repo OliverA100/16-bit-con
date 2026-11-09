@@ -9,6 +9,17 @@ import Button from './Button.astro';
 import Wordmark from './Wordmark.astro';
 import { sprites } from '../data/sprites.manifest';
 import { sessions } from '../data/sessions';
+import { railStops, type RailIcon } from '../data/guide';
+
+/** Thin outline icons for the rail, 16 × 16, 2 px strokes (brand rule: outline icons with mono labels). */
+const icons: Record<RailIcon, string> = {
+  sun: '<circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13"/>',
+  city: '<path d="M2 15V6h4v9M6 15V2h5v13M11 15V8h3v7M1 15h14"/>',
+  moon: '<path d="M11 2a6 6 0 1 0 3 8A5 5 0 0 1 11 2z"/>',
+  crt: '<rect x="1" y="2" width="14" height="10"/><path d="M4 5l2 2-2 2M6 15h4M8 12v3"/>',
+  booth: '<rect x="2" y="2" width="12" height="6"/><path d="M8 8v7M5 15h6"/>',
+  ticket: '<path d="M1 4h14v3a1 1 0 0 0 0 2v3H1V9a1 1 0 0 0 0-2z"/><path d="M10 4v8" stroke-dasharray="1 1"/>',
+};
 
 const clouds = [
   { key: 'cloudB', top: '14%', dur: '170s', delay: '-60s' },
@@ -91,12 +102,36 @@ const level3 = sessions[2]!;
     <p class="eyebrow">{level3.place}</p>
   </Window>
 
-  <Window title="HUD" class="world__hud" aria-label="Coins and time">
+  <Window title="Player 1" class="world__hud" aria-label="Coins, time and level">
     <p class="world__hud-row">
       <span class="world__coin pixel" aria-hidden="true"></span>
       <span class="mono" data-hud-coins>00/12</span>
       <span class="mono world__clock" data-hud-clock>07:00 AM</span>
+      <span class="mono world__level" data-hud-level>LVL 1</span>
     </p>
+  </Window>
+
+  <Window as="nav" title="Levels" class="world__rail" aria-label="Progress">
+    <ol class="rail">
+      {
+        railStops.map((s) => (
+          <li>
+            <button type="button" class="rail__stop" data-rail={s.id} data-jump={String(s.jump)} data-state="next">
+              <svg class="rail__icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" set:html={icons[s.icon]} />
+              <span class="rail__label">{s.label}</span>
+            </button>
+          </li>
+        ))
+      }
+    </ol>
+  </Window>
+
+  <Window title="Agent Sam" class="world__sam">
+    <div class="sam-bubble">
+      <canvas class="sam-bubble__portrait pixel" width="46" height="49" aria-hidden="true" data-sam-portrait></canvas>
+      <p class="mono sam-bubble__text" aria-hidden="true" data-sam-typed></p>
+      <p class="sr-only" aria-live="polite" data-sam-said></p>
+    </div>
   </Window>
 
   <p class="eyebrow world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
@@ -352,6 +387,8 @@ const level3 = sessions[2]!;
   .world__hud,
   .world__hint,
   .world__prompt,
+  .world__rail,
+  .world__sam,
   .world__loading {
     position: absolute;
     z-index: 3;
@@ -361,7 +398,9 @@ const level3 = sessions[2]!;
   .world--live .world__session,
   .world--live .world__hud,
   .world--live .world__hint,
-  .world--live .world__prompt {
+  .world--live .world__prompt,
+  .world--live .world__rail,
+  .world--live .world__sam {
     display: block;
     opacity: 0;
     transform: translateY(-8px);
@@ -422,9 +461,152 @@ const level3 = sessions[2]!;
     pointer-events: auto;
   }
 
-  .world--live :is(.world__session, .world__hud, .world__hint, .world__prompt).is-visible {
+  .world--live :is(.world__session, .world__hud, .world__hint, .world__prompt, .world__rail, .world__sam).is-visible {
     opacity: 1;
     transform: none;
+  }
+
+  /* Hidden overlays take no clicks or focus. */
+  .world--live :is(.world__rail, .world__sam):not(.is-visible) {
+    visibility: hidden;
+  }
+
+  /* ── Progress rail: a Levels window on the left edge, one stop per level, the current
+        one lit in Florets Yellow; a click jumps the world there with no smear. Phones show the level
+        in the HUD instead. ── */
+  .world__rail {
+    top: 50%;
+    left: var(--gutter);
+    translate: 0 -50%;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .world__rail :global(.window__body) {
+    padding: var(--space-1);
+  }
+
+  .rail {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rail__stop {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--space-8);
+    padding: 0 var(--space-2);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-mono);
+    text-transform: uppercase;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .rail__icon {
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+  }
+
+  .rail__stop[data-state='next'] {
+    color: var(--text-subtle);
+  }
+
+  .rail__stop[data-state='current'] {
+    background: var(--accent);
+    border-color: var(--outline);
+  }
+
+  .rail__stop[data-state='current'] .rail__label::before {
+    content: '▸ ';
+  }
+
+  .rail__stop:hover {
+    color: var(--text);
+    border-color: var(--outline);
+    background: var(--surface-raised);
+  }
+
+  .rail__stop[data-state='current']:hover {
+    background: var(--accent);
+  }
+
+  .world__level {
+    display: none;
+    padding-left: var(--space-2);
+    border-left: var(--border);
+  }
+
+  @media (max-width: 48rem) {
+    .world--live .world__rail {
+      display: none;
+    }
+
+    .world__level {
+      display: inline;
+    }
+  }
+
+  /* ── Agent Sam: small and sticky in a corner — top right under the HUD on wide
+        screens, above the controls on narrow ones — with his portrait at 2:1 and typewriter mono text. ── */
+  .world__sam {
+    top: calc(var(--nav-h) + var(--space-4) + 4.5rem + var(--space-3));
+    right: var(--gutter);
+    width: min(22rem, calc(100% - 2 * var(--gutter)));
+    text-align: left;
+    pointer-events: none;
+  }
+
+  .sam-bubble {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .sam-bubble__portrait {
+    flex: none;
+    width: 92px;
+    height: 98px;
+    border: var(--border);
+    background: var(--color-blue-100);
+  }
+
+  .sam-bubble__text {
+    min-height: 3lh;
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
+  }
+
+  @media (max-width: 48rem) {
+    .world__sam {
+      top: auto;
+      left: var(--gutter);
+      right: var(--gutter);
+      bottom: calc(76px * var(--px) + 120px);
+      width: auto;
+    }
+  }
+
+  @media (max-width: 40rem) {
+
+    .sam-bubble__portrait {
+      width: 46px;
+      height: 49px;
+    }
   }
 
   /* ── The breakout: a CRT bezel over the canvas, its opacity a function of t set by
@@ -598,6 +780,11 @@ const level3 = sessions[2]!;
 
     .world__dpad-arm--left {
       left: 0;
+    }
+
+    /* Pressed: a flat Green 900 shade over the arm (no filter on the art). */
+    .world__dpad-arm.is-held {
+      background: color-mix(in srgb, var(--color-green-900) 28%, transparent);
     }
 
     .world__dpad-arm--right {

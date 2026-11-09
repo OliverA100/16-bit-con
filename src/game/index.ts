@@ -23,6 +23,10 @@ import { Arrival } from './arrival';
 import { AUTO_IDLE_MS, AUTO_SPEED, BREAK, CRACK_STAGES, Dissolve, bezelAt, crackStage, dissolveLevel, drawCracks, flightAt, impactPoint, mashTarget, promptOn } from './breakout';
 import { skyAt } from './stages';
 import { GROUND_BAND } from '../data/layers';
+import { levelLabel, railStops, samLines, type SamLine } from '../data/guide';
+import { sprites } from '../data/sprites.manifest';
+import { loadImage } from './sprites';
+import { remap, SAM_BRAND_MAP } from './palette';
 
 const W = 6000;
 /** The whole run: the field, the city, the night, the breakout and the arrival at Booth 630 (world x 0–6000). */
@@ -55,6 +59,13 @@ interface Overlay {
   hint: HTMLElement | null;
   prompt: HTMLElement | null;
   promptTitle: HTMLElement | null;
+  rail: HTMLElement | null;
+  railStops: HTMLButtonElement[];
+  sam: HTMLElement | null;
+  samTyped: HTMLElement | null;
+  samSaid: HTMLElement | null;
+  samPortrait: HTMLCanvasElement | null;
+  hudLevel: HTMLElement | null;
   loading: HTMLElement | null;
   loadingText: HTMLElement | null;
   dpadLeft: HTMLElement | null;
@@ -78,6 +89,13 @@ function query(section: HTMLElement): Overlay {
     hint: q('.world__hint'),
     prompt: q('.world__prompt'),
     promptTitle: q('.world__prompt .window__title'),
+    rail: q('.world__rail'),
+    railStops: [...section.querySelectorAll<HTMLButtonElement>('[data-rail]')],
+    sam: q('.world__sam'),
+    samTyped: q('[data-sam-typed]'),
+    samSaid: q('[data-sam-said]'),
+    samPortrait: q<HTMLCanvasElement>('[data-sam-portrait]'),
+    hudLevel: q('[data-hud-level]'),
     loading: q('.world__loading'),
     loadingText: q('[data-loading-text]'),
     dpadLeft: q('[data-dpad="left"]'),
@@ -228,6 +246,36 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     },
     { passive: true },
   );
+
+  // ── Progress rail: a click jumps the world (or the page, for Register) with no smear ──
+  for (const btn of o.railStops) {
+    btn.addEventListener('click', () => {
+      const jump = btn.dataset.jump!;
+      if (jump === 'register') {
+        document.getElementById('register')?.scrollIntoView({ behavior: 'instant', block: 'start' });
+        return;
+      }
+      const t = Number(jump);
+      motion.cancel();
+      window.scrollTo({ top: Math.round(trigger.start + t * D1), behavior: 'instant' });
+      expectedY = window.scrollY;
+      timeline.jumpTo(t);
+    });
+  }
+  let railCurrent = '';
+
+  // ── Agent Sam: his portrait with the brand goggles, and the line for the current stretch, typed out ──
+  if (o.samPortrait) {
+    const pctx = o.samPortrait.getContext('2d')!;
+    loadImage(sprites.samPortrait.file)
+      .then((img) => pctx.drawImage(remap(img, SAM_BRAND_MAP), 0, 0))
+      .catch(() => {});
+  }
+  let samLine: SamLine | null = null;
+  let samSince = 0;
+  let samShown = -1;
+  /** Typewriter pace: one character per this many ms. */
+  const TYPE_MS = 32;
 
   // ── HUD wiring, and the Player 1 bonus in the Arrival section at 12/12 ──
   const bonus = document.getElementById('bonus');
@@ -381,6 +429,41 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         el.classList.toggle('is-visible', level === '1' ? t >= 0.08 && t < 0.34 : level === '2' ? t >= 0.36 && t < 0.6 : level === '3' ? t >= 0.62 && t < 0.83 : false);
       }
       o.hint?.classList.toggle('is-visible', t > 0.005 && t < 0.14);
+      // The rail: each stop done, current or next by t.
+      o.rail?.classList.toggle('is-visible', t >= 0.06);
+      const current = railStops.find((s) => t >= s.from && t < s.to)?.id ?? '';
+      if (current !== railCurrent) {
+        railCurrent = current;
+        let passed = true;
+        for (const btn of o.railStops) {
+          const isCurrent = btn.dataset.rail === current;
+          if (isCurrent) passed = false;
+          btn.dataset.state = isCurrent ? 'current' : passed ? 'done' : 'next';
+          if (isCurrent) btn.setAttribute('aria-current', 'step');
+          else btn.removeAttribute('aria-current');
+        }
+      }
+      if (o.hudLevel) {
+        const lvl = levelLabel(t);
+        if (o.hudLevel.textContent !== lvl) o.hudLevel.textContent = lvl;
+      }
+      // Agent Sam: the line for this stretch types out once it starts; screen readers get it whole.
+      const line = samLines.find((l) => t >= l.from && t < l.to) ?? null;
+      if (line !== samLine) {
+        samLine = line;
+        samSince = now;
+        samShown = -1;
+        if (o.samSaid) o.samSaid.textContent = line?.text ?? '';
+        o.sam?.classList.toggle('is-visible', !!line);
+      }
+      if (samLine && o.samTyped) {
+        const n = Math.min(samLine.text.length, Math.floor((now - samSince) / TYPE_MS));
+        if (n !== samShown) {
+          samShown = n;
+          o.samTyped.textContent = samLine.text.slice(0, n) + (n < samLine.text.length ? '▌' : '');
+        }
+      }
+
       // The breakout's DOM: the bezel's opacity and the MASH prompt, both functions of t.
       section.style.setProperty('--bezel', bezelAt(t).toFixed(3));
       o.prompt?.classList.toggle('is-visible', promptOn(t));

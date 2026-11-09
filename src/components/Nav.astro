@@ -56,11 +56,15 @@ import Wordmark from './Wordmark.astro';
   }
 
   .nav__links a {
+    display: inline-block;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid transparent;
     text-decoration: none;
   }
 
   .nav__links a:hover {
-    text-decoration: underline;
+    background: var(--accent);
+    border-color: var(--outline);
   }
 
   @media (max-width: 40rem) {

@@ -53,9 +53,11 @@ export class Input {
         e.preventDefault();
         capture(el, e.pointerId);
         this.dpadDir = dir;
+        el.classList.add('is-held');
       };
       const off = () => {
         if (this.dpadDir === dir) this.dpadDir = 0;
+        el.classList.remove('is-held');
       };
       el.addEventListener('pointerdown', on);
       el.addEventListener('pointerup', off);
