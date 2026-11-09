@@ -7,7 +7,7 @@
  */
 import { sprites } from '../data/sprites.manifest';
 import { loadImage, makeStrip, type Drawable, type Strip } from './sprites';
-import { cropImage, dominantColor, patchTileSeam, readToken, snapToPalette } from './palette';
+import { cropImage, dominantColor, patchTileSeam, remap, snapToPalette, type ColorMap } from './palette';
 import { loadSamSheets, type SamSheets } from './sam';
 
 export interface Level1Assets {
@@ -38,8 +38,10 @@ export interface Level1Assets {
   dirtRows: Drawable;
   /** The edge band's flat tone under those rows (the strip's own darkest dirt row). */
   dirt: string;
-  /** The 28 px fill below the edge band: a deeper dirt tone (token, sampled from tile-grass-dirt). */
-  dirtDeep: string;
+  /** The 28 px fill below the edge band: NEW dirt-fill tile (deep dirt, a darker top line, a sparse scatter). */
+  dirtFill: Drawable;
+  /** The clouds again with their shading stepped to Blue 300 for the pale afternoon sky. */
+  afternoon: { small: Drawable[]; medium: Drawable[]; cumulus: Drawable[]; cloudBank: Drawable };
   daisyTiny: Drawable;
 }
 
@@ -54,8 +56,9 @@ export interface CityAssets {
   sidewalk: Drawable;
   kerb: Drawable;
   road: Drawable;
-  /** NEW art: the overlay that covers the three staggered seams. */
+  /** NEW art: the seam details and the far-horizon Javits. */
   seam: Drawable;
+  javits: Drawable;
   subway: Drawable;
   arcade: Drawable;
   plant: Drawable;
@@ -67,6 +70,8 @@ export interface CityAssets {
 }
 
 /** Whole lobes of big-cloud.png (x, y, w, h), chosen where each lobe's own edges end. */
+/** Afternoon shading: the clouds' two blue shades step to Blue 300 / Blue 500 (exact remaps, the files untouched). */
+const CLOUD_AFTERNOON: ColorMap = { '#C8E2F2': '#8DCAFF', '#B9DEF1': '#8DCAFF', '#B6C8DD': '#5DB3FF' };
 const CUMULUS_LOBES: [number, number, number, number][] = [
   [292, 0, 187, 67],
   [486, 20, 281, 61],
@@ -110,6 +115,7 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     sprites.tree,
     sprites.daisyRow,
     sprites.daisyTinyA,
+    sprites.dirtFill,
   ];
   const total = files.length + 4;
   const [sam, imgs] = await Promise.all([
@@ -119,17 +125,22 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     }),
     loadAll(files, onProgress, 4),
   ]);
-  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, daisyRaw, daisyTiny] =
+  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, daisyRaw, daisyTiny, dirtFill] =
     imgs as [HTMLImageElement, ...HTMLImageElement[]];
   const snapped = snapToPalette(daisyRaw!, 16);
   const hillsPatched = patchTileSeam(hills!);
+  const small = [cloudF!, cloudG!, cloudH!, cloudFaint!];
+  const medium = [cloudA!, cloudB!, cloudD!];
+  const cumulus = CUMULUS_LOBES.map(([x, y, w, h]) => cropImage(bigCloud!, x, y, w, h));
+  const pm = (img: Drawable) => remap(img, CLOUD_AFTERNOON);
   return {
     sam,
     coin: makeStrip(coin, sprites.coin.fw, sprites.coin.fh, sprites.coin.pitch),
-    small: [cloudF!, cloudG!, cloudH!, cloudFaint!],
-    medium: [cloudA!, cloudB!, cloudD!],
-    cumulus: CUMULUS_LOBES.map(([x, y, w, h]) => cropImage(bigCloud!, x, y, w, h)),
+    small,
+    medium,
+    cumulus,
     cloudBank: cloudBank!,
+    afternoon: { small: small.map(pm), medium: medium.map(pm), cumulus: cumulus.map(pm), cloudBank: pm(cloudBank!) },
     silhouette: silhouette!,
     hills: hillsPatched,
     plain: cropImage(hillsPatched, 0, PLAIN_TOP, hillsPatched.width, hillsPatched.height - PLAIN_TOP),
@@ -139,7 +150,7 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     daisySurface: cropImage(snapped, 0, 0, snapped.width, DAISY_SURFACE_ROWS),
     dirtRows: cropImage(snapped, 0, DAISY_DIRT.top, snapped.width, DAISY_DIRT.rows),
     dirt: dominantColor(snapped, 0, DAISY_FILL_ROW, snapped.width, 1),
-    dirtDeep: readToken('--color-field-dirt-deep'),
+    dirtFill: dirtFill!,
     daisyTiny: daisyTiny!,
   };
 }
@@ -162,8 +173,9 @@ export async function loadCity(): Promise<CityAssets> {
     sprites.moleTyping,
     sprites.dogWalk,
     sprites.seamFieldStreet,
+    sprites.javitsSilhouette,
   ];
-  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam] = await loadAll(files);
+  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits] = await loadAll(files);
   const strip = (img: HTMLImageElement | undefined) => makeStrip(img!, 60, 60);
   return {
     far: cropImage(far!, 0, 0, far!.width, CITY_FAR_ROWS),
@@ -175,6 +187,7 @@ export async function loadCity(): Promise<CityAssets> {
     kerb: cropImage(sidewalk!, 0, STREET.kerbTop, sidewalk!.width, STREET.kerbRows),
     road: cropImage(road!, 0, STREET.roadTop, road!.width, STREET.roadRows),
     seam: seam!,
+    javits: javits!,
     subway: subway!,
     arcade: arcade!,
     plant: plant!,

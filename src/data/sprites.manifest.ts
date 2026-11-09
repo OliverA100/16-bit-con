@@ -86,6 +86,8 @@ export const sprites = {
   dogBark: { file: '/sprites/npc/dog-bark.png', w: 300, h: 60, frames: 5, fw: 60, fh: 60, scale: 'world' },
 
   // ── New art ──────────────────────────────────────────────────────────────────
+  dirtFill: { file: '/sprites/new/dirt-fill_256x28.png', w: 256, h: 28, period: 256, parallax: 1, scale: 'world', note: 'NEW: the 28 px dirt fill — deep dirt, a 1 px darker top line, a sparse scatter of the daisy row\'s dirt tones at the road\'s speck density' },
+  javitsSilhouette: { file: '/sprites/new/javits-silhouette_320x96.png', w: 320, h: 96, parallax: 0.2, scale: 'world', note: 'NEW: the far-horizon Javits, Grey 700 glass with a Grey 500 space frame and an Outline Black edge; sits on the city-far base line' },
   seamFieldStreet: { file: '/sprites/new/seam-field-street_72x52.png', w: 72, h: 52, scale: 'world', note: 'NEW: the seam details only — tufts after X0, a lighter kerb end-stone at X0+28, dirt pixels after X0+56; F at row 4, X0 at x 8' },
 
   // ── CMS illustrations: DOM only ─────────────────────────────────────────────

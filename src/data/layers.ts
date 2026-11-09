@@ -21,12 +21,13 @@ export type SkyStage = 'dawn' | 'morning' | 'afternoon' | 'golden' | 'dusk' | 'n
 /**
  * One flat sky colour per palette stage: no bands, no gradients — depth in the
  * sky comes from clouds. A stage change swaps the colour; the world layers then step their
- * own palettes far → near. Day is Blue 300 from the title through the afternoon.
+ * own palettes far → near. Morning is Blue 300; the afternoon pales to Blue 100 and the clouds'
+ * shading steps to Blue 300 behind it (bank, lobes, small clouds), farthest first.
  */
 export const skyColors: Record<SkyStage, string> = {
   dawn: '--color-blue-300',
   morning: '--color-blue-300',
-  afternoon: '--color-blue-300',
+  afternoon: '--color-blue-100',
   golden: '--color-yellow-200',
   dusk: '--color-blue-900',
   night: '--color-green-900',

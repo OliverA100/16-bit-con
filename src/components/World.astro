@@ -273,7 +273,9 @@ const level2 = sessions[1]!;
     height: calc(48px * var(--px));
     background:
       linear-gradient(var(--color-field-dirt), var(--color-field-dirt)) 0 calc(8px * var(--px)) / 100% calc(12px * var(--px)) no-repeat,
+      url('/sprites/new/dirt-fill_256x28.png') calc(30% + 492px * var(--px)) calc(20px * var(--px)) / calc(256px * var(--px)) calc(28px * var(--px)) repeat-x,
       var(--color-field-dirt-deep);
+    image-rendering: pixelated;
   }
 
   .hero__ground::before {

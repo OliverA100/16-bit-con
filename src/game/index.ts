@@ -22,8 +22,8 @@ import { resolveSky, stageAt } from './stages';
 import { GROUND_BAND, type SkyStage } from '../data/layers';
 
 const W = 6000;
-/** The gate build exposes the field and the walk into town (world x 0–2700). */
-const T_MAX = 0.45;
+/** Levels 1 and 2 are exposed: the field, the walk into town and the afternoon street (world x 0–3480). */
+const T_MAX = 0.58;
 const X_MAX = T_MAX * W;
 /** A scroll we did not cause suspends keys for this long. */
 const SCROLL_OVERRIDE_MS = 150;
@@ -276,7 +276,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
     if (input.active) {
       const sky = skyFor(stageAt(timeline.t));
-      level.draw(bctx, { X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, now, sky, sam, samX: X, coins, dust });
+      level.draw(bctx, { t: timeline.t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, now, sky, sam, samX: X, coins, dust });
       sctx.clearRect(0, 0, o.canvas.width, o.canvas.height);
       sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
 

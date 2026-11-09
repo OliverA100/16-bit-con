@@ -13,6 +13,8 @@ import type { Coins } from './coins';
 import type { Dust } from './dust';
 
 export interface Frame {
+  /** Timeline position, for the palette steps. */
+  t: number;
   X: number;
   camLeft: number;
   /** Sam's screen x (the camera's left margin), buffer px. */
@@ -60,13 +62,20 @@ export const STACK = {
   cumulus: { p: 0.07, period: 2000 },
   hills: { p: 0.1, bottom: 6 },
   cityFar: { p: 0.2, bottom: -94 }, // its low-rise base ends behind the plain
-  towers: { p: 0.35, bottom: -1 }, // standing on the ground; the plain hides their feet
+  towers: { p: 0.35, bottom: -1, period: 2304 }, // standing on the ground; the plain hides their feet
   plain: { p: 0.38, top: -100 }, // the hills' flat field in front of the far city and the towers, covering where their art ends
-  cityMid: { p: 0.5, bottom: -1 },
+  cityMid: { p: 0.5, bottom: -1, period: 1151 },
   /** Both hedges sit 20 px into the ground so their dark base is under the grass; only the bushes show. */
   midHedge: { p: 0.45, bottom: 20, treeBottom: 1 },
-  cityNear: { p: 0.75, bottom: 2, leadColumn: 294 },
-  cityMidLead: 104,
+  /**
+   * The near fronts lead with the tall building at column 1063 and, 328 px later, open for 264 px
+   * where the low buildings would be (columns 239–503 of the next tile, both roofline steps):
+   * a park with a view down the avenue. The mid and tower openings and the Javits silhouette are
+   * aligned to it, so that is where the destination is first seen.
+   */
+  cityNear: { p: 0.75, bottom: 2, leadColumn: 1063, gapFrom: 328, gapTo: 592 },
+  /** Javits at the towers' depth, its base on the far city's line: hidden behind the arriving fronts until the opening shows it between the flanking towers. */
+  javits: { p: 0.35 },
   near: { hedgeBottom: 20, bottom: 2, treeBottom: 3 },
   /**
    * The ground band is 48 px, identical in field and city: surface 8 px from F (grass tips and
@@ -83,6 +92,11 @@ interface Seed {
   yFrac: number;
   drift: number;
 }
+/**
+ * The afternoon arrives as flat palette steps, farthest first: the sky at t 0.34 (stageAt), then
+ * the cloud bank's shading, the big lobes, the small and medium clouds. Reverse steps back.
+ */
+const AFTERNOON_STEPS = { bank: 0.36, cumulus: 0.38, small: 0.4 } as const;
 const SMALL: Seed[] = [
   { i: 0, u: 60, yFrac: 0.05, drift: 1.4 },
   { i: 1, u: 420, yFrac: 0.15, drift: 1 },
@@ -112,7 +126,46 @@ const ARCADES = [2620, 3420];
 const NPCS = { molePhone: 2380, moleCoffee: 2680, moleTyping: 3230 } as const;
 /** The dog patrols the sidewalk on its own clock, independent of Sam: world px and px/s. */
 const DOG = { from: 2700, to: 3100, speed: 28, stride: 8 } as const;
-const POSTER_U = 420; // on the near fronts, in that layer's space
+const POSTER_U = 140; // on the leading near building, in that layer's space
+
+/** Where the mid fronts and the towers can be cut cleanly: roofline steps, and fully transparent columns. */
+const MID_EDGES = [104, 117, 152, 283, 331, 352, 518, 525, 531, 556, 582, 705, 728, 797, 919, 936, 979, 1048, 1078, 1091];
+const MID_GAPS: [number, number][] = [
+  [283, 556],
+  [705, 797],
+  [518, 728],
+];
+const TOWER_CLEAR: [number, number][] = [
+  [0, 14], [163, 183], [311, 314], [442, 460], [606, 615], [743, 783], [911, 920], [1008, 1030],
+  [1154, 1166], [1315, 1335], [1463, 1466], [1594, 1612], [1758, 1767], [1895, 1935], [2063, 2072], [2160, 2182],
+];
+const TOWER_GAPS: [number, number][] = [
+  [615, 911], [1030, 1315], [1335, 1594], [1612, 1895], [314, 606], [460, 743], [183, 442], [783, 1008], [920, 1154],
+];
+
+/**
+ * Choose a tile phase for a layer so that one of its candidate openings is centred at `centreU`
+ * while its leading edge (at `begin`) falls on a clean column — a roofline step for the mid
+ * fronts, a transparent column for the towers. Pure function of the geometry.
+ */
+function alignOpening(
+  period: number,
+  begin: number,
+  centreU: number,
+  gaps: [number, number][],
+  clean: (col: number) => number,
+): { phase: number; gapL: number; gapR: number } {
+  let best = { phase: 0, gapL: 0, gapR: 0, score: Infinity };
+  for (const [g0, g1] of gaps) {
+    const phase = centreU - (g0 + g1) / 2;
+    const lead = mod(begin - phase, period);
+    const score = clean(lead);
+    if (score < best.score) best = { phase, gapL: phase + g0, gapR: phase + g1, score };
+  }
+  return best;
+}
+const nearestEdge = (col: number) => Math.min(...MID_EDGES.map((e) => Math.abs(e - col)));
+const insideClear = (col: number) => Math.min(...TOWER_CLEAR.map(([a, b]) => (col >= a && col <= b ? 0 : Math.min(Math.abs(col - a), Math.abs(col - b)))));
 
 function drawTiled(
   ctx: CanvasRenderingContext2D,
@@ -160,9 +213,14 @@ export class Level1 {
   constructor(private readonly a: Level1Assets) {}
 
   draw(ctx: CanvasRenderingContext2D, f: Frame): void {
-    const { X, camLeft, sx, F, bw, bh, now } = f;
+    const { t, X, camLeft, sx, F, bw, bh, now } = f;
     const a = this.a;
     const c = this.city;
+    const pm = a.afternoon;
+    const small = t >= AFTERNOON_STEPS.small ? pm.small : a.small;
+    const medium = t >= AFTERNOON_STEPS.small ? pm.medium : a.medium;
+    const cumulus = t >= AFTERNOON_STEPS.cumulus ? pm.cumulus : a.cumulus;
+    const cloudBank = t >= AFTERNOON_STEPS.bank ? pm.cloudBank : a.cloudBank;
     /** Layer-space u of the right edge of the screen when Sam is at world x — where a layer begins or ends. */
     const edgeAt = (p: number, x: number) => p * (x - sx) + bw;
     const place = (img: Drawable, p: number, u: number, bottom: number) => {
@@ -182,22 +240,22 @@ export class Level1 {
     // ── Clouds at every height: small and high, medium, the bank above the hills, big lobes mid sky ──
     const skyTop = Math.max(40, F - 300);
     for (const s of SMALL) {
-      const img = a.small[s.i]!;
+      const img = small[s.i]!;
       const span = bw + img.width;
       const u = s.u + s.drift * (now / 1000) - STACK.small.p * camLeft;
       ctx.drawImage(img, Math.round(mod(u, span) - img.width), Math.round(skyTop * s.yFrac));
     }
     for (const s of MEDIUM) {
-      const img = a.medium[s.i]!;
+      const img = medium[s.i]!;
       const span = bw + img.width;
       const u = s.u + s.drift * (now / 1000) - STACK.medium.p * camLeft;
       ctx.drawImage(img, Math.round(mod(u, span) - img.width), Math.round(skyTop * s.yFrac));
     }
     drawTiled(ctx, a.silhouette, STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, bw);
-    drawTiled(ctx, a.cloudBank, STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - a.cloudBank.height, bw, { mirror: true });
+    drawTiled(ctx, cloudBank, STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - cloudBank.height, bw, { mirror: true });
     const period = Math.max(STACK.cumulus.period, bw + 400);
     for (const s of CUMULUS) {
-      const img = a.cumulus[s.i]!;
+      const img = cumulus[s.i]!;
       const u = s.u + s.drift * (now / 1000) - STACK.cumulus.p * camLeft;
       const x = Math.round(mod(u, period) - img.width);
       if (x < bw) ctx.drawImage(img, x, Math.round(skyTop * s.yFrac));
@@ -209,11 +267,20 @@ export class Level1 {
 
     // ── The far city and the towers scroll in on the horizon, each at its own speed; the plain in
     //    front of them hides where their art ends ──
+    // The opening in the near fronts, as the world x at which it is centred on screen; the other
+    // layers' openings and the silhouette line up with it (all solved per device from the geometry).
+    const nearBegin = edgeAt(STACK.cityNear.p, SEQ.nearBegin);
+    const Xgap = sx + (nearBegin + (STACK.cityNear.gapFrom + STACK.cityNear.gapTo) / 2 - bw / 2) / STACK.cityNear.p;
+    const centreAt = (p: number) => p * (Xgap - sx) + bw / 2;
     if (c) {
       const farBegin = edgeAt(STACK.cityFar.p, SEQ.farBegin);
       drawTiled(ctx, c.far, STACK.cityFar.p * camLeft, F + STACK.cityFar.bottom - c.far.height, bw, { mirror: true, from: farBegin, phase: farBegin });
+      place(c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
       const towersBegin = edgeAt(STACK.towers.p, SEQ.towersBegin);
-      drawTiled(ctx, c.towers, STACK.towers.p * camLeft, F + STACK.towers.bottom - c.towers.height, bw, { mirror: true, from: towersBegin, phase: towersBegin });
+      const tw = alignOpening(STACK.towers.period, towersBegin, centreAt(STACK.towers.p), TOWER_GAPS, insideClear);
+      const towersY = F + STACK.towers.bottom - c.towers.height;
+      drawTiled(ctx, c.towers, STACK.towers.p * camLeft, towersY, bw, { from: towersBegin, to: tw.gapL, phase: tw.phase });
+      drawTiled(ctx, c.towers, STACK.towers.p * camLeft, towersY, bw, { from: Math.max(towersBegin, tw.gapR), phase: tw.phase });
     }
     drawTiled(ctx, a.plain, STACK.plain.p * camLeft, F + STACK.plain.top, bw);
 
@@ -225,9 +292,14 @@ export class Level1 {
 
     if (c) {
       const midBegin = edgeAt(STACK.cityMid.p, SEQ.cityMidBegin);
-      drawTiled(ctx, c.mid, STACK.cityMid.p * camLeft, F + STACK.cityMid.bottom - c.mid.height, bw, { from: midBegin, phase: midBegin - STACK.cityMidLead });
-      const nearBegin = edgeAt(STACK.cityNear.p, SEQ.nearBegin);
-      drawTiled(ctx, c.near, STACK.cityNear.p * camLeft, F + STACK.cityNear.bottom - c.near.height, bw, { from: nearBegin, phase: nearBegin - STACK.cityNear.leadColumn });
+      const md = alignOpening(STACK.cityMid.period, midBegin, centreAt(STACK.cityMid.p), MID_GAPS, nearestEdge);
+      const midY = F + STACK.cityMid.bottom - c.mid.height;
+      drawTiled(ctx, c.mid, STACK.cityMid.p * camLeft, midY, bw, { from: midBegin, to: md.gapL, phase: md.phase });
+      drawTiled(ctx, c.mid, STACK.cityMid.p * camLeft, midY, bw, { from: Math.max(midBegin, md.gapR), phase: md.phase });
+      const nearPhase = nearBegin - STACK.cityNear.leadColumn;
+      const nearY = F + STACK.cityNear.bottom - c.near.height;
+      drawTiled(ctx, c.near, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
+      drawTiled(ctx, c.near, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
       place(c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
     }
     ctx.restore();
@@ -242,15 +314,11 @@ export class Level1 {
     const seamEdge = SEQ.seam + g.seamStep;
     const seamFill = SEQ.seam + 2 * g.seamStep;
     const edgeX = Math.min(bw, Math.round(seamEdge - camLeft));
-    const fillX = Math.min(bw, Math.round(seamFill - camLeft));
     if (edgeX > 0) {
       ctx.fillStyle = a.dirt;
       ctx.fillRect(0, F + g.edgeTop, edgeX, g.fillTop - g.edgeTop);
     }
-    if (fillX > 0) {
-      ctx.fillStyle = a.dirtDeep;
-      ctx.fillRect(0, F + g.fillTop, fillX, bh - F - g.fillTop);
-    }
+    drawTiled(ctx, a.dirtFill, camLeft, F + g.fillTop, bw, { to: seamFill, phase: g.daisyPhase });
     drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, bw, { to: seamEdge, phase: g.daisyPhase });
     drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, bw, { to: SEQ.seam, phase: g.daisyPhase });
     if (c) {
