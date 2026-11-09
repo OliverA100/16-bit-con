@@ -1,0 +1,545 @@
+---
+/**
+ * World — the hero and, when JS runs, the canvas world pinned over it (Phase 3).
+ * Markup is the static hero (six sky rows, Sam, grass tile); with `world--live` the canvas
+ * paints bands, clouds, ground and Sam itself and the rows become transparent overlays.
+ */
+import Window from './Window.astro';
+import Button from './Button.astro';
+import Wordmark from './Wordmark.astro';
+import { sprites } from '../data/sprites.manifest';
+import { sessions } from '../data/sessions';
+
+const clouds = [
+  { key: 'cloudB', top: '14%', dur: '170s', delay: '-60s' },
+  { key: 'cloudD', top: '30%', dur: '210s', delay: '-150s' },
+  { key: 'cloudA', top: '8%', dur: '140s', delay: '-20s' },
+  { key: 'cloudG', top: '46%', dur: '120s', delay: '-90s' },
+  { key: 'cloudF', top: '58%', dur: '190s', delay: '-130s' },
+] as const;
+
+const level1 = sessions[0]!;
+const level2 = sessions[1]!;
+---
+
+<section class="hero world" id="world" aria-labelledby="hero-title" data-world>
+  <canvas class="world__canvas pixel" aria-hidden="true"></canvas>
+
+  <div class="hero__clouds" aria-hidden="true">
+    {
+      clouds.map((c, i) => {
+        const s = sprites[c.key];
+        return (
+          <img
+            class="hero__cloud pixel"
+            src={s.file}
+            width={s.w}
+            height={s.h}
+            alt=""
+            style={`--w: ${s.w}px; --i: ${i}; top: ${c.top}; --dur: ${c.dur}; --delay: ${c.delay};`}
+          />
+        );
+      })
+    }
+  </div>
+
+  <div class="hero__row hero__row--nav" aria-hidden="true"></div>
+
+  <div class="hero__row hero__row--copy">
+    <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
+    <Wordmark as="h1" size="hero" id="hero-title" />
+    <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
+  </div>
+
+  <div class="hero__row hero__row--gap" aria-hidden="true"></div>
+
+  <div class="hero__row hero__row--window">
+    <Window title="PRESS START" id="press-start" class="hero__window">
+      <div class="hero__actions">
+        <Button href="#register">Register now</Button>
+        <Button href="#booth" variant="ghost">Find us at Booth 630</Button>
+      </div>
+      <p class="eyebrow hero__hint">Insert coin · 3 levels · 1 after party · Booth 630</p>
+    </Window>
+  </div>
+
+  <div class="hero__row hero__row--gap2" aria-hidden="true"></div>
+
+  <div class="hero__row hero__row--stage">
+    <canvas
+      class="hero__sam pixel"
+      id="hero-sam"
+      width="60"
+      height="60"
+      role="img"
+      aria-label="Sam, Vega's pixel-art mole, idling on a grass platform in blue ski goggles"></canvas>
+    <div class="hero__ground" aria-hidden="true"></div>
+  </div>
+
+  <!-- Live-only overlays -->
+  <Window title="Level 1 · 10:00 AM" class="world__session" data-session="1" aria-live="polite">
+    <p class="world__session-title">{level1.title}</p>
+    <p class="eyebrow">{level1.place}</p>
+  </Window>
+  <Window title="Level 2 · 2:00 PM" class="world__session" data-session="2" aria-live="polite">
+    <p class="world__session-title">{level2.title}</p>
+    <p class="eyebrow">{level2.place}</p>
+  </Window>
+
+  <Window title="HUD" class="world__hud" aria-label="Coins and time">
+    <p class="world__hud-row">
+      <span class="world__coin pixel" aria-hidden="true"></span>
+      <span class="mono" data-hud-coins>00/12</span>
+      <span class="mono world__clock" data-hud-clock>07:00 AM</span>
+    </p>
+  </Window>
+
+  <p class="eyebrow world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
+
+  <div class="world__touch" aria-hidden="true">
+    <div class="world__dpad">
+      <button type="button" class="world__dpad-arm world__dpad-arm--left" data-dpad="left" tabindex="-1"></button>
+      <button type="button" class="world__dpad-arm world__dpad-arm--right" data-dpad="right" tabindex="-1"></button>
+    </div>
+    <button type="button" class="world__a" data-button="a" tabindex="-1"></button>
+  </div>
+
+  <Window title="Loading" class="world__loading" hidden>
+    <p class="mono" data-loading-text>LOADING… 0%</p>
+  </Window>
+</section>
+
+<script>
+  import { bootWorld, shouldRunWorld } from '../game/index';
+  import { loadSamSheets } from '../game/sam';
+  import { fitPixelCanvas, worldBuffer } from '../game/scale';
+
+  const section = document.querySelector<HTMLElement>('[data-world]');
+  const heroSam = document.getElementById('hero-sam') as HTMLCanvasElement | null;
+
+  if (section && shouldRunWorld()) {
+    bootWorld(section).catch((err) => console.error('[world] boot failed, static hero stays', err));
+  } else if (heroSam) {
+    // Static fallback: Sam idles in his own small canvas (frame 0 under reduced motion).
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const fit = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const { k } = worldBuffer(window.innerWidth, window.innerHeight, dpr);
+      return fitPixelCanvas(heroSam, 60, 60, k / dpr);
+    };
+    let { k, ctx } = fit();
+    loadSamSheets()
+      .then(({ idle }) => {
+        let frame = 0;
+        let last = 0;
+        const paint = () => {
+          ctx.setTransform(k, 0, 0, k, 0, 0);
+          ctx.clearRect(0, 0, 60, 60);
+          idle.draw(ctx, frame, 0, 0);
+        };
+        paint();
+        window.addEventListener('resize', () => {
+          ({ k, ctx } = fit());
+          paint();
+        });
+        if (reduceMotion) return;
+        const tick = (now: number) => {
+          if (now - last >= 125) {
+            last = now;
+            frame = (frame + 1) % idle.frames;
+            if (!document.hidden) paint();
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      })
+      .catch((err) => console.error(err));
+  }
+</script>
+
+<style>
+  /* ── Hero: the first viewport is the flat day sky (one colour, depth from clouds), built as
+        rows so the title overlay and the canvas share one layout. Feet line F = H − 48 art px;
+        the daisy row runs under Sam from the first frame over the 48 px ground band. ── */
+  .hero {
+    --stage-h: calc(60px * var(--px));
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-rows: auto auto minmax(var(--space-8), 1fr) auto var(--space-8) var(--stage-h);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: calc(48px * var(--px));
+    overflow: clip;
+    background: var(--sky);
+    text-align: center;
+  }
+
+  .hero__row {
+    width: 100%;
+  }
+
+  .hero__row--nav {
+    height: calc(var(--nav-h) + var(--space-4));
+  }
+
+  .hero__row--copy {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-4);
+    padding: var(--space-8) var(--gutter);
+  }
+
+  .hero__row--window {
+    display: flex;
+    justify-content: center;
+    padding: 0 var(--gutter) var(--space-6);
+  }
+
+  .hero__row--stage {
+    position: relative;
+  }
+
+  .hero__row--copy > *,
+  .hero__window {
+    position: relative;
+    z-index: 2;
+  }
+
+  .hero__clouds {
+    position: absolute;
+    inset: calc(var(--nav-h) + var(--space-2)) 0 calc(140px * var(--px));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .hero__cloud {
+    position: absolute;
+    left: calc(-1 * var(--w) * var(--px));
+    width: calc(var(--w) * var(--px));
+    height: auto;
+    max-width: none;
+    animation: drift var(--dur) linear infinite;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes drift {
+    to {
+      translate: calc(100vw + var(--w) * var(--px)) 0;
+    }
+  }
+
+  .hero__eyebrow,
+  .hero__tagline {
+    color: var(--text-muted);
+  }
+
+  .hero__tagline {
+    max-width: 34rem;
+    font-size: var(--text-lg);
+  }
+
+  .hero__window {
+    width: min(100%, 34rem);
+    text-align: left;
+  }
+
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .hero__hint {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: var(--border);
+  }
+
+  .hero__sam {
+    position: absolute;
+    left: 30%;
+    bottom: calc(-5px * var(--px)); /* soles 4 px into the surface band, as in the engine (FOOT_SINK) */
+    z-index: 2;
+  }
+
+  /* The ground band, 48 px as in the engine: surface 8 (the strip's tips and fill), edge 12 (its
+     dirt rows over the dirt tone), fill 28 (the deeper dirt). Tiled with the canvas's phase. */
+  .hero__ground {
+    position: absolute;
+    inset: auto 0 calc(-1 * 48px * var(--px));
+    z-index: 1;
+    height: calc(48px * var(--px));
+    background:
+      linear-gradient(var(--color-field-dirt), var(--color-field-dirt)) 0 calc(8px * var(--px)) / 100% calc(12px * var(--px)) no-repeat,
+      var(--color-field-dirt-deep);
+  }
+
+  .hero__ground::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(34px * var(--px));
+    height: calc(61px * var(--px));
+    background: url('/sprites/world/ground-daisy-row-strip_898x63.png') calc(30% + 492px * var(--px)) top / calc(898px * var(--px)) calc(63px * var(--px)) repeat-x;
+    image-rendering: pixelated;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero__cloud {
+      animation: none;
+      translate: calc(var(--i, 1) * 22vw) 0;
+    }
+  }
+
+  /* ── Live world ── */
+  .world__canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  .world--live {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .world--live .world__canvas {
+    display: block;
+  }
+
+  .world--live .hero__row,
+  .world--live .hero__row--nav,
+  .world--live .hero__row--copy,
+  .world--live .hero__row--gap,
+  .world--live .hero__row--window,
+  .world--live .hero__row--gap2,
+  .world--live .hero__row--stage {
+    background: transparent;
+  }
+
+  .world--live .hero__clouds,
+  .world--live .hero__ground,
+  .world--live .hero__sam {
+    display: none;
+  }
+
+  .world--live .hero__row--copy,
+  .world--live .hero__row--window {
+    will-change: transform, opacity;
+  }
+
+  .world__session,
+  .world__hud,
+  .world__hint,
+  .world__loading {
+    position: absolute;
+    z-index: 3;
+    display: none;
+  }
+
+  .world--live .world__session,
+  .world--live .world__hud,
+  .world--live .world__hint {
+    display: block;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+      opacity var(--dur-base) var(--steps-16bit),
+      transform var(--dur-base) var(--steps-16bit);
+  }
+
+  .world--live .world__hint {
+    pointer-events: none;
+  }
+
+  /* ── Touch surfaces: the canvas and the controls are game input — never text
+        to select, never the start of a scroll, zoom or long-press menu. Overlay windows allow
+        panning; the session copy stays selectable; the Arrival section below the pin is a
+        normal page. ── */
+  .world__canvas,
+  .world__touch,
+  .world__hud,
+  .world__hint,
+  .world__loading,
+  .world__session,
+  .world--live .hero__row {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .world__session :global(.window__body) {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .world--live .world__canvas,
+  .world__dpad-arm,
+  .world__a {
+    touch-action: none;
+  }
+
+  .world__session,
+  .world__hud,
+  .world__loading,
+  .world--live .hero__window {
+    touch-action: manipulation;
+  }
+
+  /* In live mode the rows are only title scaffolding: touches fall through to the canvas, and
+     only the PRESS START window (while it is visible) keeps its buttons and panning. */
+  .world--live .hero__row {
+    pointer-events: none;
+  }
+
+  .world--live .hero__window {
+    pointer-events: auto;
+  }
+
+  .world--live :is(.world__session, .world__hud, .world__hint).is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  .world__session {
+    top: calc(var(--nav-h) + var(--space-4));
+    left: var(--gutter);
+    width: min(20rem, calc(100% - 2 * var(--gutter)));
+    text-align: left;
+  }
+
+  .world__session-title {
+    font-weight: 600;
+    line-height: var(--leading-snug);
+  }
+
+  .world__hud {
+    top: calc(var(--nav-h) + var(--space-4));
+    right: var(--gutter);
+  }
+
+  @media (max-width: 40rem) {
+    /* Phones: HUD first, session window stacked under it. */
+    .world__session {
+      top: calc(var(--nav-h) + var(--space-4) + 56px + var(--space-3));
+    }
+  }
+
+  .world__hud :global(.window__body) {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .world__hud-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+
+  .world__coin {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background: url('/sprites/ui/anim-vega-coin-3f_80x24.png') 0 0 / 80px 24px no-repeat;
+  }
+
+  .world__clock {
+    padding-left: var(--space-2);
+    border-left: var(--border);
+  }
+
+  .world__hint {
+    left: 50%;
+    bottom: calc(130px * var(--px));
+    translate: -50% 0;
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface);
+    border: var(--border);
+  }
+
+  .world__loading {
+    display: block;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+  }
+
+  .world__loading[hidden] {
+    display: none !important;
+  }
+
+  .world__touch {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .world--live .world__touch {
+      position: absolute;
+      inset: auto var(--gutter) calc(76px * var(--px));
+      z-index: 3;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      pointer-events: none;
+    }
+
+    .world__dpad,
+    .world__a {
+      pointer-events: auto;
+      image-rendering: pixelated;
+    }
+
+    .world__dpad {
+      position: relative;
+      width: calc(2 * 52px);
+      height: calc(2 * 53px);
+      background: url('/sprites/ui/dpad.png') 0 0 / 100% 100% no-repeat;
+    }
+
+    .world__dpad-arm {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 45%;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      touch-action: none;
+    }
+
+    .world__dpad-arm--left {
+      left: 0;
+    }
+
+    .world__dpad-arm--right {
+      right: 0;
+    }
+
+    /* a-button.png is two 22 px frames side by side: up, then pressed. */
+    .world__a {
+      width: calc(2 * 22px);
+      height: calc(2 * 36px);
+      padding: 0;
+      background: url('/sprites/ui/a-button.png') 0 0 / 200% 100% no-repeat;
+      border: 0;
+      touch-action: none;
+    }
+
+    .world__a.is-held {
+      background-position: 100% 0;
+    }
+
+    .world__hint {
+      display: none !important;
+    }
+  }
+</style>

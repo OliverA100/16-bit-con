@@ -1,0 +1,64 @@
+---
+/**
+ * Wordmark — "16-Bit Con" set in its own identity, not as a headline; Signifier stays for
+ * section headings. Geist 900, uppercase, tight tracking, with one pixel detail: Vega's daisy
+ * icon as the hyphen, at an integer scale per context (nav 1:1, hero 4:1 / phones 2:1, OG 6:1).
+ * The accessible name is set explicitly to "16-Bit Con" (the inline-block daisy would otherwise
+ * split the computed name into "16 - BIT CON"). Chosen 2026-11-08
+ * over a 4 px-grid block wordmark.
+ */
+interface Props {
+  size?: 'hero' | 'nav' | 'og';
+  as?: 'h1' | 'span' | 'div';
+  id?: string;
+  class?: string;
+}
+const { size = 'hero', as: Tag = 'span', id, class: className } = Astro.props;
+---
+
+<Tag class:list={['wm', `wm--${size}`, className]} id={id} aria-label="16-Bit Con">
+  <span>16</span><span class="wm__daisy pixel" aria-hidden="true"></span><span class="sr-only">-</span><span>Bit Con</span>
+</Tag>
+
+<style>
+  .wm {
+    --wm-px: 4;
+    display: inline-block;
+    margin: 0;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-weight: 900;
+    font-size: clamp(3rem, 10.5vw, 8rem);
+    line-height: 0.9;
+    letter-spacing: -0.045em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .wm--nav {
+    --wm-px: 1;
+    font-size: 1.125rem;
+    letter-spacing: -0.03em;
+  }
+
+  .wm--og {
+    --wm-px: 6;
+    font-size: 10rem;
+  }
+
+  .wm__daisy {
+    display: inline-block;
+    width: calc(17px * var(--wm-px));
+    height: calc(17px * var(--wm-px));
+    margin: 0 0.04em;
+    vertical-align: baseline;
+    translate: 0 calc(2px * var(--wm-px));
+    background: url('/sprites/ui/daisy-icon-yellow_17x17.png') 0 0 / 100% 100% no-repeat;
+  }
+
+  @media (max-width: 40rem) {
+    .wm--hero {
+      --wm-px: 2;
+    }
+  }
+</style>

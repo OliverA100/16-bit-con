@@ -10,24 +10,31 @@
  * Vega drew them 510–1108 px tall for a vertically scrolling game: bottom-anchored they
  * would wall off the sky. Read it as Sam running along the High Line toward Javits, with
  * the upper floors beside him. Sky ramps are token names, top → horizon, six bands.
+ *
+ * The canvas engine's Level 1 depth stack (parallax, baselines, foreground) lives in
+ * src/game/world.ts STACK; the recipes below feed the static stills.
  */
 import type { SpriteKey } from './sprites.manifest';
 
 export type SkyStage = 'dawn' | 'morning' | 'afternoon' | 'golden' | 'dusk' | 'night' | 'real';
 
-export const skyRamps: Record<SkyStage, readonly [string, string, string, string, string, string]> = {
-  dawn: ['--color-blue-500', '--color-blue-300', '--color-blue-100', '--color-blue-100', '--color-daisy-white', '--color-daisy-white'],
-  morning: ['--color-blue-300', '--color-blue-300', '--color-blue-300', '--color-blue-300', '--color-blue-100', '--color-blue-100'],
-  afternoon: ['--color-blue-300', '--color-blue-300', '--color-blue-100', '--color-yellow-100', '--color-yellow-200', '--color-yellow-200'],
-  golden: ['--color-blue-500', '--color-yellow-200', '--color-yellow-200', '--color-yellow-500', '--color-yellow-500', '--color-yellow-600'],
-  dusk: ['--color-blue-900', '--color-blue-900', '--color-blue-900', '--color-blue-700', '--color-yellow-500', '--color-yellow-600'],
-  night: ['--color-green-900', '--color-green-900', '--color-green-900', '--color-green-900', '--color-green-900', '--color-green-700'],
-  real: ['--color-daisy-white', '--color-daisy-white', '--color-daisy-white', '--color-daisy-white', '--color-blue-100', '--color-blue-100'],
+/**
+ * One flat sky colour per palette stage: no bands, no gradients — depth in the
+ * sky comes from clouds. A stage change swaps the colour; the world layers then step their
+ * own palettes far → near. Day is Blue 300 from the title through the afternoon.
+ */
+export const skyColors: Record<SkyStage, string> = {
+  dawn: '--color-blue-300',
+  morning: '--color-blue-300',
+  afternoon: '--color-blue-300',
+  golden: '--color-yellow-200',
+  dusk: '--color-blue-900',
+  night: '--color-green-900',
+  real: '--color-daisy-white',
 };
 
-/** Sam's feet sit 2 px into the grass tile (its first two rows are grass tips). */
-export const GROUND_BAND = 80; // F = H − 80
-export const TILE_TOP_ABOVE_F = 2;
+/** Ground band below Sam's feet: surface 8 px, edge 12 px, fill 28 px, identical in field and city. */
+export const GROUND_BAND = 48; // F = H − 48
 
 export interface LayerDef {
   key: SpriteKey;
@@ -38,8 +45,7 @@ export interface LayerDef {
 }
 
 export const fieldLayers: LayerDef[] = [
-  { key: 'cloudsStrip', parallax: 0.05, anchor: 'bottom', offset: -140, repeat: 'mirror' },
-  { key: 'hills', parallax: 0.12, anchor: 'bottom', offset: 6, repeat: 'mirror' },
+  { key: 'hills', parallax: 0.1, anchor: 'bottom', offset: 6, repeat: 'tile' },
   { key: 'bushes', parallax: 1, anchor: 'bottom', offset: 2, repeat: 'tile' },
   { key: 'daisyRow', parallax: 1, anchor: 'bottom', offset: 16, repeat: 'tile' },
 ];

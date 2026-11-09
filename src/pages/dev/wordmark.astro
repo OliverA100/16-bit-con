@@ -1,0 +1,91 @@
+---
+/**
+ * /dev/wordmark — the wordmark in the three places it lives: the hero, the nav and the OG card
+ * (the source of public/og.png, exported at 1200×630). Review page only (noindex); removed before handoff.
+ */
+import Base from '../../layouts/Base.astro';
+import Window from '../../components/Window.astro';
+import Button from '../../components/Button.astro';
+import Wordmark from '../../components/Wordmark.astro';
+const variants = ['a'] as const;
+---
+
+<Base title="Wordmark options — 16-Bit Con" description="Review page" noindex>
+  <style is:inline>
+    /* The site's own fixed nav would sit over the first mock; the mocks carry their own. */
+    body > header, body > .site-nav, nav.nav:not(.mock-nav .nav), .skip-link { display: none !important; }
+  </style>
+  {
+    variants.map((v) => (
+      <section class="opt" data-variant={v}>
+        <div class="mock-hero" data-shot={`hero-${v}`}>
+          <div class="mock-nav">
+            <Window title="16-BIT CON · OCT 3–5, 2026" as="nav" class="nav">
+              <div class="nav__row">
+                <a class="nav__brand" href="/"><img class="nav__logo" src="/favicon.svg" width="20" height="20" alt="" /><Wordmark size="nav" /></a>
+                <div class="nav__links"><a href="#schedule">Schedule</a><a href="#booth">Booth 630</a><Button href="#register">Register now</Button></div>
+              </div>
+            </Window>
+          </div>
+          <p class="eyebrow">October 3–5, 2026 · Javits Center, New York</p>
+          <Wordmark size="hero" as="h1" />
+          <p class="tagline">The retro gaming convention for people who never stopped playing.</p>
+          <Window title="PRESS START" class="press">
+            <div class="press__actions"><Button href="#register">Register now</Button><Button href="#booth" variant="ghost">Find us at Booth 630</Button></div>
+          </Window>
+          <div class="ground" aria-hidden="true"></div>
+        </div>
+        <div class="og" data-shot={`og-${v}`}>
+          <p class="eyebrow og__eyebrow">October 3–5, 2026 · Javits Center, New York · Booth 630</p>
+          <Wordmark size="og" />
+          <p class="mono og__url">vega.io/16-bit-con</p>
+          <div class="og__ground"><span class="og__sam pixel"></span></div>
+        </div>
+      </section>
+    ))
+  }
+</Base>
+
+<style>
+  .opt { margin: 0 0 var(--space-12); }
+  .mock-hero {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: var(--space-4);
+    min-height: 640px;
+    padding: 0 var(--gutter) calc(60px * var(--px));
+    background: var(--sky);
+    text-align: center;
+    overflow: clip;
+  }
+  .mock-nav { width: 100%; padding: 8px 0 var(--space-8); }
+  .mock-nav :global(.nav) { width: min(100%, var(--container)); margin: 0 auto; text-align: left; }
+  .nav__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+  .nav__brand { display: inline-flex; align-items: center; gap: var(--space-2); color: inherit; text-decoration: none; }
+  .nav__links { display: flex; align-items: center; gap: var(--space-5); font-family: var(--font-mono); text-transform: uppercase; font-size: var(--text-sm); letter-spacing: var(--tracking-mono); }
+  .nav__links a { color: inherit; text-decoration: none; }
+  .tagline { max-width: 34rem; font-size: var(--text-lg); color: var(--text-muted); }
+  .press { width: min(100%, 34rem); text-align: left; margin-bottom: var(--space-10); }
+  .press__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .ground {
+    position: absolute; inset: auto 0 0; height: calc(60px * var(--px)); background: var(--color-field-dirt);
+  }
+  .ground::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: calc(46px * var(--px)); height: calc(61px * var(--px));
+    background: url('/sprites/world/ground-daisy-row-strip_898x63.png') calc(30% + 492px * var(--px)) top / calc(898px * var(--px)) calc(63px * var(--px)) repeat-x;
+    image-rendering: pixelated;
+  }
+  .og {
+    position: relative; display: grid; align-content: center; justify-items: center; gap: var(--space-6);
+    width: 1200px; height: 630px; margin: var(--space-8) auto 0; padding-bottom: 120px; background: var(--sky); overflow: clip; text-align: center;
+  }
+  .og__eyebrow { font-size: var(--text-lg); }
+  .og__url { font-size: var(--text-xl); }
+  .og__ground { position: absolute; inset: auto 0 0; height: 120px; background: var(--color-field-dirt); }
+  .og__ground::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 92px; height: 122px;
+    background: url('/sprites/world/ground-daisy-row-strip_898x63.png') 980px top / 1796px 126px repeat-x; image-rendering: pixelated;
+  }
+  .og__sam { position: absolute; left: 30%; bottom: 120px; width: 120px; height: 120px; background: url('/sprites/sam/sam-propeller-idle_8f_60x60.png') 0 0 / 960px 120px no-repeat; }
+</style>

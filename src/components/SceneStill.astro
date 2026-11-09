@@ -2,10 +2,10 @@
 /**
  * SceneStill — a still crop of one of the worlds, composed from Vega's source layers at
  * CSS 1:1 with the same geometry the canvas uses in Phase 3 (ground line F, layer anchors
- * from src/data/layers.ts). Sky = six flat bands of the stage ramp. All images lazy.
+ * from src/data/layers.ts). Sky = the stage's one flat colour. All images lazy.
  */
 import { sprites, type SpriteEntry, type SpriteKey } from '../data/sprites.manifest';
-import { skyRamps, fieldLayers, cityLayers, type SkyStage, type LayerDef } from '../data/layers';
+import { skyColors, fieldLayers, cityLayers, type SkyStage, type LayerDef } from '../data/layers';
 
 export type Scene = 'field' | 'city' | 'night';
 
@@ -69,9 +69,7 @@ const scenes: Record<Scene, { sky: SkyStage; layers: LayerDef[]; shift: Partial<
 };
 
 const def = scenes[scene];
-const sky = `linear-gradient(to bottom, ${skyRamps[def.sky]
-  .map((c, i) => `var(${c}) ${((i / 6) * 100).toFixed(3)}% ${(((i + 1) / 6) * 100).toFixed(3)}%`)
-  .join(', ')})`;
+const sky = `var(${skyColors[def.sky]})`;
 
 interface Placed {
   file: string;

@@ -31,6 +31,12 @@
   --color-grey-700: #3C3B38;
   --color-outline-black: #151514;
 
+  /* Ground: the flat fill under ground-daisy-row-strip, sampled from the strip's own darkest
+     dirt row. An asset colour (not a brand token) so the static hero and the canvas share it. */
+  --color-field-dirt: #773D34;
+  /* The deeper fill under it, sampled from tile-grass-dirt's dark dirt specks (rows 6–7). */
+  --color-field-dirt-deep: #4A2620;
+
   /* Blues — sky and sky illustrations only */
   --color-blue-100: #CAE6FF;
   --color-blue-300: #8DCAFF;

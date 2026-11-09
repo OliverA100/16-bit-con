@@ -29,11 +29,18 @@ const {
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/Signifier-Variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#FFFAEB" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL('/og.png', Astro.site)} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="16-Bit Con, October 3–5, 2026, Javits Center, New York. Sam the mole flies over a daisy field." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={new URL('/og.png', Astro.site)} />
     <meta name="generator" content={Astro.generator} />
     <script is:inline>
       // World art scale for DOM-placed world art (hero platform, Sam). Mirrors worldBuffer()

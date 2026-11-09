@@ -1,13 +1,14 @@
 ---
 import Window from './Window.astro';
 import Button from './Button.astro';
+import Wordmark from './Wordmark.astro';
 ---
 
 <div class="nav-slot">
   <Window as="nav" title="16-BIT CON · OCT 3–5, 2026" id="site-nav" class="nav" aria-label="Primary">
     <a class="nav__brand" href="/">
       <img src="/favicon.svg" alt="" width="20" height="18" />
-      <span>16-Bit Con</span>
+      <Wordmark size="nav" />
     </a>
     <ul class="nav__links">
       <li><a href="#schedule">Schedule</a></li>
@@ -38,8 +39,6 @@ import Button from './Button.astro';
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    font-family: var(--font-pixel);
-    font-size: var(--text-lg);
     line-height: 1;
     text-decoration: none;
   }

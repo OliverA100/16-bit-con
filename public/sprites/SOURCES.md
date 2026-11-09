@@ -38,8 +38,8 @@ matches; the files in this folder are untouched.
 - city-far 1152x590 / city-towers 2304x510 / city-mid 1151x650 / city-near 2304x1108 /
   city-near-fill 2304x144: 5-layer NYC parallax. near and near-fill repeat every 1152 px (the
   files hold two copies), mid loops at 1151; far and towers do not loop (mirror-tile them)
-- big-cloud, cloud-* : clouds, many sizes
-- ground-daisy-row-strip, ground-grass-underground, ground-bushes-strip, tile-grass-dirt*: ground
+- big-cloud, cloud-* : clouds, many sizes. big-cloud is a 1160×729 two-colour cumulus bank; the engine crops three whole lobes out of it at load rather than drawing or scaling the bank. cloud-f/g/h/faint sit high, cloud-a/b/d in the upper-mid sky, and bg-clouds-strip is the horizon cumulus bank just above the hills. bg-hills-silhouette-light is the pale far range behind it.
+- ground-daisy-row-strip, ground-grass-underground, ground-bushes-strip, tile-grass-dirt*: ground. The daisy row is snapped to 16 colours at load; its rows 57–60 are also the dirt texture under the whole level and its inner dirt tone is the flat fill below. bg-green-hills is tiled plainly with its seam patched at load, at full saturation (no file changed); it ends at a world x and scrolls off as the city arrives.
 - daisy-tiny-a..g: 9-18px daisies for ground decoration
 - ground-grass-rocks-strip_960x115, ground-desert-strip_509x51: ground strips (grass over grey rock, sand over rock)
 - bg-hills-golden_509x121: the green hills (bg-green-hills) in warm sunlight, cropped to the hills
@@ -52,7 +52,7 @@ matches; the files in this folder are untouched.
 
 ## props/
 arcade-machine (VEGA marquee), vega-sign, vega-sign-horizontal, poster-i-want-you,
-subway-front/back/closed, road-tile, sidewalk-tile, street-fence, tree-1, deck-chair,
+subway-front/back/closed, road-tile, sidewalk-tile, street-fence (the city fence behind Sam from world x 1900), tree-1 (rows 65–80 are a white planter: cropped at load in the field, kept for the street trees), plant-flowers (by the buildings after the gate), deck-chair,
 plant-flowers, hand-megaphone / hand-clipboard / hand-phone / hand-scroll (mole hand in dirt),
 prop-cookie, icon-bank, beach-set
 
@@ -79,3 +79,5 @@ vega-daisy.svg: the daisy alone. frames/: vega.io UI frames (window-single, wind
 
 ## NEW (drawn for 16-Bit Con)
 _(add entries here as new art is created: file, size, what it is)_
+
+- new/seam-field-street_72x52.png — the details at the field → street ground seams, nothing more: three to four grass tufts of 2–4 px standing on the first pavement slabs after X0, a 4 px lighter kerb end-stone at X0 + 28 (sidewalk-tile's kerb top grey), and dark dirt pixels (the deep-dirt token) on the kerb and the first road pixels after X0 + 56. Placed with row 4 on the feet line F and x 8 on X0. Native density, Green 700 / Green 500 tufts, no scaling. Drawn by script, 2026-11-08.

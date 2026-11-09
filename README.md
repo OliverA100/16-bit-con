@@ -1,7 +1,7 @@
 # 16-Bit Con — Vega design-engineer take-home
 
 Landing page for a fictional retro tech convention, built on Vega's pixel-art brand.
-Live: https://16-bit-con-seven.vercel.app (Phase 2: the static page, also the reduced-motion fallback; the world arrives in Phase 3).
+Live: https://16-bit-con-seven.vercel.app (Phase 3 gate, third pass: Level 1 and the walk into town — scroll, or hold → to run and Space to jump; on phones the d-pad and A drive the pinned world; the static page remains the reduced-motion fallback. The "16-Bit Con" wordmark is Geist 900 with the daisy as its hyphen; OG image at /og.png.)
 See public/sprites/SOURCES.md for asset provenance.
 
 TODO before Phase 0:

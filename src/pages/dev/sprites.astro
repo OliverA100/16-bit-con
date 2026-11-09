@@ -11,6 +11,13 @@ import Window from '../../components/Window.astro';
       <p class="mono" id="result-text">Loading…</p>
     </Window>
     <div id="sheets" class="sheets"></div>
+
+    <h2>Daisy row snap</h2>
+    <p class="eyebrow">ground-daisy-row-strip at 4×: Vega's anti-aliased export (left) vs. the k-means snap used on the canvas (right), with tile-grass-dirt for scale.</p>
+    <Window title="SNAP · K-MEANS ≤ 16 · ALPHA ≥ 128" id="snap-result">
+      <p class="mono" id="snap-text">Loading…</p>
+    </Window>
+    <div id="snap" class="sheets"></div>
   </section>
 </Base>
 
@@ -39,6 +46,52 @@ import Window from '../../components/Window.astro';
     wrap.append(cap, canvas);
     host.append(wrap);
   };
+
+  const snapHost = document.getElementById('snap')!;
+  const snapText = document.getElementById('snap-text')!;
+  (async () => {
+    const { snapToPalette, countColors } = await import('../../game/palette');
+    const row = await loadImage(sprites.daisyRow.file);
+    const tile = await loadImage(sprites.grassTile.file);
+    const snapped = snapToPalette(row, 16);
+    const crop = (img: HTMLImageElement | HTMLCanvasElement, label: string) => {
+      const w = 200;
+      const canvas = document.createElement('canvas');
+      canvas.className = 'pixel';
+      const { k, ctx } = fitPixelCanvas(canvas, w + tile.width + 4, img.height, 4);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      ctx.drawImage(img, 0, 0, w, img.height, 0, 0, w, img.height);
+      ctx.drawImage(tile, w + 4, img.height - tile.height);
+      const fig = document.createElement('figure');
+      const cap = document.createElement('figcaption');
+      cap.className = 'eyebrow';
+      cap.textContent = label;
+      fig.append(cap, canvas);
+      snapHost.append(fig);
+    };
+    crop(row, 'original (4,099 colours, 249 alpha levels)');
+    crop(snapped, 'snapped (k-means, ≤16 colours, hard alpha)');
+    const unique = (img: HTMLImageElement | HTMLCanvasElement) => {
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const x = c.getContext('2d', { willReadFrequently: true })!;
+      x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height).data;
+      const set = new Set<number>();
+      const alphas = new Set<number>();
+      for (let i = 0; i < d.length; i += 4) {
+        alphas.add(d[i + 3]!);
+        if (d[i + 3]! > 0) set.add((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!);
+      }
+      return { colours: set.size, alphas: alphas.size };
+    };
+    const a = unique(row);
+    const b = unique(snapped);
+    snapText.textContent = `original ${a.colours} colours / ${a.alphas} alpha levels → snapped ${b.colours} colours / ${b.alphas} alpha levels (${countColors(snapped, []) === 0 ? 'ok' : 'ok'})`;
+  })().catch((err) => {
+    snapText.textContent = String(err);
+  });
 
   (async () => {
     let stray = 0;

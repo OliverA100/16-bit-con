@@ -1,75 +1,16 @@
 ---
 import Base from '../layouts/Base.astro';
 import Window from '../components/Window.astro';
-import Button from '../components/Button.astro';
+import World from '../components/World.astro';
 import SectionMarker from '../components/SectionMarker.astro';
 import SessionCard from '../components/SessionCard.astro';
 import RegisterForm from '../components/RegisterForm.astro';
 import { sessions } from '../data/sessions';
 import { sprites } from '../data/sprites.manifest';
-
-const clouds = [
-  { key: 'cloudB', top: '14%', dur: '170s', delay: '-60s' },
-  { key: 'cloudD', top: '30%', dur: '210s', delay: '-150s' },
-  { key: 'cloudA', top: '8%', dur: '140s', delay: '-20s' },
-  { key: 'cloudG', top: '46%', dur: '120s', delay: '-90s' },
-  { key: 'cloudF', top: '58%', dur: '190s', delay: '-130s' },
-] as const;
 ---
 
 <Base>
-  <section class="hero" aria-labelledby="hero-title">
-    <div class="hero__clouds" aria-hidden="true">
-      {
-        clouds.map((c, i) => {
-          const s = sprites[c.key];
-          return (
-            <img
-              class="hero__cloud pixel"
-              src={s.file}
-              width={s.w}
-              height={s.h}
-              alt=""
-              style={`--w: ${s.w}px; --i: ${i}; top: ${c.top}; --dur: ${c.dur}; --delay: ${c.delay};`}
-            />
-          );
-        })
-      }
-    </div>
-
-    <div class="hero__row hero__row--nav" aria-hidden="true"></div>
-
-    <div class="hero__row hero__row--copy">
-      <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
-      <h1 id="hero-title">16-Bit Con</h1>
-      <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
-    </div>
-
-    <div class="hero__row hero__row--gap" aria-hidden="true"></div>
-
-    <div class="hero__row hero__row--window">
-      <Window title="PRESS START" id="press-start" class="hero__window">
-        <div class="hero__actions">
-          <Button href="#register">Register now</Button>
-          <Button href="#booth" variant="ghost">Find us at Booth 630</Button>
-        </div>
-        <p class="eyebrow hero__hint">Insert coin · 3 levels · 1 after party · Booth 630</p>
-      </Window>
-    </div>
-
-    <div class="hero__row hero__row--gap2" aria-hidden="true"></div>
-
-    <div class="hero__row hero__row--stage">
-      <canvas
-        class="hero__sam pixel"
-        id="hero-sam"
-        width="60"
-        height="60"
-        role="img"
-        aria-label="Sam, Vega's pixel-art mole, idling on a grass platform in blue ski goggles"></canvas>
-      <div class="hero__ground" aria-hidden="true"></div>
-    </div>
-  </section>
+  <World />
 
   <section class="section container" id="schedule" aria-labelledby="schedule-title">
     <SectionMarker sprite="handClipboard" />
@@ -102,182 +43,8 @@ const clouds = [
   </section>
 </Base>
 
-<script>
-  import { loadSamSheets } from '../game/sam';
-  import { fitPixelCanvas, worldBuffer } from '../game/scale';
-
-  const canvas = document.getElementById('hero-sam') as HTMLCanvasElement | null;
-  if (canvas) {
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const fit = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const { k } = worldBuffer(window.innerWidth, window.innerHeight, dpr);
-      return fitPixelCanvas(canvas, 60, 60, k / dpr);
-    };
-    let { k, ctx } = fit();
-
-    loadSamSheets()
-      .then(({ idle }) => {
-        const fps = 8;
-        let last = 0;
-        let frame = 0;
-        const paint = () => {
-          ctx.setTransform(k, 0, 0, k, 0, 0);
-          ctx.clearRect(0, 0, 60, 60);
-          idle.draw(ctx, frame, 0, 0);
-        };
-        paint();
-        window.addEventListener(
-          'resize',
-          () => {
-            ({ k, ctx } = fit());
-            paint();
-          },
-          { passive: true },
-        );
-        if (reduceMotion) return;
-        const tick = (now: number) => {
-          if (now - last >= 1000 / fps) {
-            last = now;
-            frame = (frame + 1) % idle.frames;
-            if (!document.hidden) paint();
-          }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      })
-      .catch((err) => console.error(err));
-  }
-</script>
 
 <style>
-  /* ── Hero: the first viewport is the S0 sky, built as six layout rows so every band edge
-        falls in a gap (never behind the headline or a window). Phase 3's canvas takes over
-        this exact area: feet line F = H − 80 art px, grass tile top at F − 2, Daisy White below. ── */
-  .hero {
-    --stage-h: calc(67px * var(--px)); /* Sam's 60 px cell + the 7 px of tile below his feet */
-    position: relative;
-    isolation: isolate;
-    display: grid;
-    grid-template-rows: auto auto minmax(var(--space-8), 1fr) auto var(--space-8) var(--stage-h);
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding-bottom: calc(73px * var(--px)); /* F + 80 = hero bottom */
-    overflow: clip;
-    background: var(--surface);
-    text-align: center;
-  }
-
-  .hero__row {
-    width: 100%;
-  }
-
-  .hero__row--nav {
-    height: calc(var(--nav-h) + var(--space-4));
-    background: var(--color-blue-500);
-  }
-
-  .hero__row--copy {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-4);
-    padding: var(--space-8) var(--gutter);
-    background: var(--color-blue-300);
-  }
-
-  .hero__row--gap,
-  .hero__row--window {
-    background: var(--color-blue-100);
-  }
-
-  .hero__row--window {
-    display: flex;
-    justify-content: center;
-    padding: 0 var(--gutter) var(--space-6);
-  }
-
-  .hero__row--gap2,
-  .hero__row--stage {
-    background: var(--surface);
-  }
-
-  .hero__row--stage {
-    position: relative;
-  }
-
-  .hero__row--copy > *,
-  .hero__window {
-    position: relative;
-    z-index: 2;
-  }
-
-  .hero__clouds {
-    position: absolute;
-    inset: calc(var(--nav-h) + var(--space-2)) 0 calc(140px * var(--px));
-    z-index: 1;
-    overflow: hidden;
-    pointer-events: none;
-  }
-
-  .hero__cloud {
-    position: absolute;
-    left: calc(-1 * var(--w) * var(--px));
-    width: calc(var(--w) * var(--px));
-    height: auto;
-    max-width: none;
-    animation: drift var(--dur) linear infinite;
-    animation-delay: var(--delay);
-  }
-
-  @keyframes drift {
-    to {
-      translate: calc(100vw + var(--w) * var(--px)) 0;
-    }
-  }
-
-  .hero__eyebrow {
-    color: var(--text-muted);
-  }
-
-  .hero__tagline {
-    max-width: 34rem;
-    font-size: var(--text-lg);
-    color: var(--text-muted);
-  }
-
-  .hero__window {
-    width: min(100%, 34rem);
-    text-align: left;
-  }
-
-  .hero__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .hero__hint {
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: var(--border);
-  }
-
-  .hero__sam {
-    position: absolute;
-    left: 30%;
-    bottom: calc(7px * var(--px));
-    z-index: 2;
-  }
-
-  .hero__ground {
-    position: absolute;
-    inset: auto 0 0;
-    z-index: 2;
-    height: calc(9px * var(--px));
-    background: url('/sprites/world/tile-grass-dirt_24x9.png') left top / calc(24px * var(--px)) calc(9px * var(--px)) repeat-x;
-    image-rendering: pixelated;
-  }
-
   /* ── Sections ── */
   .section {
     display: grid;
@@ -327,12 +94,5 @@ const clouds = [
     padding-top: var(--space-3);
     border-top: var(--border);
     font-size: var(--text-sm);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .hero__cloud {
-      animation: none;
-      translate: calc(var(--i, 1) * 22vw) 0;
-    }
   }
 </style>
