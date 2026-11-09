@@ -19,11 +19,12 @@ import Button from './Button.astro';
 
 <style>
   .nav-slot {
-    position: sticky;
+    position: fixed;
     top: var(--space-2);
+    left: 50%;
     z-index: 20;
     width: min(100% - 2 * var(--gutter), var(--container));
-    margin: var(--space-2) auto 0;
+    translate: -50% 0;
   }
 
   .nav :global(.window__body) {

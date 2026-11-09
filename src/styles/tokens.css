@@ -96,6 +96,11 @@
   /* Layout */
   --container: 72rem; /* 1152 px: one city tile period */
   --gutter: var(--space-4);
+  --nav-h: 64px; /* fixed nav window + its top margin */
+
+  /* World art scale: CSS px per art px = k / devicePixelRatio, k from src/game/scale.ts.
+     Set by the inline script in Base.astro; 2 is the no-JS fallback. */
+  --px: 2;
 
   /* Motion: smooth easing for UI, steps() where things should feel 16-bit */
   --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);

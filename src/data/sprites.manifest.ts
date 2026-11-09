@@ -58,6 +58,33 @@ export const sprites = {
   cloudG: { file: '/sprites/world/cloud-g_94x25.png', w: 94, h: 25, scale: 'world' },
   cloudH: { file: '/sprites/world/cloud-h_63x15.png', w: 63, h: 15, scale: 'world' },
   cloudFaint: { file: '/sprites/world/cloud-faint_54x27.png', w: 54, h: 27, scale: 'world' },
+
+  // ── Levels 2–3: Vega's New York ─────────────────────────────────────────────
+  cityFar: { file: '/sprites/world/city-far.png', w: 1152, h: 590, period: 1152, mirrorTile: true, parallax: 0.15, scale: 'world', note: 'edges do not loop' },
+  cityTowers: { file: '/sprites/world/city-towers.png', w: 2304, h: 510, period: 2304, mirrorTile: true, parallax: 0.3, scale: 'world', note: 'edges do not loop' },
+  cityMid: { file: '/sprites/world/city-mid.png', w: 1151, h: 650, period: 1151, parallax: 0.5, scale: 'world' },
+  cityNear: { file: '/sprites/world/city-near.png', w: 2304, h: 1108, period: 1152, parallax: 0.75, scale: 'world', note: 'file holds two copies' },
+  cityNearFill: { file: '/sprites/world/city-near-fill.png', w: 2304, h: 144, period: 1152, parallax: 0.75, scale: 'world' },
+  sidewalk: { file: '/sprites/props/sidewalk-tile.png', w: 256, h: 83, period: 256, parallax: 1, scale: 'world' },
+  road: { file: '/sprites/props/road-tile.png', w: 256, h: 107, period: 256, parallax: 1, scale: 'world' },
+  subwayFront: { file: '/sprites/props/subway-front.png', w: 215, h: 146, scale: 'world' },
+  arcade: { file: '/sprites/props/arcade-machine.png', w: 53, h: 87, scale: 'world' },
+  vegaSign: { file: '/sprites/props/vega-sign.png', w: 30, h: 122, scale: 'world' },
+  vegaSignHorizontal: { file: '/sprites/props/vega-sign-horizontal.png', w: 138, h: 29, scale: 'world' },
+  streetFence: { file: '/sprites/props/street-fence.png', w: 144, h: 75, scale: 'world' },
+  poster: { file: '/sprites/props/poster-i-want-you.png', w: 74, h: 112, scale: 'world' },
+  moleCoffee: { file: '/sprites/npc/mole-coffee.png', w: 1800, h: 60, frames: 30, fw: 60, fh: 60, scale: 'world' },
+  moleTyping: { file: '/sprites/npc/mole-typing.png', w: 540, h: 60, frames: 9, fw: 60, fh: 60, scale: 'world' },
+  molePizza: { file: '/sprites/npc/mole-pizza.png', w: 1260, h: 60, frames: 21, fw: 60, fh: 60, scale: 'world' },
+  molePhone: { file: '/sprites/npc/mole-phone.png', w: 120, h: 60, frames: 2, fw: 60, fh: 60, scale: 'world' },
+  molesChess: { file: '/sprites/npc/moles-chess.png', w: 840, h: 100, frames: 6, fw: 140, fh: 100, scale: 'world' },
+  molesSofa: { file: '/sprites/npc/moles-sofa.png', w: 3360, h: 90, frames: 24, fw: 140, fh: 90, scale: 'world' },
+  dogWalk: { file: '/sprites/npc/dog-walk.png', w: 240, h: 60, frames: 4, fw: 60, fh: 60, scale: 'world' },
+  dogBark: { file: '/sprites/npc/dog-bark.png', w: 300, h: 60, frames: 5, fw: 60, fh: 60, scale: 'world' },
+
+  // ── CMS illustrations: DOM only ─────────────────────────────────────────────
+  handClipboard: { file: '/sprites/props/hand-clipboard.png', w: 295, h: 245, scale: 'cms' },
+  handMegaphone: { file: '/sprites/props/hand-megaphone.png', w: 312, h: 264, scale: 'cms' },
 } as const satisfies Record<string, SpriteEntry>;
 
 export type SpriteKey = keyof typeof sprites;

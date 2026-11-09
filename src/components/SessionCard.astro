@@ -1,0 +1,61 @@
+---
+import Window from './Window.astro';
+import SceneStill from './SceneStill.astro';
+import type { Session } from '../data/sessions';
+
+interface Props {
+  session: Session;
+}
+
+const { session } = Astro.props;
+const dark = session.scene === 'night';
+---
+
+<Window
+  as="article"
+  title={`Level ${session.level} · ${session.time}`}
+  id={`session-${session.level}`}
+  tone={dark ? 'dark' : 'light'}
+  class:list={['session', { 'session--dark': dark }]}
+  flush
+>
+  <SceneStill scene={session.scene} />
+  <div class="session__body">
+    <h3 class="session__title">{session.title}</h3>
+    <p class="session__blurb">{session.blurb}</p>
+    <p class="eyebrow session__meta">{session.time} · {session.place}</p>
+  </div>
+</Window>
+
+<style>
+  .session__body {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+  }
+
+  .session__title {
+    text-align: left;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: var(--text-lg);
+    line-height: var(--leading-snug);
+    color: inherit;
+  }
+
+  .session__blurb {
+    color: var(--text-muted);
+  }
+
+  .session__meta {
+    margin-top: var(--space-1);
+  }
+
+  .session--dark .session__blurb {
+    color: var(--text-on-dark);
+  }
+
+  .session--dark .session__meta {
+    color: var(--text-on-dark-accent);
+  }
+</style>

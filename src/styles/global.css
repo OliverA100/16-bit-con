@@ -27,6 +27,10 @@ body {
   overflow-x: clip;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 img,
 canvas,
 svg,
@@ -123,6 +127,54 @@ p {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.below-nav {
+  padding-top: calc(var(--nav-h) + var(--space-8));
+}
+
+/* Form controls: Daisy White fields, 1 px Green 900 border, no radius, 4 px grid */
+.field {
+  display: grid;
+  gap: var(--space-1);
+  text-align: left;
+}
+
+.field > label,
+.field > legend {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-mono);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.field input[type='text'],
+.field input[type='email'] {
+  width: 100%;
+  min-height: var(--space-10);
+  padding: 0 var(--space-3);
+  background: var(--surface-raised);
+  border: var(--border);
+  border-radius: 0;
+}
+
+.field[data-invalid='true'] input[type='text'],
+.field[data-invalid='true'] input[type='email'] {
+  border-width: 2px;
+  background: var(--color-yellow-100);
+}
+
+.field__error {
+  min-height: 1.25em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-mono);
+  color: var(--text);
+}
+
+.field__error:empty {
+  display: none;
 }
 
 .skip-link {

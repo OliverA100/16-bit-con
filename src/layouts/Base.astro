@@ -35,6 +35,23 @@ const {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta name="generator" content={Astro.generator} />
+    <script is:inline>
+      // World art scale for DOM-placed world art (hero platform, Sam). Mirrors worldBuffer()
+      // in src/game/scale.ts: k = clamp(round(deviceH / 540), 2, 6), 240 px width floor.
+      (function () {
+        var root = document.documentElement;
+        function fit() {
+          var dpr = window.devicePixelRatio || 1;
+          var devW = Math.round(window.innerWidth * dpr);
+          var devH = Math.round(window.innerHeight * dpr);
+          var k = Math.min(6, Math.max(2, Math.round(devH / 540)));
+          if (Math.ceil(devW / k) < 240) k = Math.max(2, k - 1);
+          root.style.setProperty('--px', String(k / dpr));
+        }
+        fit();
+        window.addEventListener('resize', fit, { passive: true });
+      })();
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -44,8 +61,8 @@ const {
     </main>
     <footer class="site-footer container">
       <p class="eyebrow">
-        16-Bit Con · Oct 3–5, 2026 · Javits Center, New York ·
-        <a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a>
+        16-Bit Con · Oct 3–5, 2026 · Javits Center, New York · hosted by
+        <a href="https://vega.io">vega.io</a>
       </p>
     </footer>
   </body>

@@ -1,0 +1,222 @@
+---
+/**
+ * RegisterForm — the CTA. A real <form> with labels, required fields and inline errors.
+ * Client-side validation only: nothing is sent or stored. On a valid submit the window
+ * swaps to a one-line confirmation. The coin-bonus slot is wired in Phase 3.
+ */
+import Window from './Window.astro';
+import Button from './Button.astro';
+
+const tickets = [
+  { value: 'sat', label: 'Saturday', meta: 'Oct 3' },
+  { value: 'sun', label: 'Sunday', meta: 'Oct 4' },
+  { value: 'weekend', label: 'Weekend pass', meta: 'Oct 3–5' },
+];
+---
+
+<Window as="section" title="Register" id="register" class="register" aria-labelledby="register-heading">
+  <h3 id="register-heading" class="register__heading">Player 1, enter your details</h3>
+
+  <form id="register-form" class="register__form" novalidate>
+    <div class="field" data-field="name">
+      <label for="reg-name">Player name</label>
+      <input id="reg-name" name="name" type="text" autocomplete="name" minlength="2" required aria-describedby="reg-name-error" />
+      <p class="field__error" id="reg-name-error" aria-live="polite"></p>
+    </div>
+
+    <div class="field" data-field="email">
+      <label for="reg-email">Email</label>
+      <input id="reg-email" name="email" type="email" autocomplete="email" inputmode="email" required aria-describedby="reg-email-error" />
+      <p class="field__error" id="reg-email-error" aria-live="polite"></p>
+    </div>
+
+    <fieldset class="field register__tickets" data-field="ticket" aria-describedby="reg-ticket-error">
+      <legend>Ticket type · pick one</legend>
+      <div class="register__options" role="presentation">
+        {
+          tickets.map((t) => (
+            <label class="option">
+              <input type="radio" name="ticket" value={t.value} required />
+              <span class="option__label">{t.label}</span>
+              <span class="eyebrow option__meta">{t.meta}</span>
+            </label>
+          ))
+        }
+      </div>
+      <p class="field__error" id="reg-ticket-error" aria-live="polite"></p>
+    </fieldset>
+
+    <div class="register__actions">
+      <Button type="submit">Register now</Button>
+      <p class="eyebrow">Client-side only. Nothing is sent or stored.</p>
+    </div>
+  </form>
+
+  <div id="register-done" class="register__done" hidden tabindex="-1">
+    <p class="register__gg">GG. See you at Booth 630.</p>
+    <p class="eyebrow">Nothing was sent or stored. We already forgot your name.</p>
+    <p class="eyebrow register__bonus" id="register-bonus" hidden>Player 1 bonus · promo code 16BIT-GG</p>
+  </div>
+</Window>
+
+<script>
+  const form = document.getElementById('register-form') as HTMLFormElement | null;
+  const done = document.getElementById('register-done') as HTMLDivElement | null;
+  const title = document.getElementById('register-title');
+  const heading = document.getElementById('register-heading');
+
+  if (form && done) {
+    const field = (name: string) => form.querySelector<HTMLElement>(`[data-field="${name}"]`)!;
+    const errorEl = (name: string) => field(name).querySelector<HTMLElement>('.field__error')!;
+
+    const validators: Record<string, () => string> = {
+      name: () => {
+        const v = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
+        return v.length >= 2 ? '' : 'Enter a player name (2+ characters).';
+      },
+      email: () => {
+        const v = (form.elements.namedItem('email') as HTMLInputElement).value.trim();
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? '' : 'Enter a valid email, like sam@vega.io.';
+      },
+      ticket: () => (form.querySelector<HTMLInputElement>('input[name="ticket"]:checked') ? '' : 'Pick a ticket.'),
+    };
+
+    const show = (name: string, message: string) => {
+      const wrap = field(name);
+      wrap.dataset.invalid = message ? 'true' : 'false';
+      errorEl(name).textContent = message ? `! ${message}` : '';
+      wrap.querySelectorAll('input').forEach((input) => input.setAttribute('aria-invalid', message ? 'true' : 'false'));
+    };
+
+    const validate = (name: string) => {
+      const message = validators[name]!();
+      show(name, message);
+      return !message;
+    };
+
+    // Re-validate a field once it has been flagged, so errors clear as the player types.
+    for (const name of Object.keys(validators)) {
+      field(name).addEventListener('input', () => {
+        if (field(name).dataset.invalid === 'true') validate(name);
+      });
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const results = Object.keys(validators).map((name) => [name, validate(name)] as const);
+      const firstInvalid = results.find(([, ok]) => !ok);
+      if (firstInvalid) {
+        field(firstInvalid[0]).querySelector<HTMLInputElement>('input')?.focus();
+        return;
+      }
+      form.hidden = true;
+      if (heading) heading.hidden = true;
+      done.hidden = false;
+      if (title) title.textContent = 'Registered · GG';
+      done.focus();
+    });
+  }
+</script>
+
+<style>
+  .register__heading {
+    margin-bottom: var(--space-4);
+    text-align: left;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: var(--text-lg);
+    line-height: var(--leading-snug);
+  }
+
+  .register__form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .register__tickets {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Radios drawn as a segmented control: one cell lit at a time reads as exclusive. */
+  .register__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+    border: var(--border);
+    background: var(--outline);
+    gap: 1px;
+  }
+
+  .option {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: var(--space-1);
+    min-height: var(--space-12);
+    padding: var(--space-2);
+    background: var(--surface-raised);
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    opacity: 0;
+  }
+
+  .option__label {
+    font-weight: 600;
+    font-size: var(--text-sm);
+    line-height: 1.2;
+  }
+
+  .option:has(input:checked) {
+    background: var(--accent);
+    box-shadow: inset 0 0 0 2px var(--outline);
+  }
+
+  .option:has(input:checked) .option__label::before {
+    content: '▸ ';
+  }
+
+  .option:has(input:focus-visible) {
+    z-index: 1;
+    outline: 2px solid var(--outline);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px var(--focus-ring);
+  }
+
+  .register__tickets[data-invalid='true'] .register__options {
+    outline: 1px solid var(--outline);
+    outline-offset: 0;
+  }
+
+  .register__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+    padding-top: var(--space-2);
+    border-top: var(--border);
+  }
+
+  .register__done {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .register__done:focus {
+    outline: none;
+  }
+
+  .register__gg {
+    font-family: var(--font-pixel);
+    font-size: var(--text-2xl);
+    line-height: var(--leading-tight);
+  }
+</style>

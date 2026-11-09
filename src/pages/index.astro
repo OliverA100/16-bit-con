@@ -2,58 +2,84 @@
 import Base from '../layouts/Base.astro';
 import Window from '../components/Window.astro';
 import Button from '../components/Button.astro';
+import SectionMarker from '../components/SectionMarker.astro';
+import SessionCard from '../components/SessionCard.astro';
+import RegisterForm from '../components/RegisterForm.astro';
+import { sessions } from '../data/sessions';
+import { sprites } from '../data/sprites.manifest';
 
-const sessions = [
-  { level: 1, time: '10:00 AM', title: 'Opening Keynote: The Future of Retro' },
-  { level: 2, time: '2:00 PM', title: 'Panel: Pixel Art in the Age of AI' },
-  { level: 3, time: '6:00 PM', title: 'Vega After Party — Booth 630' },
-];
+const clouds = [
+  { key: 'cloudB', top: '14%', dur: '170s', delay: '-60s' },
+  { key: 'cloudD', top: '30%', dur: '210s', delay: '-150s' },
+  { key: 'cloudA', top: '8%', dur: '140s', delay: '-20s' },
+  { key: 'cloudG', top: '46%', dur: '120s', delay: '-90s' },
+  { key: 'cloudF', top: '58%', dur: '190s', delay: '-130s' },
+] as const;
 ---
 
 <Base>
   <section class="hero" aria-labelledby="hero-title">
-    <div class="container hero__copy">
-      <p class="eyebrow">October 3–5, 2026 · Javits Center, New York</p>
+    <div class="hero__clouds" aria-hidden="true">
+      {
+        clouds.map((c, i) => {
+          const s = sprites[c.key];
+          return (
+            <img
+              class="hero__cloud pixel"
+              src={s.file}
+              width={s.w}
+              height={s.h}
+              alt=""
+              style={`--w: ${s.w}px; --i: ${i}; top: ${c.top}; --dur: ${c.dur}; --delay: ${c.delay};`}
+            />
+          );
+        })
+      }
+    </div>
+
+    <div class="hero__row hero__row--nav" aria-hidden="true"></div>
+
+    <div class="hero__row hero__row--copy">
+      <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
       <h1 id="hero-title">16-Bit Con</h1>
       <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
     </div>
 
-    <div class="hero__sky" aria-hidden="true">
-      <img class="hero__cloud hero__cloud--a pixel" src="/sprites/world/cloud-b_219x63.png" alt="" width="219" height="63" />
-      <img class="hero__cloud hero__cloud--b pixel" src="/sprites/world/cloud-f_69x44.png" alt="" width="69" height="44" />
+    <div class="hero__row hero__row--gap" aria-hidden="true"></div>
+
+    <div class="hero__row hero__row--window">
+      <Window title="PRESS START" id="press-start" class="hero__window">
+        <div class="hero__actions">
+          <Button href="#register">Register now</Button>
+          <Button href="#booth" variant="ghost">Find us at Booth 630</Button>
+        </div>
+        <p class="eyebrow hero__hint">Insert coin · 3 levels · 1 after party · Booth 630</p>
+      </Window>
     </div>
 
-    <div class="container hero__stage">
-      <Window title="PRESS START" id="press-start" class="hero__window">
-        <div class="hero__row">
-          <canvas
-            class="hero__sam pixel"
-            id="hero-sam"
-            width="60"
-            height="60"
-            role="img"
-            aria-label="Sam, Vega's pixel-art mole, idling in blue ski goggles"></canvas>
-          <div class="hero__actions">
-            <Button href="#register">Register now</Button>
-            <Button href="#booth" variant="ghost">Find us at Booth 630</Button>
-          </div>
-        </div>
-        <p class="eyebrow hero__status">Loading world… Phase 1/5 · Insert coin to continue</p>
-      </Window>
+    <div class="hero__row hero__row--gap2" aria-hidden="true"></div>
+
+    <div class="hero__row hero__row--stage">
+      <canvas
+        class="hero__sam pixel"
+        id="hero-sam"
+        width="60"
+        height="60"
+        role="img"
+        aria-label="Sam, Vega's pixel-art mole, idling on a grass platform in blue ski goggles"></canvas>
+      <div class="hero__ground" aria-hidden="true"></div>
     </div>
   </section>
 
   <section class="section container" id="schedule" aria-labelledby="schedule-title">
+    <SectionMarker sprite="handClipboard" />
     <h2 id="schedule-title">Schedule</h2>
     <p class="section__lede">Three sessions. One day. Save states not included.</p>
     <ol class="sessions">
       {
-        sessions.map((s) => (
+        sessions.map((session) => (
           <li>
-            <Window as="article" title={`Level ${s.level} · ${s.time}`} id={`session-${s.level}`}>
-              <h3 class="session__title">{s.title}</h3>
-              <p class="eyebrow">{s.time} · Javits Center</p>
-            </Window>
+            <SessionCard session={session} />
           </li>
         ))
       }
@@ -61,31 +87,34 @@ const sessions = [
   </section>
 
   <section class="section container" id="booth" aria-labelledby="booth-title">
+    <SectionMarker sprite="handMegaphone" />
     <h2 id="booth-title">Find us at Booth 630</h2>
     <p class="section__lede">Vega is at the con all weekend. Bring your high scores.</p>
     <div class="cta">
-      <Window title="BOOTH 630" id="booth-window">
+      <Window title="Booth 630" id="booth-window">
         <img class="cta__sign" src="/sprites/ui/vega-logo.svg" alt="Vega" width="138" height="45" />
-        <p>Come say hi, grab a sticker, and stay for the after party at 6:00 PM.</p>
+        <p class="cta__copy">Stickers, demos, a very good mole. The after party starts at 6:00 PM and ends when the arcade does.</p>
+        <p class="eyebrow">Javits Center · Hall 3B · Booth 630</p>
+        <p class="mono cta__url">vega.io/16-bit-con</p>
       </Window>
-      <Window title="REGISTER" id="register" tone="dark">
-        <p>Registration opens in Phase 2. Until then, the official page has you covered.</p>
-        <div class="cta__actions">
-          <Button href="https://vega.io/16-bit-con">Register now</Button>
-        </div>
-      </Window>
+      <RegisterForm />
     </div>
   </section>
 </Base>
 
 <script>
   import { loadSamSheets } from '../game/sam';
-  import { fitPixelCanvas } from '../game/scale';
+  import { fitPixelCanvas, worldBuffer } from '../game/scale';
 
   const canvas = document.getElementById('hero-sam') as HTMLCanvasElement | null;
   if (canvas) {
-    const { k, ctx } = fitPixelCanvas(canvas, 60, 60, 2);
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const fit = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const { k } = worldBuffer(window.innerWidth, window.innerHeight, dpr);
+      return fitPixelCanvas(canvas, 60, 60, k / dpr);
+    };
+    let { k, ctx } = fit();
 
     loadSamSheets()
       .then(({ idle }) => {
@@ -98,6 +127,14 @@ const sessions = [
           idle.draw(ctx, frame, 0, 0);
         };
         paint();
+        window.addEventListener(
+          'resize',
+          () => {
+            ({ k, ctx } = fit());
+            paint();
+          },
+          { passive: true },
+        );
         if (reduceMotion) return;
         const tick = (now: number) => {
           if (now - last >= 1000 / fps) {
@@ -114,71 +151,103 @@ const sessions = [
 </script>
 
 <style>
+  /* ── Hero: the first viewport is the S0 sky, built as six layout rows so every band edge
+        falls in a gap (never behind the headline or a window). Phase 3's canvas takes over
+        this exact area: feet line F = H − 80 art px, grass tile top at F − 2, Daisy White below. ── */
   .hero {
+    --stage-h: calc(67px * var(--px)); /* Sam's 60 px cell + the 7 px of tile below his feet */
     position: relative;
-    padding-top: var(--space-16);
-  }
-
-  .hero__copy {
+    isolation: isolate;
     display: grid;
-    gap: var(--space-4);
-    justify-items: center;
+    grid-template-rows: auto auto minmax(var(--space-8), 1fr) auto var(--space-8) var(--stage-h);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: calc(73px * var(--px)); /* F + 80 = hero bottom */
+    overflow: clip;
+    background: var(--surface);
     text-align: center;
   }
 
-  .hero__tagline {
-    max-width: 36rem;
-    font-size: var(--text-lg);
-    color: var(--text-muted);
+  .hero__row {
+    width: 100%;
   }
 
-  .hero__sky {
+  .hero__row--nav {
+    height: calc(var(--nav-h) + var(--space-4));
+    background: var(--color-blue-500);
+  }
+
+  .hero__row--copy {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-4);
+    padding: var(--space-8) var(--gutter);
+    background: var(--color-blue-300);
+  }
+
+  .hero__row--gap,
+  .hero__row--window {
+    background: var(--color-blue-100);
+  }
+
+  .hero__row--window {
+    display: flex;
+    justify-content: center;
+    padding: 0 var(--gutter) var(--space-6);
+  }
+
+  .hero__row--gap2,
+  .hero__row--stage {
+    background: var(--surface);
+  }
+
+  .hero__row--stage {
     position: relative;
-    height: var(--space-32);
-    margin-top: var(--space-10);
-    background: var(--sky);
-    border-top: var(--border);
-    border-bottom: var(--border);
+  }
+
+  .hero__row--copy > *,
+  .hero__window {
+    position: relative;
+    z-index: 2;
+  }
+
+  .hero__clouds {
+    position: absolute;
+    inset: calc(var(--nav-h) + var(--space-2)) 0 calc(140px * var(--px));
+    z-index: 1;
     overflow: hidden;
+    pointer-events: none;
   }
 
   .hero__cloud {
     position: absolute;
-    width: calc(2 * var(--w));
+    left: calc(-1 * var(--w) * var(--px));
+    width: calc(var(--w) * var(--px));
     height: auto;
+    max-width: none;
+    animation: drift var(--dur) linear infinite;
+    animation-delay: var(--delay);
   }
 
-  .hero__cloud--a {
-    --w: 219px;
-    top: var(--space-4);
-    left: 8%;
+  @keyframes drift {
+    to {
+      translate: calc(100vw + var(--w) * var(--px)) 0;
+    }
   }
 
-  .hero__cloud--b {
-    --w: 69px;
-    top: var(--space-12);
-    right: 12%;
+  .hero__eyebrow {
+    color: var(--text-muted);
   }
 
-  .hero__stage {
-    display: flex;
-    justify-content: center;
-    margin-top: calc(-1 * var(--space-16));
+  .hero__tagline {
+    max-width: 34rem;
+    font-size: var(--text-lg);
+    color: var(--text-muted);
   }
 
   .hero__window {
-    width: min(100%, 36rem);
-  }
-
-  .hero__row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-4) var(--space-6);
-  }
-
-  .hero__sam {
-    flex: none;
+    width: min(100%, 34rem);
+    text-align: left;
   }
 
   .hero__actions {
@@ -187,17 +256,38 @@ const sessions = [
     gap: var(--space-2);
   }
 
-  .hero__status {
-    margin-top: var(--space-4);
+  .hero__hint {
+    margin-top: var(--space-3);
     padding-top: var(--space-3);
     border-top: var(--border);
   }
 
+  .hero__sam {
+    position: absolute;
+    left: 30%;
+    bottom: calc(7px * var(--px));
+    z-index: 2;
+  }
+
+  .hero__ground {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 2;
+    height: calc(9px * var(--px));
+    background: url('/sprites/world/tile-grass-dirt_24x9.png') left top / calc(24px * var(--px)) calc(9px * var(--px)) repeat-x;
+    image-rendering: pixelated;
+  }
+
+  /* ── Sections ── */
   .section {
-    padding-top: var(--space-24);
     display: grid;
     gap: var(--space-6);
     justify-items: center;
+    padding-top: var(--space-24);
+  }
+
+  .section :global(.marker) {
+    margin-bottom: calc(-1 * var(--space-4));
   }
 
   .section__lede {
@@ -207,27 +297,19 @@ const sessions = [
 
   .sessions {
     display: grid;
-    gap: var(--space-6);
+    gap: var(--space-8);
     width: 100%;
     padding: 0;
     list-style: none;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  }
-
-  .session__title {
-    margin-bottom: var(--space-2);
-    text-align: left;
-    font-family: var(--font-body);
-    font-weight: 600;
-    font-size: var(--text-lg);
-    line-height: var(--leading-snug);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   }
 
   .cta {
     display: grid;
-    gap: var(--space-6);
+    gap: var(--space-8);
     width: 100%;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    align-items: start;
   }
 
   .cta__sign {
@@ -236,13 +318,21 @@ const sessions = [
     margin-bottom: var(--space-4);
   }
 
-  .cta__actions {
-    margin-top: var(--space-4);
+  .cta__copy {
+    margin-bottom: var(--space-2);
   }
 
-  @media (max-width: 40rem) {
-    .hero__cloud--a {
-      left: -10%;
+  .cta__url {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: var(--border);
+    font-size: var(--text-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero__cloud {
+      animation: none;
+      translate: calc(var(--i, 1) * 22vw) 0;
     }
   }
 </style>
