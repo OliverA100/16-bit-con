@@ -26,6 +26,11 @@ export class Dust {
   private readonly outline = readToken('--color-outline-black');
   private readonly fill = readToken('--color-daisy-white');
 
+  /** True while a puff is still showing. */
+  alive(now: number): boolean {
+    return this.puffs.some((p) => now - p.born < LIFE_MS);
+  }
+
   spawn(x: number, slide: number, now: number): void {
     this.puffs.push({ x, slide, born: now });
     if (this.puffs.length > 6) this.puffs.shift();

@@ -38,39 +38,9 @@ import {
   type Material,
 } from 'three';
 
-export const DIMS = {
-  W: 1,
-  H: 1,
-  DEPTH: 1.05,
-  /** The back is this much smaller than the front (x and y, about the bottom centre). */
-  TAPER: 0.06,
-  /** Every casing edge: the vertical corners and the front and back edges. */
-  R: 0.06,
-  /** Screen opening: 70 % of the width, 57 % of the height, top bezel 9 % → chin 34 %. */
-  opening: { w: 0.7, h: 0.57, top: 0.09, r: 0.035 },
-  /** The rounded inner edge of the opening, before the recess walls. */
-  lip: 0.015,
-  /** The screen's edge sits this far behind the bezel. */
-  recess: 0.04,
-  /** The tube's cap bulges 3 % of the screen width at its centre. */
-  bulge: 0.021,
-  glassGap: 0.004,
-  seam: { z: 0.22, depth: 0.0028, half: 0.0028 },
-  vents: { z: [0.74, 0.79, 0.84, 0.89], half: 0.009, y0: 0.44, y1: 0.8, depth: 0.0045, wall: 0.0035 },
-  /** Floppy slot: 45 % of the width, centred 60 % of the chin height above the base. */
-  slot: { w: 0.45, h: 0.022, at: 0.6, lip: 0.011, lipDepth: 0.004 },
-  button: { r: 0.0225, x: 0.36, h: 0.009 },
-  led: { r: 0.0055, x: 0.316 },
-  feet: { r: 0.034, h: 0.022, x: 0.38, z: [0.12, 0.93] },
-} as const;
+import { CENTRE, DIMS, OPENING_Y, SLOT_Y } from './spec';
 
-export const OPENING_Y = DIMS.H - DIMS.opening.top - DIMS.opening.h / 2; // 0.625
-export const CHIN = DIMS.H - DIMS.opening.top - DIMS.opening.h; // 0.34
-export const SLOT_Y = CHIN * DIMS.slot.at;
-/** Screen aspect (width / height of the opening). */
-export const SCREEN_ASPECT = DIMS.opening.w / DIMS.opening.h;
-/** The visual centre of the monitor, the pivot for the parallax turn. */
-export const CENTRE = { x: 0, y: DIMS.H / 2, z: -DIMS.DEPTH / 2 } as const;
+export { CENTRE, CHIN, DIMS, OPENING_Y, SCREEN_ASPECT, SLOT_Y } from './spec';
 
 const scaleAt = (z: number) => 1 - DIMS.TAPER * Math.min(1, Math.max(0, -z / DIMS.DEPTH));
 

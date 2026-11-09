@@ -5,6 +5,7 @@
  * state outside the timeline.
  */
 import type { Strip } from './sprites';
+import type { Rect } from './world';
 import { SAM_HITBOX, SAM_CELL } from './sam';
 
 export interface CoinDef {
@@ -80,12 +81,22 @@ export class Coins {
     this.onChange?.(this.count);
   }
 
-  draw(ctx: CanvasRenderingContext2D, strip: Strip, camLeft: number, F: number, bw: number, now: number): void {
-    const frame = Math.floor(now / 160) % strip.frames;
+  /** True while an uncollected coin is inside the range (its spin is then on screen). */
+  showing(camLeft: number, r: Pick<Rect, 'x0' | 'x1'>): boolean {
+    return this.defs.some((c) => !this.collected.has(c.id) && c.x + HALF - camLeft > r.x0 && c.x - HALF - camLeft < r.x1);
+  }
+
+  /** The spin frame on the wall clock (a coin turns every 160 ms). */
+  static frameAt(now: number, frames: number): number {
+    return Math.floor(now / 160) % frames;
+  }
+
+  draw(ctx: CanvasRenderingContext2D, strip: Strip, camLeft: number, F: number, r: Pick<Rect, 'x0' | 'x1'>, now: number): void {
+    const frame = Coins.frameAt(now, strip.frames);
     for (const c of this.defs) {
       if (this.collected.has(c.id)) continue;
       const sx = c.x - HALF - camLeft;
-      if (sx < -24 || sx > bw) continue;
+      if (sx + 24 < r.x0 || sx > r.x1) continue;
       strip.draw(ctx, frame, sx, F - c.y - HALF);
     }
   }

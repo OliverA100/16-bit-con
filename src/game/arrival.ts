@@ -117,25 +117,26 @@ export class Arrival {
   /** The real sky and its clouds on the screen canvas at device resolution, as Level1.drawFar. */
   drawFar(sctx: CanvasRenderingContext2D, f: Frame, k: number): void {
     sctx.save();
-    sctx.setTransform(k, 0, 0, k, 0, 0);
+    sctx.scale(k, k);
     sctx.imageSmoothingEnabled = false;
     this.sky_(sctx, f, (v) => Math.round(v * k) / k);
     sctx.restore();
   }
 
   private sky_(ctx: CanvasRenderingContext2D, f: Frame, snap: (v: number) => number): void {
-    const { camLeft, F, bw, bh, now } = f;
+    const { camLeft, F, now, range: r, span } = f;
     const a = this.a;
     const sky = this.sky ?? (this.sky = { top: readToken(REAL_SKY), horizon: readToken(REAL_HORIZON) });
     ctx.fillStyle = sky.top;
-    ctx.fillRect(0, 0, bw, bh);
+    ctx.fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
     ctx.fillStyle = sky.horizon;
-    ctx.fillRect(0, F - PLAZA.horizon, bw, bh - F + PLAZA.horizon);
+    ctx.fillRect(r.x0, F - PLAZA.horizon, r.x1 - r.x0, r.y1 - F + PLAZA.horizon);
     for (const s of CLOUDS) {
       const img = (s.set === 'small' ? a.small : a.medium)[s.i]!;
-      const span = bw + img.width;
+      // wrapped over the screen frame's span, as the game's far clouds
       const u = s.u + s.drift * (now / 1000) - STACK.small.p * camLeft;
-      ctx.drawImage(img, snap(mod(u, span) - img.width), Math.round((F - PLAZA.horizon) * s.y));
+      const x = span.x0 + mod(u - span.x0, span.x1 - span.x0 + img.width) - img.width;
+      if (x < r.x1 && x + img.width > r.x0) ctx.drawImage(img, snap(x), Math.round((F - PLAZA.horizon) * s.y));
     }
   }
 
@@ -143,20 +144,20 @@ export class Arrival {
    * @param opaque true while the dissolve masks this frame (its own sky and clouds, at art pixels);
    *   false once it is the whole picture, when drawFar paints the sky behind a transparent buffer
    */
-  draw(ctx: CanvasRenderingContext2D, f: Frame, opaque = true): void {
-    const { camLeft, sx, F, bw, bh, now } = f;
+  draw(ctx: CanvasRenderingContext2D, f: Frame, opaque = true, clear = true): void {
+    const { camLeft, sx, F, bw, bh, now, range: r } = f;
     const a = this.a;
     const c = this.city;
     const g = STACK.ground;
     const base = F + STACK.near.bottom;
     const place = (img: Drawable, x: number, bottom: number) => {
       const px = Math.round(x - camLeft);
-      if (px > -img.width && px < bw) ctx.drawImage(img, px, Math.round(bottom - img.height));
+      if (px + img.width > r.x0 && px < r.x1) ctx.drawImage(img, px, Math.round(bottom - img.height));
     };
 
     // Sky: flat Blue 100, and Daisy White only at the horizon behind the roofline.
     if (opaque) this.sky_(ctx, f, Math.round);
-    else ctx.clearRect(0, 0, bw, bh);
+    else if (clear) ctx.clearRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
 
     if (c) {
       // The real Javits at p 0.25, its entrance centred on screen where Sam stops; its end annex repeats outward.
@@ -168,34 +169,37 @@ export class Arrival {
       ctx.drawImage(c.facade, fx, fy);
       const mq = this.marqueeFor(c);
       ctx.drawImage(mq.img, fx + mq.x, F + PLAZA.facade.bottom - mq.bottom - mq.img.height);
-      for (let x = fx - c.facadeBay.width; x > -c.facadeBay.width; x -= c.facadeBay.width) ctx.drawImage(c.facadeBay, x, fy);
-      for (let x = fx + c.facade.width; x < bw; x += c.facadeBay.width) ctx.drawImage(c.facadeBay, x, fy);
+      for (let x = fx - c.facadeBay.width; x + c.facadeBay.width > r.x0; x -= c.facadeBay.width) ctx.drawImage(c.facadeBay, x, fy);
+      for (let x = fx + c.facade.width; x < r.x1; x += c.facadeBay.width) ctx.drawImage(c.facadeBay, x, fy);
       const treeY = F + PLAZA.facade.bottom - c.cypress.height;
       for (let x = CYPRESS.from; x < CYPRESS.to; x += CYPRESS.step) {
         if (x > CYPRESS.gap[0] && x < CYPRESS.gap[1]) continue;
         const tx = fx + x;
-        if (tx > -c.cypress.width && tx < bw) ctx.drawImage(c.cypress, tx, treeY);
+        if (tx + c.cypress.width > r.x0 && tx < r.x1) ctx.drawImage(c.cypress, tx, treeY);
       }
     }
 
     // Ground: the street's bands run on as the plaza paving, then the daisy bed through three
-    // vertical seams 28 px apart, surface first, fill last.
+    // vertical seams 28 px apart, surface first, fill last; below the viewport (the monitor's screen
+    // frame only) the fill carries on down.
     const X1 = PLAZA.seam;
     const X2 = X1 + g.seamStep;
     const X3 = X1 + 2 * g.seamStep;
     if (c) {
-      drawTiled(ctx, c.sidewalk, camLeft, F, bw, { to: X1 });
-      drawTiled(ctx, c.kerb, camLeft, F + g.edgeTop, bw, { to: X2 });
-      drawTiled(ctx, c.road, camLeft, F + g.fillTop, bw, { to: X3 });
+      drawTiled(ctx, c.sidewalk, camLeft, F, r, { to: X1 });
+      drawTiled(ctx, c.kerb, camLeft, F + g.edgeTop, r, { to: X2 });
     }
-    const edgeX = c ? Math.max(0, Math.round(X2 - camLeft)) : 0;
-    if (edgeX < bw) {
+    const edgeX = c ? Math.max(r.x0, Math.round(X2 - camLeft)) : r.x0;
+    if (edgeX < r.x1) {
       ctx.fillStyle = a.dirt;
-      ctx.fillRect(edgeX, F + g.edgeTop, bw - edgeX, g.fillTop - g.edgeTop);
+      ctx.fillRect(edgeX, F + g.edgeTop, r.x1 - edgeX, g.fillTop - g.edgeTop);
     }
-    drawTiled(ctx, a.dirtFill, camLeft, F + g.fillTop, bw, { from: c ? X3 : -Infinity, phase: g.daisyPhase });
-    drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, bw, { from: c ? X2 : -Infinity, phase: g.daisyPhase });
-    drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, bw, { from: c ? X1 : -Infinity, phase: g.daisyPhase });
+    for (let y = F + g.fillTop; y < Math.max(bh, r.y1); y += a.dirtFill.height) {
+      if (c) drawTiled(ctx, c.road, camLeft, y, r, { to: X3 });
+      drawTiled(ctx, a.dirtFill, camLeft, y, r, { from: c ? X3 : -Infinity, phase: g.daisyPhase });
+    }
+    drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, r, { from: c ? X2 : -Infinity, phase: g.daisyPhase });
+    drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, r, { from: c ? X1 : -Infinity, phase: g.daisyPhase });
     if (c) place(c.seamBack, X1 - SEAM_BACK_X1, F + g.seamTileTop + c.seamBack.height);
 
     for (const x of PLAZA.daisies) place(a.daisyTiny, x, F);

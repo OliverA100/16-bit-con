@@ -7,11 +7,18 @@
  * The camera frames the monitor by its projected silhouette (sampled casing vertices, not a
  * bounding box), so "22 % of the viewport width" means the visible monitor, and a view offset puts
  * that silhouette's centre on the layout slot's centre.
+ *
+ * Setup is a sequence of steps (renderer, room light, the build, the camera) so the page can run
+ * them one task at a time and keep every main-thread task short (createMonitorAsync). Nearly all of
+ * the room light's cost is compiling its programs on first use (a second PMREM of the same room takes
+ * 1 ms), so the page compiles the room's programs in parallel first and only then renders it.
  */
 import {
   ACESFilmicToneMapping,
   Color,
+  CubeCamera,
   DirectionalLight,
+  HalfFloatType,
   LinearMipmapLinearFilter,
   NearestFilter,
   PerspectiveCamera,
@@ -19,45 +26,29 @@ import {
   Scene,
   SRGBColorSpace,
   Vector3,
+  WebGLCubeRenderTarget,
   WebGLRenderer,
   type Texture,
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { readToken } from '../game/palette';
-import { buildMonitor, DIMS, OPENING_Y, measure, type MonitorParts } from './build';
+import { buildMonitor, measure, type MonitorParts } from './build';
 import { createCrtMaterial, coverRect } from './crt';
+import { DIMS, FOV, OPENING_Y, type Slot, type View } from './spec';
+
+export { FOV, REST, restWidth, VIEWS, type Slot, type View } from './spec';
 
 const DEG = Math.PI / 180;
 
-/** A layout slot in CSS px of the canvas: the monitor's projected silhouette is centred on (cx, cy) and `w` wide. */
-export interface Slot {
-  cx: number;
-  cy: number;
-  w: number;
-}
-
-export interface View {
-  yaw: number;
-  pitch: number;
-  /** What the camera looks at, and what is fitted to the slot width. */
-  fit: 'casing' | 'screen';
-}
-
-/** The rest pose: a 3/4 view from the front right, 20° yaw, 6° above. */
-export const REST: View = { yaw: 20, pitch: 6, fit: 'casing' };
-export const VIEWS: Record<string, View> = {
-  front34: REST,
-  side: { yaw: 78, pitch: 6, fit: 'casing' },
-  closeup: { yaw: 13, pitch: 4, fit: 'screen' },
-};
-export const FOV = 30;
-
-/** At rest the monitor is 22 % of the viewport width, never under 220 CSS px. */
-export function restWidth(viewportW: number): number {
-  return Math.max(0.22 * viewportW, 220);
-}
-
 const color = (token: string) => new Color().setStyle(readToken(token));
+
+/** A box in CSS px of the canvas. */
+export interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
 
 export interface Monitor {
   renderer: WebGLRenderer;
@@ -68,29 +59,54 @@ export interface Monitor {
   lights: { key: DirectionalLight; rim: DirectionalLight };
   setSize(cssW: number, cssH: number): void;
   /** Place the camera for `view` with the monitor on `slot`; returns its silhouette box and the screen's projected size (CSS px). */
-  frame(view: View, slot: Slot): { box: { x0: number; y0: number; x1: number; y1: number }; screenW: number; screenH: number };
+  frame(view: View, slot: Slot): { box: Box; screenW: number; screenH: number };
   setFrame(texture: Texture, aspect: number): void;
+  /**
+   * A point on the tube's surface in world space (the bulged cap, as the vertex shader moves it):
+   * u across the opening left → right, v top → bottom, both 0–1.
+   */
+  screenPoint(u: number, v: number, target?: Vector3): Vector3;
+  /** World → CSS px of the canvas, through the current camera (view offset included). */
+  toCss(p: Vector3): [number, number];
   render(): void;
   measure(): Record<string, number>;
+  dispose(): void;
 }
 
-export function createMonitor(canvas: HTMLCanvasElement): Monitor {
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+/** The setup, one step per `yield` (a yielded promise is awaited first); returns the monitor. */
+function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, precompile = false): Generator<Promise<unknown> | void, Monitor> {
+  const renderer = new WebGLRenderer({ canvas, context, antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.5;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
+  // Reading a program's link status makes the main thread wait for the GPU's compile; only dev reads the log.
+  renderer.debug.checkShaderErrors = import.meta.env.DEV;
+  yield;
 
   const scene = new Scene();
   const pmrem = new PMREMGenerator(renderer);
-  const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const room = new RoomEnvironment();
+  if (precompile) {
+    // The room's programs, compiled in parallel (KHR_parallel_shader_compile) exactly as PMREM will
+    // use them, into a half-float cube target: then fromScene only compiles its own three passes.
+    const target = new WebGLCubeRenderTarget(256, { type: HalfFloatType });
+    const cube = new CubeCamera(0.1, 100, target);
+    renderer.setRenderTarget(target, 0);
+    const compiled = renderer.compileAsync(room, cube.children[0] as PerspectiveCamera);
+    renderer.setRenderTarget(null);
+    yield compiled.finally(() => target.dispose());
+  }
+  const env = pmrem.fromScene(room, 0.04).texture;
   pmrem.dispose();
+  room.dispose();
   // A dim room for the plastic, so the clearcoat carries highlights rather than a white sheen and the
   // key light shapes the casing (front lit, the side falling into orange). Exposure, room and key were
   // swept against reference 01's front/side colours.
   scene.environment = env;
   scene.environmentIntensity = 0.22;
+  yield;
 
   const key = new DirectionalLight(0xffffff, 3);
   key.position.set(-2.4, 3.4, 2.8);
@@ -123,43 +139,39 @@ export function createMonitor(canvas: HTMLCanvasElement): Monitor {
   parts.materials.glass.roughness = 0.22;
   // turned so the room's bright panel lands as a soft sheet in the glass's upper left, as in reference 01
   parts.materials.glass.envMapRotation.set(0.45, 5.2, 0);
+  yield;
 
   const camera = new PerspectiveCamera(FOV, 1, 0.02, 40);
   let cssW = 1;
   let cssH = 1;
 
-  // Silhouette samples (world space once the pivot is placed): every casing and foot vertex.
+  // Silhouette samples (body space, so they turn with the monitor): every third casing and foot vertex.
   const silhouette: Vector3[] = [];
-  const screenCorners: Vector3[] = [];
-  const collect = () => {
-    parts.pivot.updateMatrixWorld(true);
-    silhouette.length = 0;
-    for (const m of [parts.casing, ...parts.feet]) {
-      const p = m.geometry.getAttribute('position');
-      for (let i = 0; i < p.count; i += 3) silhouette.push(new Vector3(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(m.matrixWorld));
-    }
-    screenCorners.length = 0;
-    const { w, h } = DIMS.opening;
-    for (const [x, y] of [
-      [-w / 2, OPENING_Y - h / 2],
-      [w / 2, OPENING_Y - h / 2],
-      [w / 2, OPENING_Y + h / 2],
-      [-w / 2, OPENING_Y + h / 2],
-    ] as const)
-      screenCorners.push(new Vector3(x, y, -DIMS.recess).applyMatrix4(parts.body.matrixWorld));
-  };
-  collect();
+  parts.pivot.updateMatrixWorld(true);
+  for (const m of [parts.casing, ...parts.feet]) {
+    const p = m.geometry.getAttribute('position');
+    for (let i = 0; i < p.count; i += 3) silhouette.push(new Vector3(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(m.matrix));
+  }
+  const corners = [
+    [0, 1],
+    [1, 1],
+    [1, 0],
+    [0, 0],
+  ] as const;
+  const scaleAt = (z: number) => 1 - DIMS.TAPER * Math.min(1, Math.max(0, -z / DIMS.DEPTH));
 
-  const project = (pts: Vector3[]) => {
-    const v = new Vector3();
+  const tmp = new Vector3();
+  const project = (pts: Vector3[], space: 'body' | 'world') => {
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
     let y1 = -Infinity;
     for (const p of pts) {
-      v.copy(p).project(camera);
-      const x = ((v.x + 1) / 2) * cssW;
-      const y = ((1 - v.y) / 2) * cssH;
+      tmp.copy(p);
+      if (space === 'body') tmp.applyMatrix4(parts.body.matrixWorld);
+      tmp.project(camera);
+      const x = ((tmp.x + 1) / 2) * cssW;
+      const y = ((1 - tmp.y) / 2) * cssH;
       x0 = Math.min(x0, x);
       x1 = Math.max(x1, x);
       y0 = Math.min(y0, y);
@@ -183,8 +195,14 @@ export function createMonitor(canvas: HTMLCanvasElement): Monitor {
       camera.updateProjectionMatrix();
     },
     frame(view, slot) {
-      const target = view.fit === 'screen' ? new Vector3(0, OPENING_Y, -DIMS.recess).applyMatrix4(parts.body.matrixWorld) : new Vector3(0, 0, 0);
-      const pts = view.fit === 'screen' ? screenCorners : silhouette;
+      // Framed with the monitor square to the world (no parallax turn), so the rest pose never moves.
+      const turned = parts.pivot.quaternion.clone();
+      parts.pivot.quaternion.identity();
+      parts.pivot.updateMatrixWorld(true);
+      const screenCorners = corners.map(([u, v]) => monitor.screenPoint(u, v));
+      const target = view.fit === 'screen' ? monitor.screenPoint(0.5, 0.5) : new Vector3(0, 0, 0);
+      const fitPts = view.fit === 'screen' ? screenCorners : silhouette;
+      const space = view.fit === 'screen' ? 'world' : 'body';
       const yaw = view.yaw * DEG;
       const pitch = view.pitch * DEG;
       const dir = new Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
@@ -197,17 +215,20 @@ export function createMonitor(canvas: HTMLCanvasElement): Monitor {
         camera.position.copy(target).addScaledVector(dir, d);
         camera.lookAt(target);
         camera.updateMatrixWorld();
-        box = project(pts);
+        box = project(fitPts, space);
         d *= (box.x1 - box.x0) / slot.w;
       }
       camera.position.copy(target).addScaledVector(dir, d);
       camera.lookAt(target);
       camera.updateMatrixWorld();
-      box = project(pts);
+      box = project(fitPts, space);
       camera.setViewOffset(cssW, cssH, (box.x0 + box.x1) / 2 - slot.cx, (box.y0 + box.y1) / 2 - slot.cy, cssW, cssH);
       camera.updateMatrixWorld();
-      const s = project(screenCorners);
-      return { box: project(silhouette), screenW: s.x1 - s.x0, screenH: s.y1 - s.y0 };
+      const s = project(screenCorners, 'world');
+      const result = { box: project(silhouette, 'body'), screenW: s.x1 - s.x0, screenH: s.y1 - s.y0 };
+      parts.pivot.quaternion.copy(turned);
+      parts.pivot.updateMatrixWorld(true);
+      return result;
     },
     setFrame(texture, aspect) {
       texture.colorSpace = SRGBColorSpace;
@@ -219,12 +240,56 @@ export function createMonitor(canvas: HTMLCanvasElement): Monitor {
       crt.uniforms.uMap.value = texture;
       crt.uniforms.uFrame.value = coverRect(aspect);
     },
+    screenPoint(u, v, target = new Vector3()) {
+      const { w, h } = DIMS.opening;
+      const cx = 2 * u - 1;
+      const cy = 2 * v - 1;
+      const z = -DIMS.recess + crt.uniforms.uBulge.value * (1 - cx * cx) * (1 - cy * cy);
+      const s = scaleAt(-DIMS.recess);
+      return target.set((u - 0.5) * w * s, (OPENING_Y + (0.5 - v) * h) * s, z).applyMatrix4(parts.body.matrixWorld);
+    },
+    toCss(p) {
+      tmp.copy(p).project(camera);
+      return [((tmp.x + 1) / 2) * cssW, ((1 - tmp.y) / 2) * cssH];
+    },
     render() {
       renderer.render(scene, camera);
     },
     measure() {
       return measure(parts);
     },
+    dispose() {
+      scene.traverse((o) => {
+        const mesh = o as { geometry?: { dispose(): void }; material?: { dispose(): void } | { dispose(): void }[] };
+        mesh.geometry?.dispose();
+        const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+        for (const m of mats) m.dispose();
+      });
+      env.dispose();
+      renderer.dispose();
+    },
   };
   return monitor;
+}
+
+/** Build the monitor in one go (the review page). */
+export function createMonitor(canvas: HTMLCanvasElement): Monitor {
+  const it = steps(canvas);
+  for (;;) {
+    const r = it.next();
+    if (r.done) return r.value;
+  }
+}
+
+/** Build the monitor one step per task, awaiting `pause` between steps (the page, with the context it made). */
+export async function createMonitorAsync(canvas: HTMLCanvasElement, context: WebGL2RenderingContext, pause: () => Promise<void>): Promise<Monitor> {
+  const it = steps(canvas, context, true);
+  for (let i = 0; ; i++) {
+    const t0 = performance.now();
+    const r = it.next();
+    if (import.meta.env.DEV) performance.measure(`monitor:step${i}`, { start: t0, end: performance.now() });
+    if (r.done) return r.value;
+    if (r.value) await r.value;
+    await pause();
+  }
 }

@@ -77,6 +77,10 @@ daisy-logo-pixel, daisy-icon-yellow, logo.svg, logo-flower.svg
 vega-logo.svg (Green 700) / vega-logo-light.svg (Daisy White): the Vega logo, wordmark and daisy together;
 vega-daisy.svg: the daisy alone. frames/: vega.io UI frames (window-single, window-site, folder, document).
 
+## monitor/ and dev/ (renders of our own code, not art)
+- ../monitor/monitor-off.webp, ../monitor/monitor-on.webp — the monitor posters: renders of src/monitor at rest by /dev/monitor?poster=off|on (1440 × 900, device pixel ratio 2), cropped to the alpha, WebP q86 — screen off (shown while the 3D loads) and screen on with the game's first frame (shown wherever there is no 3D). Their placement round the slot is measured into src/monitor/poster.ts. Rendered 2026-11-09.
+- ../dev/title-frame.png, ../dev/screen-frame.png — review-page textures (dev only): the engine's title frame at t ≈ 0 (Gate 1), and the monitor's screen frame at t = 0, 1440 × 900 @2 — the viewport frame with its margins (Gate 2, the source of monitor-on).
+
 ## NEW (drawn for 16-Bit Con)
 _(add entries here as new art is created: file, size, what it is)_
 

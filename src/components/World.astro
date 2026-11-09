@@ -1,15 +1,17 @@
 ---
 /**
- * World — the hero and, when JS runs, the canvas world pinned over it (Phase 3).
- * Markup is the static hero (six sky rows, Sam, grass tile); with `world--live` the canvas
- * paints bands, clouds, ground and Sam itself and the rows become transparent overlays.
+ * World — the opening and, when JS runs, the canvas world pinned under it.
+ * The opening is real DOM on the Daisy White page: the eyebrow and the wordmark above the monitor,
+ * the tagline below, PRESS START laid on the monitor's screen. The monitor is a poster painted into
+ * a canvas (so it is never the LCP element) until the 3D takes over; with the world live, the
+ * canvas world sits under the opening and the overlays come in as it plays.
  */
 import Window from './Window.astro';
 import Button from './Button.astro';
 import Wordmark from './Wordmark.astro';
-import { sprites } from '../data/sprites.manifest';
 import { sessions } from '../data/sessions';
 import { railStops, type RailIcon } from '../data/guide';
+import { POSTER } from '../monitor/poster';
 
 /** Thin outline icons for the rail, 16 × 16, 2 px strokes (brand rule: outline icons with mono labels). */
 const icons: Record<RailIcon, string> = {
@@ -21,72 +23,67 @@ const icons: Record<RailIcon, string> = {
   ticket: '<path d="M1 4h14v3a1 1 0 0 0 0 2v3H1V9a1 1 0 0 0 0-2z"/><path d="M10 4v8" stroke-dasharray="1 1"/>',
 };
 
-const clouds = [
-  { key: 'cloudB', top: '14%', dur: '170s', delay: '-60s' },
-  { key: 'cloudD', top: '30%', dur: '210s', delay: '-150s' },
-  { key: 'cloudA', top: '8%', dur: '140s', delay: '-20s' },
-  { key: 'cloudG', top: '46%', dur: '120s', delay: '-90s' },
-  { key: 'cloudF', top: '58%', dur: '190s', delay: '-130s' },
-] as const;
-
 const level1 = sessions[0]!;
 const level2 = sessions[1]!;
 const level3 = sessions[2]!;
+
+const pct = (v: number) => `${+(v * 100).toFixed(3)}%`;
+const posterStyle = `left: ${pct(POSTER.left)}; top: ${pct(POSTER.top)}; width: ${pct(POSTER.width)}; height: ${pct(POSTER.height)};`;
+const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con game on its screen';
 ---
 
 <section class="hero world" id="world" aria-labelledby="hero-title" data-world>
   <canvas class="world__canvas pixel" aria-hidden="true"></canvas>
 
-  <div class="hero__clouds" aria-hidden="true">
-    {
-      clouds.map((c, i) => {
-        const s = sprites[c.key];
-        return (
-          <img
-            class="hero__cloud pixel"
-            src={s.file}
-            width={s.w}
-            height={s.h}
-            alt=""
-            style={`--w: ${s.w}px; --i: ${i}; top: ${c.top}; --dur: ${c.dur}; --delay: ${c.delay};`}
-          />
-        );
-      })
-    }
-  </div>
-
-  <div class="hero__row hero__row--nav" aria-hidden="true"></div>
-
-  <div class="hero__row hero__row--copy">
-    <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
-    <Wordmark as="h1" size="hero" id="hero-title" />
+  <div class="hero__stage" data-stage>
+    <canvas class="hero__gl" aria-hidden="true" data-gl></canvas>
+    <div class="hero__copy">
+      <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
+      <Wordmark as="h1" size="hero" id="hero-title" />
+    </div>
+    <div class="hero__monitor" style={`--slot-aspect: ${1 / POSTER.slotAspect};`} data-monitor>
+      <canvas
+        class="hero__poster"
+        width={POSTER.w}
+        height={POSTER.h}
+        style={posterStyle}
+        role="img"
+        aria-label={monitorLabel}
+        data-poster
+        data-off="/monitor/monitor-off.webp"
+        data-on="/monitor/monitor-on.webp"></canvas>
+      <noscript><img class="hero__poster" src="/monitor/monitor-on.webp" width={POSTER.w} height={POSTER.h} style={posterStyle} alt={monitorLabel} /></noscript>
+    </div>
     <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
-  </div>
-
-  <div class="hero__row hero__row--gap" aria-hidden="true"></div>
-
-  <div class="hero__row hero__row--window">
-    <Window title="PRESS START" id="press-start" class="hero__window">
-      <div class="hero__actions">
-        <Button href="#register">Register now</Button>
-        <Button href="#booth" variant="ghost">Find us at Booth 630</Button>
-      </div>
-      <p class="eyebrow hero__hint">Insert coin · 3 levels · 1 after party · Booth 630</p>
+    <Window title="Player 1" class="hero__start" data-start>
+      <Button size="sm" class="hero__start-btn" data-start-button>Press start</Button>
     </Window>
   </div>
-
-  <div class="hero__row hero__row--gap2" aria-hidden="true"></div>
-
-  <div class="hero__row hero__row--stage">
-    <canvas
-      class="hero__sam pixel"
-      id="hero-sam"
-      width="60"
-      height="60"
-      role="img"
-      aria-label="Sam, Vega's pixel-art mole, idling on a grass platform in blue ski goggles"></canvas>
-    <div class="hero__ground" aria-hidden="true"></div>
-  </div>
+  <script is:inline>
+    // The poster, painted into its canvas as soon as it decodes (canvas pixels are never an LCP
+    // candidate, so the wordmark stays the LCP element). Screen off while the 3D loads; screen on
+    // wherever there will be no 3D. Mirrors shouldRunWorld() in src/game/index.ts, plus WebGL 2.
+    (function () {
+      var c = document.querySelector('[data-poster]');
+      if (!c) return;
+      var n = navigator;
+      var live =
+        !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+        !(n.connection && n.connection.saveData) &&
+        !((n.deviceMemory || 8) <= 2) &&
+        !!window.WebGL2RenderingContext;
+      var which = live ? 'off' : 'on';
+      c.dataset.state = which;
+      var img = new Image();
+      img.decoding = 'async';
+      img.onload = function () {
+        if (c.dataset.state !== which) return;
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.dataset.painted = '1';
+      };
+      img.src = c.dataset[which];
+    })();
+  </script>
 
   <!-- Live-only overlays -->
   <Window title="Level 1 · 10:00 AM" class="world__session" data-session="1" aria-live="polite">
@@ -136,8 +133,6 @@ const level3 = sessions[2]!;
 
   <p class="eyebrow world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
 
-  <div class="world__bezel" aria-hidden="true"></div>
-
   <Window title="BREAK OUT · 0/6" class="world__prompt" aria-live="polite">
     <p class="world__prompt-key"><span class="world__prompt-fine">Mash space</span><span class="world__prompt-coarse">Tap to break out</span></p>
   </Window>
@@ -157,123 +152,71 @@ const level3 = sessions[2]!;
 
 <script>
   import { bootWorld, shouldRunWorld } from '../game/index';
-  import { loadSamSheets } from '../game/sam';
-  import { fitPixelCanvas, worldBuffer } from '../game/scale';
+  import { queryHero, staticHero } from '../game/hero-dom';
 
   const section = document.querySelector<HTMLElement>('[data-world]');
-  const heroSam = document.getElementById('hero-sam') as HTMLCanvasElement | null;
+  const toRegister = () => document.getElementById('register')?.scrollIntoView({ block: 'start' });
 
   if (section && shouldRunWorld()) {
-    bootWorld(section).catch((err) => console.error('[world] boot failed, static hero stays', err));
-  } else if (heroSam) {
-    // Static fallback: Sam idles in his own small canvas (frame 0 under reduced motion).
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const fit = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const { k } = worldBuffer(window.innerWidth, window.innerHeight, dpr);
-      return fitPixelCanvas(heroSam, 60, 60, k / dpr);
-    };
-    let { k, ctx } = fit();
-    loadSamSheets()
-      .then(({ idle }) => {
-        let frame = 0;
-        let last = 0;
-        const paint = () => {
-          ctx.setTransform(k, 0, 0, k, 0, 0);
-          ctx.clearRect(0, 0, 60, 60);
-          idle.draw(ctx, frame, 0, 0);
-        };
-        paint();
-        window.addEventListener('resize', () => {
-          ({ k, ctx } = fit());
-          paint();
-        });
-        if (reduceMotion) return;
-        const tick = (now: number) => {
-          if (now - last >= 125) {
-            last = now;
-            frame = (frame + 1) % idle.frames;
-            if (!document.hidden) paint();
-          }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      })
-      .catch((err) => console.error(err));
+    bootWorld(section).catch((err) => {
+      console.error('[world] boot failed, the static opening stays', err);
+      const d = queryHero(section);
+      if (d && !section.classList.contains('world--live')) {
+        staticHero(d);
+        d.startButton.addEventListener('click', toRegister);
+      }
+    });
+  } else if (section) {
+    // Reduced motion, save-data or a small device: the static page, the monitor powered on, and
+    // PRESS START goes straight to the Register section.
+    const d = queryHero(section);
+    if (d) {
+      staticHero(d);
+      d.startButton.addEventListener('click', toRegister);
+    }
   }
 </script>
 
 <style>
-  /* ── Hero: the first viewport is the flat day sky (one colour, depth from clouds), built as
-        rows so the title overlay and the canvas share one layout. Feet line F = H − 48 art px;
-        the daisy row runs under Sam from the first frame over the 48 px ground band. ── */
+  /* ── The opening: the Daisy White page with the copy as real DOM round the monitor,
+        readable before anything loads. The monitor's slot is its silhouette at rest: 22 % of the
+        viewport width, never under 220 px (src/monitor/spec.ts restWidth). ── */
   .hero {
-    --stage-h: calc(60px * var(--px));
     position: relative;
     isolation: isolate;
-    display: grid;
-    grid-template-rows: auto auto minmax(var(--space-8), 1fr) auto var(--space-8) var(--stage-h);
     min-height: 100vh;
     min-height: 100dvh;
-    padding-bottom: calc(48px * var(--px));
     overflow: clip;
-    background: var(--sky);
+    background: var(--surface);
     text-align: center;
   }
 
-  .hero__row {
-    width: 100%;
-  }
-
-  .hero__row--nav {
-    height: calc(var(--nav-h) + var(--space-4));
-  }
-
-  .hero__row--copy {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-4);
-    padding: var(--space-8) var(--gutter);
-  }
-
-  .hero__row--window {
-    display: flex;
-    justify-content: center;
-    padding: 0 var(--gutter) var(--space-6);
-  }
-
-  .hero__row--stage {
+  .hero__stage {
     position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-6);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: calc(var(--nav-h) + var(--space-6)) var(--gutter) var(--space-10);
+    background: var(--surface);
   }
 
-  .hero__row--copy > *,
-  .hero__window {
+  .hero__copy {
     position: relative;
     z-index: 2;
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
   }
 
-  .hero__clouds {
-    position: absolute;
-    inset: calc(var(--nav-h) + var(--space-2)) 0 calc(140px * var(--px));
-    z-index: 1;
-    overflow: hidden;
-    pointer-events: none;
-  }
-
-  .hero__cloud {
-    position: absolute;
-    left: calc(-1 * var(--w) * var(--px));
-    width: calc(var(--w) * var(--px));
-    height: auto;
-    max-width: none;
-    animation: drift var(--dur) linear infinite;
-    animation-delay: var(--delay);
-  }
-
-  @keyframes drift {
-    to {
-      translate: calc(100vw + var(--w) * var(--px)) 0;
-    }
+  /* The wordmark fills a phone's width and fits the height too, so the copy and the monitor share
+     a short screen — and it stays the largest text, the LCP element, at every size. */
+  .hero__copy :global(.wm--hero) {
+    font-size: clamp(3rem, min(15.5vw, 13vh), 8rem);
   }
 
   .hero__eyebrow,
@@ -282,67 +225,103 @@ const level3 = sessions[2]!;
   }
 
   .hero__tagline {
+    position: relative;
+    z-index: 2;
     max-width: 34rem;
     font-size: var(--text-lg);
   }
 
-  .hero__window {
-    width: min(100%, 34rem);
-    text-align: left;
-  }
-
-  .hero__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .hero__hint {
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: var(--border);
-  }
-
-  .hero__sam {
-    position: absolute;
-    left: 30%;
-    bottom: calc(-5px * var(--px)); /* soles 4 px into the surface band, as in the engine (FOOT_SINK) */
-    z-index: 2;
-  }
-
-  /* The ground band, 48 px as in the engine: surface 8 (the strip's tips and fill), edge 12 (its
-     dirt rows over the dirt tone), fill 28 (the deeper dirt). Tiled with the canvas's phase. */
-  .hero__ground {
-    position: absolute;
-    inset: auto 0 calc(-1 * 48px * var(--px));
-    z-index: 1;
-    height: calc(48px * var(--px));
-    background:
-      linear-gradient(var(--color-field-dirt), var(--color-field-dirt)) 0 calc(8px * var(--px)) / 100% calc(12px * var(--px)) no-repeat,
-      url('/sprites/new/dirt-fill_256x28.png') calc(30% + 492px * var(--px)) calc(20px * var(--px)) / calc(256px * var(--px)) calc(28px * var(--px)) repeat-x,
-      var(--color-field-dirt-deep);
-    image-rendering: pixelated;
-  }
-
-  .hero__ground::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: calc(34px * var(--px));
-    height: calc(61px * var(--px));
-    background: url('/sprites/world/ground-daisy-row-strip_898x63.png') calc(30% + 492px * var(--px)) top / calc(898px * var(--px)) calc(63px * var(--px)) repeat-x;
-    image-rendering: pixelated;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .hero__cloud {
-      animation: none;
-      translate: calc(var(--i, 1) * 22vw) 0;
+  @media (max-width: 40rem) {
+    .hero__tagline {
+      max-width: 20rem;
+      font-size: var(--text-base);
     }
   }
 
-  /* ── Live world ── */
+  .hero__monitor {
+    position: relative;
+    flex: none;
+    width: max(22vw, 220px);
+    aspect-ratio: var(--slot-aspect);
+  }
+
+  .hero__poster {
+    position: absolute;
+    max-width: none;
+  }
+
+  .hero__poster.is-hidden {
+    opacity: 0;
+  }
+
+  /* The 3D: the whole stage, transparent, and no pointer events — swipes scroll, the copy stays selectable.
+     It replaces the poster in one frame (no fade: two half-transparent layers would let the page through). */
+  .hero__gl {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .hero__gl.is-on {
+    opacity: 1;
+  }
+
+  /* PRESS START: laid on the screen by a matrix3d from the camera (src/game/quad.ts) and hidden
+     until the screen has powered on. Designed 8rem wide; the transform scales it with the monitor. */
+  .hero__start {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    width: 8rem;
+    box-shadow: var(--shadow-hard-sm);
+    text-align: left;
+    transform-origin: 0 0;
+    visibility: hidden;
+  }
+
+  .hero__start.is-ready {
+    visibility: visible;
+  }
+
+  .hero__start :global(.window__body) {
+    padding: var(--space-2);
+  }
+
+  /* The tube's scanlines run over PRESS START too, at the screen's own period (--scan, from the camera
+     at rest), so it sits in the picture rather than on the glass. */
+  .hero__start::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--scan, 2px) * 0.4),
+      color-mix(in srgb, var(--color-outline-black) 30%, transparent) calc(var(--scan, 2px) * 0.7),
+      transparent var(--scan, 2px)
+    );
+  }
+
+  /* The button fills the window, and its hit area reaches past it to the window's edges and title
+     bar: a comfortable target even at a phone's scale. It presses 1 px on hover (Button.astro). */
+  .hero__start :global(.hero__start-btn) {
+    position: relative;
+    width: 100%;
+  }
+
+  .hero__start :global(.hero__start-btn)::after {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--window-bar-h) - var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
+  }
+
+  /* ── Live world: the canvas world under the opening, which lies over it and steps out as the run starts ── */
   .world__canvas {
     position: absolute;
     inset: 0;
@@ -362,24 +341,10 @@ const level3 = sessions[2]!;
     display: block;
   }
 
-  .world--live .hero__row,
-  .world--live .hero__row--nav,
-  .world--live .hero__row--copy,
-  .world--live .hero__row--gap,
-  .world--live .hero__row--window,
-  .world--live .hero__row--gap2,
-  .world--live .hero__row--stage {
-    background: transparent;
-  }
-
-  .world--live .hero__clouds,
-  .world--live .hero__ground,
-  .world--live .hero__sam {
-    display: none;
-  }
-
-  .world--live .hero__row--copy,
-  .world--live .hero__row--window {
+  .world--live .hero__stage {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
     will-change: transform, opacity;
   }
 
@@ -422,10 +387,8 @@ const level3 = sessions[2]!;
   .world__hud,
   .world__hint,
   .world__prompt,
-  .world__bezel,
   .world__loading,
-  .world__session,
-  .world--live .hero__row {
+  .world__session {
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
@@ -447,18 +410,8 @@ const level3 = sessions[2]!;
   .world__hud,
   .world__prompt,
   .world__loading,
-  .world--live .hero__window {
+  .hero__start {
     touch-action: manipulation;
-  }
-
-  /* In live mode the rows are only title scaffolding: touches fall through to the canvas, and
-     only the PRESS START window (while it is visible) keeps its buttons and panning. */
-  .world--live .hero__row {
-    pointer-events: none;
-  }
-
-  .world--live .hero__window {
-    pointer-events: auto;
   }
 
   .world--live :is(.world__session, .world__hud, .world__hint, .world__prompt, .world__rail, .world__sam).is-visible {
@@ -609,32 +562,6 @@ const level3 = sessions[2]!;
     }
   }
 
-  /* ── The breakout: a CRT bezel over the canvas, its opacity a function of t set by
-        the loop (--bezel); the outer spread fills the corners outside the rounded glass. ── */
-  .world__bezel {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    display: none;
-    pointer-events: none;
-    opacity: var(--bezel, 0);
-  }
-
-  .world--live .world__bezel {
-    display: block;
-  }
-
-  .world__bezel::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: calc(28px * var(--px));
-    box-shadow:
-      inset 0 0 0 calc(14px * var(--px)) var(--color-outline-black),
-      inset 0 0 0 calc(16px * var(--px)) var(--color-grey-700),
-      0 0 0 calc(40px * var(--px)) var(--color-outline-black);
-  }
-
   /* Centred at the top under the nav, on the HUD's row; where the two would meet (below 48rem) it
      drops under the HUD instead, still centred. */
   .world__prompt {
@@ -744,7 +671,7 @@ const level3 = sessions[2]!;
   }
 
   @media (pointer: coarse) {
-    .world--live .world__touch {
+    .world--live:not(.world--opening) .world__touch {
       position: absolute;
       inset: auto var(--gutter) calc(76px * var(--px));
       z-index: 3;

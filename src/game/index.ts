@@ -7,6 +7,13 @@
  * velocity, set the timeline directly, and scroll the page to match; a hit on the glass and the
  * auto-break move the target one step and scroll the page with it. Those are the only scrollTo
  * calls. A scroll we did not cause cancels them all for 150 ms. Scroll wins.
+ *
+ * The opening: a Daisy White page with the monitor, the copy and PRESS START lies over
+ * the canvas world. Once the page has loaded and gone idle, the monitor's 3D (three.js, its own
+ * chunk) is built a step per task, takes the poster's place in one frame and powers on with the live game
+ * on its screen: this loop draws the game into the screen frame and renders the 3D while the
+ * opening shows, and only the canvas world after. Until the zoom (Gate 3) the opening steps out over
+ * t 0.05–0.08 and PRESS START jumps to the world start.
  */
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -20,13 +27,18 @@ import { Coins, LEVEL1_COINS, TOTAL_COINS } from './coins';
 import { loadCity, loadLevel1 } from './assets';
 import { Level1 } from './world';
 import { Arrival } from './arrival';
-import { AUTO_IDLE_MS, AUTO_SPEED, BREAK, CRACK_STAGES, Dissolve, bezelAt, crackStage, dissolveLevel, drawCracks, flightAt, impactPoint, mashTarget, promptOn } from './breakout';
+import { AUTO_IDLE_MS, AUTO_SPEED, BREAK, CRACK_STAGES, Dissolve, crackStage, dissolveLevel, drawCracks, flightAt, impactPoint, mashTarget, promptOn } from './breakout';
 import { skyAt } from './stages';
 import { GROUND_BAND } from '../data/layers';
 import { levelLabel, railStops, samLines, type SamLine } from '../data/guide';
 import { sprites } from '../data/sprites.manifest';
 import { loadImage } from './sprites';
 import { remap, SAM_BRAND_MAP } from './palette';
+import { ScreenFrame } from './screen-frame';
+import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
+import type { Frame as WorldFrame, Rect } from './world';
+import type { Hero } from '../monitor/hero';
+import { GL_ATTRIBUTES } from '../monitor/spec';
 
 const W = 6000;
 /** The whole run: the field, the city, the night, the breakout and the arrival at Booth 630 (world x 0–6000). */
@@ -36,6 +48,18 @@ const X_MAX = T_MAX * W;
 const SCROLL_OVERRIDE_MS = 150;
 /** Our own scrollTo echoes back through ScrollTrigger; within this many px it is ours. */
 const ECHO_PX = 1.5;
+/** The opening steps out over this stretch of t, in six hard steps (until the zoom replaces it, Gate 3). */
+const HERO_OUT: readonly [number, number] = [0.05, 0.08];
+/** Where PRESS START lands until the zoom plays it in (Gate 3): the opening gone, the run begun. */
+const WORLD_START = HERO_OUT[1];
+/**
+ * The 3D shows its dark glass this long before it powers on. It takes the poster's place in one frame,
+ * with no fade: the two match (a mean 1.7 / 255 apart), and a fade would make both half-transparent at
+ * once, letting the page show through the whole monitor — a flash (the dark screen 89 → 131 of 255).
+ */
+const POWER_DELAY_MS = 200;
+/** A 3D that is not on screen this long after it was asked for gives way to the static opening. */
+const HERO_TIMEOUT_MS = 10000;
 
 export function shouldRunWorld(): boolean {
   if (typeof window === 'undefined') return false;
@@ -49,9 +73,7 @@ export function shouldRunWorld(): boolean {
 interface Overlay {
   section: HTMLElement;
   canvas: HTMLCanvasElement;
-  rows: HTMLElement[]; // nav, copy, gap, window, gap2, stage
-  copy: HTMLElement;
-  windowRow: HTMLElement;
+  hero: HeroDom | null;
   hud: HTMLElement | null;
   hudCoins: HTMLElement | null;
   hudClock: HTMLElement | null;
@@ -75,13 +97,10 @@ interface Overlay {
 
 function query(section: HTMLElement): Overlay {
   const q = <T extends HTMLElement>(sel: string) => section.querySelector<T>(sel);
-  const rows = ['nav', 'copy', 'gap', 'window', 'gap2', 'stage'].map((n) => q<HTMLElement>(`.hero__row--${n}`)!);
   return {
     section,
     canvas: q<HTMLCanvasElement>('.world__canvas')!,
-    rows,
-    copy: rows[1]!,
-    windowRow: rows[3]!,
+    hero: queryHero(section),
     hud: q('.world__hud'),
     hudCoins: q('[data-hud-coins]'),
     hudClock: q('[data-hud-clock]'),
@@ -105,6 +124,52 @@ function query(section: HTMLElement): Overlay {
 }
 
 const steps = (p: number, n: number) => Math.ceil(Math.min(1, Math.max(0, p)) * n) / n;
+const clamp1 = (v: number) => Math.min(1, Math.max(-1, v));
+
+type IdleWindow = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+
+/** Once the page has loaded and the main thread has gone idle. */
+function whenIdleAfterLoad(cb: () => void): void {
+  const w = window as IdleWindow;
+  const idle = () => (w.requestIdleCallback ? w.requestIdleCallback(cb, { timeout: 2000 }) : window.setTimeout(cb, 300));
+  if (document.readyState === 'complete') idle();
+  else window.addEventListener('load', idle, { once: true });
+}
+
+/**
+ * Once the wordmark has painted: its largest-contentful-paint entry where the browser reports one,
+ * else the fonts in and two frames painted with them — and never later than 1.5 s.
+ */
+function afterOpeningPaint(h1: Element | null): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    window.setTimeout(finish, 1500);
+    if (h1 && PerformanceObserver.supportedEntryTypes?.includes('largest-contentful-paint')) {
+      const po = new PerformanceObserver((list) => {
+        if (!list.getEntries().some((e) => (e as LargestContentfulPaint).element === h1)) return;
+        po.disconnect();
+        requestAnimationFrame(finish);
+      });
+      po.observe({ type: 'largest-contentful-paint', buffered: true });
+    } else {
+      void document.fonts?.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(finish)));
+    }
+  });
+}
+
+/** Yield the main thread between the 3D's setup steps, so each runs as its own short task. */
+function pauseTask(): Promise<void> {
+  return new Promise((resolve) => {
+    const w = window as IdleWindow;
+    if (w.requestIdleCallback) w.requestIdleCallback(() => resolve(), { timeout: 100 });
+    else window.setTimeout(resolve, 16);
+  });
+}
 
 function clockFor(t: number): string {
   // 07:00 during the title; 10:00 at t 0.08 → 14:00 at 0.36 → 18:00 at 0.62 → 22:00 at 0.84,
@@ -140,15 +205,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const o = query(section);
   gsap.registerPlugin(ScrollTrigger);
 
-  // Loading window only if assets take longer than 300 ms.
-  const loadingTimer = window.setTimeout(() => {
-    if (o.loading) o.loading.hidden = false;
-  }, 300);
+  // The opening is a whole page while the world loads (the monitor is its loading state), so no
+  // loading window covers it — and the world's ~1 MB of art waits until the wordmark (the LCP
+  // element) has painted, so the opening's text never queues behind it.
+  await afterOpeningPaint(section.querySelector('#hero-title'));
   const assets = await loadLevel1((done, total) => {
     if (o.loadingText) o.loadingText.textContent = `LOADING… ${Math.round((done / total) * 100)}%`;
   });
-  window.clearTimeout(loadingTimer);
-  if (o.loading) o.loading.hidden = true;
+  const bootAt = performance.now();
 
   // ── Viewport, buffers, geometry ─────────────────────────────────────────
   // Two offscreen frames: the game frame, and the real frame the dissolve reveals behind it.
@@ -160,11 +224,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let vp = worldBuffer(window.innerWidth, window.innerHeight);
   let F = vp.bh - GROUND_BAND;
   let sx = Math.round(0.3 * vp.bw);
+  let viewport: Rect = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
+  // The monitor's screen: the same world, with margins (src/game/screen-frame.ts).
+  const screen = new ScreenFrame();
 
   const fit = () => {
     vp = worldBuffer(window.innerWidth, window.innerHeight);
     F = vp.bh - GROUND_BAND;
     sx = Math.round(0.3 * vp.bw);
+    viewport = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
     buffer.width = realBuf.width = vp.bw;
     buffer.height = realBuf.height = vp.bh;
     o.canvas.width = vp.devW;
@@ -172,9 +240,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     bctx.imageSmoothingEnabled = false;
     rctx.imageSmoothingEnabled = false;
     sctx.imageSmoothingEnabled = false;
+    screen.fit(vp.bw, vp.bh);
   };
 
   section.classList.add('world--live');
+  // The opening is up: the touch controls belong to the run and wait until it has gone.
+  if (o.hero) section.classList.add('world--opening');
   fit();
 
   // ── Timeline, pin, inputs ───────────────────────────────────────────────
@@ -192,9 +263,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // The city set (and the arrival's art) loads right behind the field; city-far first enters at world x 300.
   loadCity()
     .then((c) => {
+      const c0 = performance.now();
       level.city = c;
       real.warm(c);
       level.prepareNight();
+      if (import.meta.env.DEV) performance.measure('world:city', { start: c0, end: performance.now() });
     })
     .catch((err) => console.error('[world] city assets failed to load', err));
   let D1 = Math.round(pinnedDistance(window.innerHeight) * T_MAX);
@@ -243,6 +316,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       fit();
       dissolve.warm(vp.bw, vp.bh, impactPoint(vp.bw, F));
       ScrollTrigger.refresh();
+      hero3d?.frameChanged(true);
+      layoutHero();
     },
     { passive: true },
   );
@@ -289,6 +364,119 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   coins.onChange = setCoins;
   setCoins(coins.count);
 
+  // ── The opening: PRESS START, the monitor's 3D, the parallax ──────────────
+  const d = o.hero;
+  /** Until the zoom plays it in (Gate 3), PRESS START — or Space / → at the monitor — jumps to the world start. */
+  const start = () => {
+    motion.cancel();
+    window.scrollTo({ top: Math.round(trigger.start + WORLD_START * D1), behavior: 'instant' });
+    expectedY = window.scrollY;
+    timeline.jumpTo(WORLD_START);
+    d?.startButton.blur();
+  };
+  d?.startButton.addEventListener('click', start);
+
+  let hero3d: Hero | null = null;
+  let heroMode: 'poster' | '3d' | 'static' = 'poster';
+  let shownAt = -1;
+  let startShown = false;
+  let startUV: [number, number, number, number] = [0, 0, 1, 1];
+  let slotCentre = { x: 0, y: 0 };
+  let lastOut = -1;
+  const layoutHero = () => {
+    if (!d || !hero3d) return;
+    const b = slotBox(d);
+    hero3d.layout(d.gl.clientWidth, d.gl.clientHeight, { cx: b.x + b.w / 2, cy: b.y + b.h / 2, w: b.w });
+    startUV = startRect(d);
+    scanStart(d, startUV, hero3d.scanLines);
+    const r = d.slot.getBoundingClientRect();
+    slotCentre = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  /** No 3D after all (no WebGL 2, an error, too slow): the powered-on poster, PRESS START on it. */
+  const toStatic = (why: unknown) => {
+    if (heroMode === 'static' || !d) return;
+    if (why) console.warn('[world] the monitor stays a poster:', why);
+    heroMode = 'static';
+    hero3d?.dispose();
+    hero3d = null;
+    staticHero(d);
+  };
+  if (d) {
+    // Dev only: ?hero=poster holds the poster (the swap check), ?hero=static is the no-3D opening.
+    const devHero = import.meta.env.DEV ? new URLSearchParams(location.search).get('hero') : null;
+    if (devHero === 'static' || !('WebGL2RenderingContext' in window)) toStatic(null);
+    else if (devHero !== 'poster')
+      whenIdleAfterLoad(() => {
+        // The context first: without one the page never downloads three.js.
+        const c0 = performance.now();
+        const gl = d.gl.getContext('webgl2', GL_ATTRIBUTES);
+        if (import.meta.env.DEV) performance.measure('monitor:context', { start: c0, end: performance.now() });
+        if (!gl) return toStatic('no WebGL 2 context');
+        const timer = window.setTimeout(() => toStatic(`not ready after ${HERO_TIMEOUT_MS} ms`), HERO_TIMEOUT_MS);
+        if (import.meta.env.DEV) performance.mark('monitor:import');
+        import('../monitor/hero')
+          .then(({ createHero }) => {
+            if (import.meta.env.DEV) performance.mark('monitor:imported');
+            return createHero(d.gl, gl, screen.canvas, pauseTask);
+          })
+          .then((h) => {
+            window.clearTimeout(timer);
+            if (heroMode === 'static') return h.dispose();
+            hero3d = h;
+            layoutHero();
+            h.sway(!window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+            heroMode = '3d'; // the loop draws the screen and the first frame, then swaps it in for the poster
+          })
+          .catch((err: unknown) => {
+            window.clearTimeout(timer);
+            toStatic(err);
+          });
+      });
+
+    // The parallax: the monitor turns toward a mouse anywhere on the page.
+    window.addEventListener(
+      'pointermove',
+      (e) => {
+        if (e.pointerType !== 'mouse' || !hero3d) return;
+        hero3d.pointer(clamp1((e.clientX - slotCentre.x) / (window.innerWidth / 2)), clamp1((e.clientY - slotCentre.y) / (window.innerHeight / 2)));
+      },
+      { passive: true },
+    );
+    document.documentElement.addEventListener('pointerleave', () => hero3d?.pointer(null));
+    // Hover or keyboard focus on PRESS START brightens the screen 10 % (the button presses 1 px itself).
+    const b = d.startButton;
+    b.addEventListener('pointerenter', () => hero3d?.hover(true));
+    b.addEventListener('pointerleave', () => hero3d?.hover(b.matches(':focus-visible')));
+    b.addEventListener('focus', () => hero3d?.hover(b.matches(':focus-visible')));
+    b.addEventListener('blur', () => hero3d?.hover(false));
+  }
+
+  /** The monitor while the opening shows: the screen frame, the first frame in place of the poster, the power-on, PRESS START. */
+  const drawHero = (f: WorldFrame, now: number) => {
+    if (heroMode !== '3d' || !hero3d || !d || document.hidden) return;
+    if (screen.update(f, level, dust, now)) hero3d.frameChanged(false);
+    if (shownAt < 0) {
+      const t0 = performance.now();
+      hero3d.render(now);
+      if (import.meta.env.DEV) performance.measure('monitor:first-render', { start: t0, end: performance.now() });
+      d.gl.classList.add('is-on');
+      d.poster.classList.add('is-hidden');
+      shownAt = now;
+      return;
+    }
+    if (hero3d.phase === 'off' && now >= shownAt + POWER_DELAY_MS) hero3d.powerOn(now);
+    const phase = hero3d.render(now);
+    placeStart(d, hero3d.quad(...startUV));
+    if (phase === 'on' && !startShown) {
+      startShown = true;
+      d.start.classList.add('is-ready');
+    }
+  };
+
+  // A dev-only virtual clock (?clock=virtual): time stands still until __world.clock.now moves, so
+  // the power-on can be captured at exact 20 ms steps.
+  const vclock = import.meta.env.DEV && new URLSearchParams(location.search).get('clock') === 'virtual' ? { now: performance.now() } : null;
+
   // ── Loop ────────────────────────────────────────────────────────────────
   let last = performance.now();
   let prevSamX = timeline.X;
@@ -296,8 +484,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let lastInputAt = performance.now();
   let lastClock = '';
 
-  const frame = (now: number) => {
-    const dt = Math.min(0.05, (now - last) / 1000);
+  const frame = (rafNow: number) => {
+    const now = vclock ? vclock.now : rafNow;
+    const dt = Math.min(0.05, Math.max(0, now - last) / 1000);
     last = now;
     const pxPerWorld = D1 / X_MAX;
     // 'instant' overrides the page's CSS scroll-behavior: smooth, which would otherwise restart
@@ -308,8 +497,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     };
     const tNow = timeline.t;
 
+    // While the opening is up the keys never drive the world: Space or → at the monitor is PRESS START.
+    // (A → press is read every frame, so one from the run can never start the game later.)
+    const heroUp = !!d && timeline.tTarget < HERO_OUT[0];
+    const rightPress = input.consumeRightPress();
+    if (heroUp && input.active && (rightPress || input.dir > 0 || input.consumeJumpPress()) && now >= scrollOverrideUntil) start();
     // Keys / d-pad: Sam runs with real velocity and the page follows him.
-    const held = input.active && now >= scrollOverrideUntil ? input.dir : 0;
+    const held = input.active && now >= scrollOverrideUntil && !heroUp ? input.dir : 0;
     if (held !== 0) lastInputAt = now;
     // While the visual is still easing after a scroll, keys move the target (the page) from where
     // the user left it and the visual catches up; otherwise they move Sam directly.
@@ -361,7 +555,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           const next = mashTarget(timeline.tTarget);
           timeline.driveTarget(next * W, 'mash');
           scrollToX(next * W);
-        } else if (tNow < BREAK.flight[0]) sam.jumpPress(now);
+        } else if (tNow < BREAK.flight[0] && !heroUp) sam.jumpPress(now);
       }
       if (!input.jumpHeld) sam.jumpRelease();
     }
@@ -397,31 +591,37 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
     if (input.active) {
       const shown = dissolveLevel(t);
-      const view = { t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, now, sky: skyAt(t), sam, coins, dust };
-      if (shown < 64) {
-        // The game frame, Sam drifting to the right edge once he is on the propeller, the cracks on its glass.
-        level.draw(bctx, { ...view, samX: flight && t < BREAK.dissolve[1] ? camLeft + flight.screenX : X });
-        const stage = crackStage(t);
-        if (stage > 0 && level.city) drawCracks(bctx, level.city.cracks, stage, vp.bw, F);
+      const view = { t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, range: viewport, span: screen.rect, now, sky: skyAt(t), sam, coins, dust };
+      // The opening steps out as a pure function of the scroll position (not the eased visual, so a
+      // scrollbar jump removes it at once): six hard steps over t 0.05–0.08. Over the canvas world
+      // until then, so the world is drawn only once it has started to go.
+      const out = steps((timeline.tTarget - HERO_OUT[0]) / (HERO_OUT[1] - HERO_OUT[0]), 6);
+      if (d && out !== lastOut) {
+        lastOut = out;
+        d.stage.style.transform = out > 0 ? `translateY(${-out * 48}px)` : '';
+        d.stage.style.opacity = out > 0 ? String(1 - out) : '';
+        d.stage.style.visibility = out >= 1 ? 'hidden' : '';
+        section.classList.toggle('world--opening', out < 1);
       }
-      if (shown > 0) {
-        // The real frame, Sam back at the left margin: drawn straight once the dissolve is through.
-        real.draw(shown >= 64 ? bctx : rctx, { ...view, samX: X }, shown < 64);
-        if (shown < 64) dissolve.apply(bctx, realBuf, rctx, shown, vp.bw, vp.bh, impactPoint(vp.bw, F));
+      if (d && out < 1) drawHero({ ...view, samX: X }, now);
+      if (!d || out > 0) {
+        if (shown < 64) {
+          // The game frame, Sam drifting to the right edge once he is on the propeller, the cracks on its glass.
+          level.draw(bctx, { ...view, samX: flight && t < BREAK.dissolve[1] ? camLeft + flight.screenX : X });
+          const stage = crackStage(t);
+          if (stage > 0 && level.city) drawCracks(bctx, level.city.cracks, stage, vp.bw, F);
+        }
+        if (shown > 0) {
+          // The real frame, Sam back at the left margin: drawn straight once the dissolve is through.
+          real.draw(shown >= 64 ? bctx : rctx, { ...view, samX: X }, shown < 64);
+          if (shown < 64) dissolve.apply(bctx, realBuf, rctx, shown, vp.bw, vp.bh, impactPoint(vp.bw, F));
+        }
+        // The far sky at device resolution (clouds glide), then the buffer over it.
+        if (shown < 64) level.drawFar(sctx, { ...view, samX: X }, vp.k);
+        else real.drawFar(sctx, { ...view, samX: X }, vp.k);
+        sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
       }
-      // The far sky at device resolution (clouds glide), then the buffer over it.
-      if (shown < 64) level.drawFar(sctx, { ...view, samX: X }, vp.k);
-      else real.drawFar(sctx, { ...view, samX: X }, vp.k);
-      sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
 
-      // The title overlay is a pure function of the scroll position (not the eased visual, so a
-      // scrollbar jump removes it at once): six hard steps over t 0.05–0.08, gone by 0.08.
-      const out = steps((timeline.tTarget - 0.05) / 0.03, 6);
-      o.copy.style.transform = `translateY(${-out * 48}px)`;
-      o.copy.style.opacity = String(1 - out);
-      o.windowRow.style.transform = `translateY(${-out * 32}px)`;
-      o.windowRow.style.opacity = String(1 - out);
-      o.copy.style.visibility = o.windowRow.style.visibility = out >= 1 ? 'hidden' : 'visible';
       o.hud?.classList.toggle('is-visible', t >= 0.06 && t < BREAK.hudOut);
       // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.
       for (const el of o.sessions) {
@@ -464,8 +664,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         }
       }
 
-      // The breakout's DOM: the bezel's opacity and the MASH prompt, both functions of t.
-      section.style.setProperty('--bezel', bezelAt(t).toFixed(3));
+      // The breakout's DOM: the MASH prompt, a function of t.
       o.prompt?.classList.toggle('is-visible', promptOn(t));
       const count = `BREAK OUT · ${crackStage(t)}/${CRACK_STAGES}`;
       if (o.promptTitle && o.promptTitle.textContent !== count) o.promptTitle.textContent = count;
@@ -478,6 +677,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
+  if (import.meta.env.DEV) performance.measure('world:boot', { start: bootAt, end: performance.now() });
 
   if (import.meta.env.DEV) {
     (window as unknown as { __world: unknown }).__world = {
@@ -497,8 +697,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         return D1;
       },
       get breakout() {
-        return { stage: crackStage(timeline.t), level: dissolveLevel(timeline.t), armed: autoArmed, bezel: bezelAt(timeline.t), flight: flightAt(timeline.t, vp.bw, sx) };
+        return { stage: crackStage(timeline.t), level: dissolveLevel(timeline.t), armed: autoArmed, flight: flightAt(timeline.t, vp.bw, sx) };
       },
+      get hero() {
+        return { mode: heroMode, phase: hero3d?.phase ?? null, shownAt, startShown, startUV, screen: screen.geom, version: screen.version, hero3d };
+      },
+      clock: vclock,
+      start,
+      screen,
       get loop() {
         return { overrideUntil: scrollOverrideUntil, expectedY, lastInputAt, active: input.active, dir: input.dir };
       },

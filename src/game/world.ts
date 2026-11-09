@@ -17,6 +17,14 @@ import { CLOUD_ROLES, RANGE_ROLES, Tinted } from './tint';
 import { board, letter } from './lettering';
 import { readToken } from './palette';
 
+/** A rectangle in viewport art px. */
+export interface Rect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 export interface Frame {
   /** Timeline position, for the palette steps. */
   t: number;
@@ -25,8 +33,16 @@ export interface Frame {
   /** Sam's screen x (the camera's left margin), buffer px. */
   sx: number;
   F: number;
+  /** The viewport frame, which the world composes itself on (layer ends, Sam's margin, the ground line). */
   bw: number;
   bh: number;
+  /**
+   * What to draw, viewport art px: the viewport [0, bw] × [0, bh], or the monitor's screen frame —
+   * the same composition with margins round it, so its centre is the viewport frame exactly.
+   */
+  range: Rect;
+  /** The screen frame's extent, in every draw: the far clouds wrap over it, so the viewport and the screen agree. */
+  span: Rect;
   now: number;
   /** The stage's flat sky colour. */
   sky: string;
@@ -283,10 +299,10 @@ const nearestEdge = (col: number) => Math.min(...MID_EDGES.map((e) => Math.abs(e
 const insideClear = (col: number) => Math.min(...TOWER_CLEAR.map(([a, b]) => (col >= a && col <= b ? 0 : Math.min(Math.abs(col - a), Math.abs(col - b)))));
 
 /** A tiled far layer on the screen canvas: positions snap to device pixels, tiles abut exactly (k · width is whole). */
-export function farTiled(ctx: CanvasRenderingContext2D, img: Drawable, scroll: number, y: number, bw: number, snap: (v: number) => number, mirror: boolean): void {
+export function farTiled(ctx: CanvasRenderingContext2D, img: Drawable, scroll: number, y: number, r: Pick<Rect, 'x0' | 'x1'>, snap: (v: number) => number, mirror: boolean): void {
   const w = img.width;
-  const first = Math.floor(scroll / w);
-  const last = Math.floor((scroll + bw) / w);
+  const first = Math.floor((scroll + r.x0) / w);
+  const last = Math.floor((scroll + r.x1) / w);
   for (let n = first; n <= last; n++) {
     const x = snap(n * w - scroll);
     if (mirror && n & 1) {
@@ -304,7 +320,7 @@ export function drawTiled(
   img: Drawable,
   scroll: number,
   y: number,
-  bw: number,
+  r: Pick<Rect, 'x0' | 'x1'>,
   opts: { mirror?: boolean; from?: number; to?: number; phase?: number } = {},
 ): void {
   const w = img.width;
@@ -313,14 +329,14 @@ export function drawTiled(
   if (bounded) {
     const x0 = Number.isFinite(from) ? Math.round(from - scroll) : -1e6;
     const x1 = Number.isFinite(to) ? Math.round(to - scroll) : 1e6;
-    if (x1 <= 0 || x0 >= bw) return;
+    if (x1 <= r.x0 || x0 >= r.x1) return;
     ctx.save();
     ctx.beginPath();
     ctx.rect(x0, -1e6, x1 - x0, 2e6);
     ctx.clip();
   }
-  const first = Math.floor((scroll - phase) / w);
-  const last = Math.floor((scroll - phase + bw) / w);
+  const first = Math.floor((scroll - phase + r.x0) / w);
+  const last = Math.floor((scroll - phase + r.x1) / w);
   for (let n = first; n <= last; n++) {
     const u0 = n * w + phase;
     if (u0 + w <= from || u0 >= to) continue;
@@ -381,41 +397,68 @@ export class Level1 {
    * px at a time. Everything nearer is drawn in the buffer over it.
    */
   drawFar(sctx: CanvasRenderingContext2D, f: Frame, k: number): void {
-    const { t, camLeft, F, bw, bh, now } = f;
+    const { t, camLeft, F, now, range: r, span } = f;
     const a = this.a;
     const tint = (img: Drawable) => this.tints.get(img)!.at(t);
     const snap = (v: number) => Math.round(v * k) / k;
     sctx.save();
-    sctx.setTransform(k, 0, 0, k, 0, 0);
+    sctx.scale(k, k);
     sctx.imageSmoothingEnabled = false;
     sctx.fillStyle = f.sky;
-    sctx.fillRect(0, 0, bw, bh);
+    sctx.fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
     sctx.beginPath();
-    sctx.rect(0, 0, bw, F);
+    sctx.rect(r.x0, r.y0, r.x1 - r.x0, F - r.y0);
     sctx.clip();
     const skyTop = Math.max(40, F - 300);
     const drift = (s: Seed, p: number) => s.u + s.drift * (now / 1000) - p * camLeft;
+    // The clouds wrap over the screen frame's span in every draw, so the viewport and the monitor's
+    // screen show each one in the same place.
+    const wrap = (u: number, w: number, period = span.x1 - span.x0 + w) => span.x0 + mod(u - span.x0, period) - w;
+    const cloud = (img: Drawable, x: number, y: number) => {
+      if (x < r.x1 && x + img.width > r.x0) sctx.drawImage(img, snap(x), y);
+    };
     for (const s of SMALL) {
       const img = tint(a.small[s.i]!);
-      sctx.drawImage(img, snap(mod(drift(s, STACK.small.p), bw + img.width) - img.width), Math.round(skyTop * s.yFrac));
+      cloud(img, wrap(drift(s, STACK.small.p), img.width), Math.round(skyTop * s.yFrac));
     }
     for (const s of MEDIUM) {
       const img = tint(a.medium[s.i]!);
-      sctx.drawImage(img, snap(mod(drift(s, STACK.medium.p), bw + img.width) - img.width), Math.round(skyTop * s.yFrac));
+      cloud(img, wrap(drift(s, STACK.medium.p), img.width), Math.round(skyTop * s.yFrac));
     }
-    farTiled(sctx, tint(a.silhouette), STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, bw, snap, false);
-    farTiled(sctx, tint(a.cloudBank), STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - a.cloudBank.height, bw, snap, true);
-    const period = Math.max(STACK.cumulus.period, bw + 400);
+    farTiled(sctx, tint(a.silhouette), STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, r, snap, false);
+    farTiled(sctx, tint(a.cloudBank), STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - a.cloudBank.height, r, snap, true);
+    const period = Math.max(STACK.cumulus.period, span.x1 - span.x0 + 400);
     for (const s of CUMULUS) {
       const img = tint(a.cumulus[s.i]!);
-      const x = mod(drift(s, STACK.cumulus.p), period) - img.width;
-      if (x < bw) sctx.drawImage(img, snap(x), Math.round(skyTop * s.yFrac));
+      cloud(img, wrap(drift(s, STACK.cumulus.p), img.width, period), Math.round(skyTop * s.yFrac));
     }
     sctx.restore();
   }
 
-  draw(ctx: CanvasRenderingContext2D, f: Frame): void {
-    const { t, camLeft, sx, F, bw, bh, now } = f;
+  /**
+   * What drawFar shows that moves on the wall clock, as one number: the far clouds' positions in
+   * whole art px. The monitor's screen frame redraws only when this, the camera or Sam changes.
+   */
+  farKey(f: Frame): number {
+    const { camLeft, now, span } = f;
+    const a = this.a;
+    const w = span.x1 - span.x0;
+    let key = 0;
+    const add = (s: Seed, p: number, period: number) => {
+      key = (key * 31 + Math.round(mod(s.u + s.drift * (now / 1000) - p * camLeft - span.x0, period))) % 1e9;
+    };
+    for (const s of SMALL) add(s, STACK.small.p, w + a.small[s.i]!.width);
+    for (const s of MEDIUM) add(s, STACK.medium.p, w + a.medium[s.i]!.width);
+    for (const s of CUMULUS) add(s, STACK.cumulus.p, Math.max(STACK.cumulus.period, w + 400));
+    return key;
+  }
+
+  /**
+   * @param clear true for the viewport buffer, which drawFar's sky shows through; false for the
+   *   monitor's screen frame, where drawFar has just painted the sky into the same canvas
+   */
+  draw(ctx: CanvasRenderingContext2D, f: Frame, clear = true): void {
+    const { t, camLeft, sx, F, bw, bh, now, range: r } = f;
     const a = this.a;
     const c = this.city;
     const nt = this.night;
@@ -426,21 +469,21 @@ export class Level1 {
     const edgeAt = (p: number, x: number) => p * (x - sx) + bw;
     const place = (img: Drawable, p: number, u: number, bottom: number) => {
       const x = Math.round(u - p * camLeft);
-      if (x > -img.width && x < bw) ctx.drawImage(img, x, Math.round(bottom - img.height));
+      if (x + img.width > r.x0 && x < r.x1) ctx.drawImage(img, x, Math.round(bottom - img.height));
     };
 
     // The sky and the clouds are drawn on the screen canvas behind this buffer (drawFar); the buffer
     // starts transparent so they show through wherever nothing nearer covers them.
-    ctx.clearRect(0, 0, bw, bh);
+    if (clear) ctx.clearRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
 
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, bw, F);
+    ctx.rect(r.x0, r.y0, r.x1 - r.x0, F - r.y0);
     ctx.clip();
 
     // ── Hills: full saturation, plain tiling, ending at a tile boundary and scrolling off ──
     const hillsEnd = edgeAt(STACK.hills.p, SEQ.hillsEnd);
-    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, bw, { to: hillsEnd, phase: mod(hillsEnd, a.hills.width) });
+    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, r, { to: hillsEnd, phase: mod(hillsEnd, a.hills.width) });
 
     // ── The far city and the towers scroll in on the horizon, each at its own speed; the plain in
     //    front of them hides where their art ends ──
@@ -454,9 +497,9 @@ export class Level1 {
       const farImg = nt ? nt.far.at(stepOf(NIGHT.far)) : c.far;
       const farOpts = { mirror: true, from: farBegin, phase: farBegin };
       const farY = F + STACK.cityFar.bottom - c.far.height;
-      drawTiled(ctx, farImg, STACK.cityFar.p * camLeft, farY, bw, farOpts);
+      drawTiled(ctx, farImg, STACK.cityFar.p * camLeft, farY, r, farOpts);
       const farLit = nt && lit(nt.lights.far, LIGHTS.far);
-      if (farLit) drawTiled(ctx, farLit, STACK.cityFar.p * camLeft, farY, bw, farOpts);
+      if (farLit) drawTiled(ctx, farLit, STACK.cityFar.p * camLeft, farY, r, farOpts);
       place(nt ? nt.javits.at(stepOf(NIGHT.towers)) : c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
       const towersBegin = edgeAt(STACK.towers.p, SEQ.towersBegin);
       const tw = alignOpening(STACK.towers.period, towersBegin, centreAt(STACK.towers.p), TOWER_GAPS, insideClear);
@@ -464,16 +507,16 @@ export class Level1 {
       const towersImg = nt ? nt.towers.at(stepOf(NIGHT.towers)) : c.towers;
       const towersLit = nt && lit(nt.lights.towers, LIGHTS.towers);
       for (const img of towersLit ? [towersImg, towersLit] : [towersImg]) {
-        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, bw, { from: towersBegin, to: tw.gapL, phase: tw.phase });
-        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, bw, { from: Math.max(towersBegin, tw.gapR), phase: tw.phase });
+        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: towersBegin, to: tw.gapL, phase: tw.phase });
+        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: Math.max(towersBegin, tw.gapR), phase: tw.phase });
       }
     }
-    drawTiled(ctx, a.plain, STACK.plain.p * camLeft, F + STACK.plain.top, bw);
+    drawTiled(ctx, a.plain, STACK.plain.p * camLeft, F + STACK.plain.top, r);
 
     // ── Mid layer: bushes and trees at 0.45, ending as the mid buildings arrive ──
     const midHedgeEnd = edgeAt(STACK.midHedge.p, SEQ.midHedgeEnd);
     const midScroll = STACK.midHedge.p * camLeft;
-    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, bw, { to: midHedgeEnd, phase: mod(midHedgeEnd, a.hedge.width) });
+    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, r, { to: midHedgeEnd, phase: mod(midHedgeEnd, a.hedge.width) });
     for (const u of MID_TREES) if (u + a.treeField.width <= midHedgeEnd) place(a.treeField, STACK.midHedge.p, u, F + STACK.midHedge.treeBottom);
 
     if (c) {
@@ -483,16 +526,16 @@ export class Level1 {
       const midImg = nt ? nt.mid.at(stepOf(NIGHT.mid)) : c.mid;
       const midLit = nt && lit(nt.lights.mid, LIGHTS.mid);
       for (const img of midLit ? [midImg, midLit] : [midImg]) {
-        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, bw, { from: midBegin, to: md.gapL, phase: md.phase });
-        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, bw, { from: Math.max(midBegin, md.gapR), phase: md.phase });
+        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: midBegin, to: md.gapL, phase: md.phase });
+        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: Math.max(midBegin, md.gapR), phase: md.phase });
       }
       const nearPhase = nearBegin - STACK.cityNear.leadColumn;
       const nearY = F + STACK.cityNear.bottom - c.near.height;
       const nearImg = nt ? nt.near.at(stepOf(NIGHT.near)) : c.near;
       const nearLit = nt && lit(nt.lights.near, LIGHTS.near);
       for (const img of nearLit ? [nearImg, nearLit] : [nearImg]) {
-        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
-        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nearBegin, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
       }
       place(nt ? nt.poster.at(streetStep) : c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
       const signs = this.signs ?? (this.signs = buildSigns(c));
@@ -502,26 +545,30 @@ export class Level1 {
 
     // ── Behind Sam (p 1): bushes rooted in the grass and the field trees, drawn before the ground
     //    so their buried bases vanish under it ──
-    drawTiled(ctx, a.hedge, camLeft, F + STACK.near.hedgeBottom - a.hedge.height, bw, { to: SEQ.hedgeEnd });
+    drawTiled(ctx, a.hedge, camLeft, F + STACK.near.hedgeBottom - a.hedge.height, r, { to: SEQ.hedgeEnd });
     for (const x of FIELD_TREES) place(a.treeField, 1, x, F + STACK.near.treeBottom);
 
     // ── Ground: three bands, three vertical seams 28 px apart, farthest-down last ──
     const g = STACK.ground;
     const seamEdge = SEQ.seam + g.seamStep;
     const seamFill = SEQ.seam + 2 * g.seamStep;
-    const edgeX = Math.min(bw, Math.round(seamEdge - camLeft));
-    if (edgeX > 0) {
+    const edgeX = Math.min(r.x1, Math.round(seamEdge - camLeft));
+    if (edgeX > r.x0) {
       ctx.fillStyle = a.dirt;
-      ctx.fillRect(0, F + g.edgeTop, edgeX, g.fillTop - g.edgeTop);
+      ctx.fillRect(r.x0, F + g.edgeTop, edgeX - r.x0, g.fillTop - g.edgeTop);
     }
-    drawTiled(ctx, a.dirtFill, camLeft, F + g.fillTop, bw, { to: seamFill, phase: g.daisyPhase });
-    drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, bw, { to: seamEdge, phase: g.daisyPhase });
-    drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, bw, { to: SEQ.seam, phase: g.daisyPhase });
+    // The fill band, and below the viewport (the monitor's screen frame only) the same fill carrying on down.
+    const road = c ? (nt ? nt.road.at(streetStep) : c.road) : null;
+    for (let y = F + g.fillTop; y < Math.max(bh, r.y1); y += a.dirtFill.height) {
+      drawTiled(ctx, a.dirtFill, camLeft, y, r, { to: seamFill, phase: g.daisyPhase });
+      if (road) drawTiled(ctx, road, camLeft, y, r, { from: seamFill });
+    }
+    drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, r, { to: seamEdge, phase: g.daisyPhase });
+    drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, r, { to: SEQ.seam, phase: g.daisyPhase });
     if (c) {
       const sw = nt ? nt.sidewalk.at(streetStep) : c.sidewalk;
-      drawTiled(ctx, sw, camLeft, F, bw, { from: SEQ.seam });
-      drawTiled(ctx, nt ? nt.kerb.at(streetStep) : c.kerb, camLeft, F + g.edgeTop, bw, { from: seamEdge });
-      drawTiled(ctx, nt ? nt.road.at(streetStep) : c.road, camLeft, F + g.fillTop, bw, { from: seamFill });
+      drawTiled(ctx, sw, camLeft, F, r, { from: SEQ.seam });
+      drawTiled(ctx, nt ? nt.kerb.at(streetStep) : c.kerb, camLeft, F + g.edgeTop, r, { from: seamEdge });
       // The seam details: tufts on the first slabs, a lighter kerb end-stone, dirt pixels on kerb and road.
       place(nt ? nt.seam.at(streetStep) : c.seam, 1, SEQ.seam + g.seamTileLeft, F + g.seamTileTop + c.seam.height);
     }
@@ -559,7 +606,7 @@ export class Level1 {
       npc(c.dog).draw(ctx, Math.floor(travelled / DOG.stride), dogX - camLeft, feet, goingLeft);
     }
 
-    f.coins.draw(ctx, a.coin, camLeft, F, bw, now);
+    f.coins.draw(ctx, a.coin, camLeft, F, r, now);
     f.sam.draw(ctx, f.samX - camLeft, F);
     f.dust.draw(ctx, camLeft, F + FOOT_SINK, now);
   }

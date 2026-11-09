@@ -1,17 +1,42 @@
 /**
- * The tube: a ShaderMaterial that shows the game frame through a CRT.
+ * The tube: a ShaderMaterial that shows the game frame through a vintage CRT.
  *
  * Colour path: the frame texture is sRGB, sampled to linear, and written back through
  * `colorspace_fragment` with tone mapping off — so with every effect at zero the screen shows the
  * game's pixels exactly, which is what lets the zoom hand over to the 2D canvas without a jump.
  *
- * Effects (each one uniform, so the zoom can fade it): barrel curvature, scanlines defined in screen
- * space (they grow with the zoom, as on a real tube), corner vignette, a rolling bar, a ~4 px glow,
- * brightness; the cap's bulge lives in the vertex shader so it can flatten. Power-on is a vertical
- * opening mask plus a bright line, and the off tube is a dark grey with the glass reflection on top.
+ * The effects work in linear light, where a darkening reads about half as strong as its number
+ * (×0.85 linear is ×0.93 on screen), so their rest values (CRT_REST) are set by what the eye sees at
+ * the monitor's resting size. Each is one uniform, so the zoom can fade it to zero:
+ *  - uBarrel  tube curvature (and uBulge, the cap's bulge, in the vertex shader)
+ *  - uScan    the dark gaps between the beam's lines, uScanLines of them, in screen space
+ *  - uMask    an aperture-grille phosphor mask, uMaskCols RGB triads across
+ *  - uAberr   convergence error: red and blue drift apart, more toward the sides
+ *  - uGlow    phosphor bloom, an 8-tap ring uGlowR wide
+ *  - uVignette  the corners fall off, and a shadow runs round the inside of the tube's edge
+ *  - uBar, uHum  the hum bar rolling down once every 6 s, brighter, nudging the lines it crosses sideways
+ *  - uNoise   fine grain, 24 times a second
+ *  - uGrade   phosphor colour: a little desaturated and warm, the blacks lifted off pure black
+ *  - uBright  brightness (the scanlines and the mask take light away; this gives some back)
+ * Power-on: a bright line grows from the centre to the full width (uLine, uLineW), then the raster
+ * opens vertically from it (uOn, uOpen); the off tube is a dark grey under the glass.
  */
 import { Color, ShaderMaterial, Vector2, Vector4, type Texture } from 'three';
-import { DIMS } from './build';
+import { DIMS } from './spec';
+
+/** The effects at rest. The sizes measured in device px of the screen at rest are set by tuneAtRest(). */
+export const CRT_REST = {
+  barrel: 0.09,
+  scan: 0.55,
+  mask: 0,
+  glow: 1,
+  vignette: 0.7,
+  bar: 0.22,
+  hum: 0.0025,
+  noise: 0.09,
+  grade: 1,
+  bright: 1.15,
+} as const;
 
 export interface CrtUniforms {
   uMap: { value: Texture | null };
@@ -21,17 +46,27 @@ export interface CrtUniforms {
   uBarrel: { value: number };
   uScan: { value: number };
   uScanLines: { value: number };
-  uVignette: { value: number };
-  uBar: { value: number };
+  uMask: { value: number };
+  uMaskCols: { value: number };
+  uAberr: { value: number };
   uGlow: { value: number };
   uGlowR: { value: Vector2 };
+  uVignette: { value: number };
+  uBar: { value: number };
+  uHum: { value: number };
+  uNoise: { value: number };
+  uGrade: { value: number };
   uBright: { value: number };
   uOn: { value: number };
   uOpen: { value: number };
   uLine: { value: number };
+  /** How much of the screen's width the power-on line spans, 0 (a point at the centre) to 1. */
+  uLineW: { value: number };
   uLineH: { value: number };
   uTube: { value: Color };
   uTime: { value: number };
+  /** The screen at rest in device px (the grain's cell). */
+  uRes: { value: Vector2 };
 }
 
 const vertex = /* glsl */ `
@@ -52,21 +87,33 @@ uniform vec4 uFrame;
 uniform float uBarrel;
 uniform float uScan;
 uniform float uScanLines;
-uniform float uVignette;
-uniform float uBar;
+uniform float uMask;
+uniform float uMaskCols;
+uniform float uAberr;
 uniform float uGlow;
 uniform vec2 uGlowR;
+uniform float uVignette;
+uniform float uBar;
+uniform float uHum;
+uniform float uNoise;
+uniform float uGrade;
 uniform float uBright;
 uniform float uOn;
 uniform float uOpen;
 uniform float uLine;
+uniform float uLineW;
 uniform float uLineH;
 uniform vec3 uTube;
 uniform float uTime;
+uniform vec2 uRes;
 varying vec2 vUv;
 
 vec3 frame(vec2 uv) {
   return texture2D(uMap, mix(uFrame.xy, uFrame.zw, uv)).rgb;
+}
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 void main() {
@@ -78,7 +125,21 @@ void main() {
   vec2 inside = smoothstep(vec2(0.0), e, uv) * smoothstep(vec2(0.0), e, 1.0 - uv);
   float raster = inside.x * inside.y;
 
-  vec3 col = frame(uv);
+  // The hum bar rolls down once every 6 s; the lines it crosses slip sideways a touch.
+  float bar = 1.0 - fract(uTime / 6.0);
+  float d = abs(uv.y - bar);
+  d = min(d, 1.0 - d);
+  float hum = exp(-d * d / 0.004);
+  uv.x += uHum * hum * sin(uv.y * 260.0 + uTime * 11.0);
+
+  // Convergence: red and blue drift apart, more toward the sides.
+  vec3 col;
+  if (uAberr > 0.0) {
+    vec2 ab = vec2(uAberr * (0.4 + 2.2 * abs(c.x)), 0.0);
+    col = vec3(frame(uv + ab).r, frame(uv).g, frame(uv - ab).b);
+  } else col = frame(uv);
+
+  // Phosphor bloom.
   if (uGlow > 0.0) {
     vec3 g = vec3(0.0);
     for (int i = 0; i < 8; i++) {
@@ -86,53 +147,98 @@ void main() {
       g += frame(uv + vec2(cos(a), sin(a)) * uGlowR);
     }
     g /= 8.0;
-    col = mix(col, g, 0.22 * uGlow) + g * 0.10 * uGlow;
+    col = mix(col, g, 0.35 * uGlow) + g * 0.08 * uGlow;
   }
-  // Scanlines: one dark line per period, 15 % at its darkest.
-  col *= 1.0 - uScan * (0.5 + 0.5 * cos(6.2831853 * uv.y * uScanLines));
-  // Vignette, darkest in the corners.
-  col *= 1.0 - uVignette * pow(clamp(length(c) / 0.7071, 0.0, 1.0), 2.4);
-  // Rolling bar, top to bottom once every 6 s.
-  float bar = 1.0 - fract(uTime / 6.0);
-  float d = abs(uv.y - bar);
-  d = min(d, 1.0 - d);
-  col += col * uBar * exp(-d * d / 0.0035);
-  col *= uBright;
 
-  // Power: the raster opens vertically from a line; outside it (and outside the barrel) is the tube.
+  // Phosphor colour: greyer, warm.
+  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = mix(col, mix(vec3(luma), col, 0.78) * vec3(1.05, 1.0, 0.86), uGrade);
+
+  // Scanlines: a narrow dark gap between the beam's lines.
+  float gap = 0.5 + 0.5 * cos(6.2831853 * uv.y * uScanLines);
+  col *= 1.0 - uScan * gap * gap;
+
+  // Aperture grille: each column of a triad favours one phosphor (off at rest: it reads as a screen door at this size).
+  if (uMask > 0.0) {
+    float m = 6.2831853 * uv.x * uMaskCols;
+    vec3 mask = 0.5 + 0.5 * cos(vec3(m, m - 2.0943951, m - 4.1887902));
+    col *= 1.0 - uMask * (1.0 - mask);
+  }
+
+  // Vignette: the corners fall off, and a shadow runs round the inside of the tube's edge.
+  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+  col *= 1.0 - uVignette * (0.55 * pow(clamp(length(c) / 0.7071, 0.0, 1.0), 2.6) + 0.5 * (1.0 - smoothstep(0.0, 0.14, edge)));
+  // The hum bar's light, brightness, grain.
+  col += col * uBar * hum;
+  col *= uBright;
+  col *= 1.0 + uNoise * (hash(floor(vUv * uRes) + floor(uTime * 24.0)) - 0.5);
+  // The black level: phosphor glass is never quite black.
+  col += uGrade * 0.006 * (1.0 - col);
+
+  // Power: the raster opens vertically from the line; outside it (and outside the barrel) is the tube.
   float open = 1.0 - smoothstep(uOpen * 0.5 - e.y, uOpen * 0.5 + e.y, abs(vUv.y - 0.5));
   float lit = raster * open * uOn;
   vec3 tube = uTube * (1.0 + 0.35 * (1.0 - length(c) * 1.4));
   col = mix(tube, col, lit);
-  col += vec3(uLine) * (1.0 - smoothstep(0.0, uLineH, abs(vUv.y - 0.5))) * raster;
+  // The power-on line: a hard core with a soft halo, grown out from the centre to uLineW of the width.
+  float ly = abs(vUv.y - 0.5);
+  float lx = 1.0 - smoothstep(uLineW * 0.5 - e.x * 2.0, uLineW * 0.5 + e.x * 2.0, abs(vUv.x - 0.5));
+  col += vec3(uLine) * ((1.0 - smoothstep(0.0, uLineH, ly)) + 0.35 * exp(-ly * ly / (16.0 * uLineH * uLineH))) * lx * raster;
 
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }
 `;
 
-export function createCrtMaterial(tube: Color): ShaderMaterial & { uniforms: CrtUniforms } {
+export type CrtMaterial = ShaderMaterial & { uniforms: CrtUniforms };
+
+export function createCrtMaterial(tube: Color): CrtMaterial {
   const uniforms: CrtUniforms = {
     uMap: { value: null },
     uFrame: { value: new Vector4(0, 0, 1, 1) },
     uBulge: { value: DIMS.bulge },
-    uBarrel: { value: 0.06 },
-    uScan: { value: 0.15 },
+    uBarrel: { value: CRT_REST.barrel },
+    uScan: { value: CRT_REST.scan },
     uScanLines: { value: 120 },
-    uVignette: { value: 0.25 },
-    uBar: { value: 0.08 },
-    uGlow: { value: 1 },
-    uGlowR: { value: new Vector2(0.004, 0.005) },
-    uBright: { value: 1 },
+    uMask: { value: CRT_REST.mask },
+    uMaskCols: { value: 140 },
+    uAberr: { value: 0.003 },
+    uGlow: { value: CRT_REST.glow },
+    uGlowR: { value: new Vector2(0.006, 0.007) },
+    uVignette: { value: CRT_REST.vignette },
+    uBar: { value: CRT_REST.bar },
+    uHum: { value: CRT_REST.hum },
+    uNoise: { value: CRT_REST.noise },
+    uGrade: { value: CRT_REST.grade },
+    uBright: { value: CRT_REST.bright },
     uOn: { value: 1 },
     uOpen: { value: 1 },
     uLine: { value: 0 },
-    uLineH: { value: 0.004 },
+    uLineW: { value: 1 },
+    uLineH: { value: 0.006 },
     uTube: { value: tube },
     uTime: { value: 0 },
+    uRes: { value: new Vector2(420, 340) },
   };
   const m = new ShaderMaterial({ uniforms: uniforms as unknown as ShaderMaterial['uniforms'], vertexShader: vertex, fragmentShader: fragment, toneMapped: false });
-  return m as ShaderMaterial & { uniforms: CrtUniforms };
+  return m as CrtMaterial;
+}
+
+/** One scanline every this many device px of the screen at rest (the reference shows about 4). */
+export const SCAN_PX = 4;
+
+/**
+ * The sizes set in device px of the screen at rest (w × h device px): a dark gap every 4 px, an RGB
+ * triad every 3 px, a ~6 px bloom, red and blue ~1.2 px apart at the centre, a 1 px grain. Defined
+ * in screen space, so they grow with the zoom as on a real tube.
+ */
+export function tuneAtRest(crt: CrtMaterial, w: number, h: number): void {
+  const u = crt.uniforms;
+  u.uScanLines.value = h / SCAN_PX;
+  u.uMaskCols.value = w / 3;
+  u.uGlowR.value.set(6 / w, 6 / h);
+  u.uAberr.value = 1.2 / w;
+  u.uRes.value.set(w, h);
 }
 
 /**

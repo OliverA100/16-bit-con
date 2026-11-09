@@ -9,6 +9,7 @@ export class Input {
   private keys = new Set<string>();
   private jumpKeys = new Set<string>();
   private pressQueued = false;
+  private rightQueued = false;
   private pointerJumps = 0;
   dpadDir = 0;
   /** True while the world section is on screen. */
@@ -45,6 +46,13 @@ export class Input {
     const j = this.pressQueued;
     this.pressQueued = false;
     return j;
+  }
+
+  /** True once per new press of → (or D): PRESS START at the monitor, however short the tap. */
+  consumeRightPress(): boolean {
+    const r = this.rightQueued;
+    this.rightQueued = false;
+    return r;
   }
 
   bindDpad(left: HTMLElement, right: HTMLElement, a: HTMLElement): void {
@@ -109,6 +117,7 @@ export class Input {
 
     e.preventDefault();
     if (e.type === 'keydown') {
+      if (move && !e.repeat && (e.code === 'ArrowRight' || e.code === 'KeyD')) this.rightQueued = true;
       if (move) this.keys.add(e.code);
       if (jump && !this.jumpKeys.has(e.code)) {
         this.jumpKeys.add(e.code);

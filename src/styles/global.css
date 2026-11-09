@@ -18,6 +18,9 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   scroll-behavior: smooth;
+  /* The scrollbar's room is kept from the first frame: a first paint made before the rest of the page
+     has streamed in would otherwise re-centre everything when the scrollbar appears (a small CLS). */
+  scrollbar-gutter: stable;
 }
 
 body {
