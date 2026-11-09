@@ -13,6 +13,9 @@ import type { Coins } from './coins';
 import type { Dust } from './dust';
 import { Lights, NIGHT_STEPS, Stepper, nightTokens, rankMap, type NightTokens } from './night';
 import { makeStrip, type Strip } from './sprites';
+import { CLOUD_ROLES, RANGE_ROLES, Tinted } from './tint';
+import { board, letter } from './lettering';
+import { readToken } from './palette';
 
 export interface Frame {
   /** Timeline position, for the palette steps. */
@@ -52,7 +55,7 @@ export const SEQ = {
   seam: 2000, // X0: the surface changes (grass → pavement); the edge at X0 + 28, the fill at X0 + 56
   subway: 2136, // the entrance stands on the pavement 80 px after the fill seam, like any prop
   nearBegin: 2150, // building fronts
-  fenceEnd: 5100,
+  fenceEnd: 6400, // the street carries on under the breakout; the game frame is gone before its end could show
 } as const;
 
 /** Parallax factor and where each layer's bottom sits (art px relative to the ground line F). */
@@ -94,11 +97,6 @@ interface Seed {
   yFrac: number;
   drift: number;
 }
-/**
- * The afternoon arrives as flat palette steps, farthest first: the sky at t 0.34 (stageAt), then
- * the cloud bank's shading, the big lobes, the small and medium clouds. Reverse steps back.
- */
-const AFTERNOON_STEPS = { bank: 0.36, cumulus: 0.38, small: 0.4 } as const;
 const SMALL: Seed[] = [
   { i: 0, u: 60, yFrac: 0.05, drift: 1.4 },
   { i: 1, u: 420, yFrac: 0.15, drift: 1 },
@@ -121,16 +119,36 @@ const FIELD_TREES = [600, 900, 1250, 1600, 1900];
 /** Mid-layer trees in that layer's own space (u). */
 const MID_TREES = [260, 1000, 1760];
 const TINY_DAISIES = [560, 760, 1100, 1420, 1700];
-/** The street, world x, through Level 3. */
-const STREET_TREES = [2330, 2630, 2930, 3230, 3530, 3830, 4130, 4430, 4730];
-const PLANTS = [2400, 2950, 3380, 3900, 4500];
+/** The street, world x, through Level 3 and on under the breakout. */
+const STREET_TREES = [2330, 2630, 2930, 3230, 3530, 3830, 4130, 4430, 4730, 5030, 5330, 5630];
+const PLANTS = [2400, 2950, 3380, 3900, 4500, 5200, 5500];
 const ARCADES = [2620, 3420];
 /** Level 2's life (one office-chair gag, then street chess) and Level 3's crowd toward the after party at Booth 630. */
 const NPCS = { molePhone: 2380, moleCoffee: 2680, molesChess: 3340, molesSofa: 4300, molePizza: 4450, dogBark: 4600, molePhone2: 4780 } as const;
 /** The after-party spot: vega-sign-horizontal over two arcade machines. */
 const PARTY = { x: 4950, arcadeGap: 56 } as const;
-/** The vertical vega-sign on a near front, in that layer's space. */
-const VEGA_SIGN_U = 1500;
+/**
+ * Signage hierarchy: the event is 16-Bit Con and Vega is a booth at it. A 16-BIT CON ·
+ * OCT 3–5 billboard on a Level 2 front (near-layer space), and 16-BIT CON in neon over the party
+ * cabinets; "vega" stays only on the cabinets and the Booth 630 sign at the end.
+ */
+/** On the first front after the park opening (near-layer u, past gapTo), above the street trees. */
+const BILLBOARD = { u: 616, bottom: -112 } as const;
+interface Signs {
+  billboard: { day: Drawable; neon: Drawable };
+  party: { day: Drawable; neon: Drawable };
+}
+function buildSigns(c: CityAssets): Signs {
+  const k = readToken('--color-outline-black');
+  const g7 = readToken('--color-grey-700');
+  const make = (neon: boolean) => ({
+    billboard: board([letter(c.letters, '16-BIT CON', 'large', neon), letter(c.letters, 'OCT 3-5', 'small', neon)], { fill: k, outline: k, frame: g7 }),
+    party: board([letter(c.letters, '16-BIT CON', 'large', neon)], { fill: k, outline: k, pad: 2 }),
+  });
+  const day = make(false);
+  const neon = make(true);
+  return { billboard: { day: day.billboard, neon: neon.billboard }, party: { day: day.party, neon: neon.party } };
+}
 
 /**
  * Night: each layer steps its palette over `span` in NIGHT_STEPS, far first and
@@ -145,6 +163,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 interface NightSet {
   far: Stepper;
+  javits: Stepper;
   towers: Stepper;
   mid: Stepper;
   near: Stepper;
@@ -159,7 +178,6 @@ interface NightSet {
   poster: Stepper;
   tree: Stepper;
   strips: Map<Strip, Stepper>;
-  neon: { vertical: Drawable; horizontal: Drawable };
   lights: { far: Lights; towers: Lights; mid: Lights; near: Lights };
 }
 
@@ -172,33 +190,33 @@ function stripOver(img: Drawable, like: Strip): Strip {
 }
 
 function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
+  // Glass by layer: the blue panes, and the panes Vega drew in warm "already lit" colours. Both go
+  // dark at night and both belong to the window finder, so a window lights only as a whole and
+  // only through the overlay — a warm slat gap under a dark pane never glows on its own.
   const glass = {
     far: ['#B9D6DF', '#B9C8E5'],
-    towers: ['#629EFB', '#4E88EF', '#5487E2', '#7FB0FF'],
-    mid: ['#3E81E8', '#2386F1', '#5E9AF9', '#5BABFF'],
-    near: ['#3A7DE7', '#5C98F9', '#386DD2', '#59A9FF'],
+    towers: ['#629EFB', '#4E88EF', '#5487E2', '#7FB0FF', '#C5B298', '#C48D71'],
+    mid: ['#3E81E8', '#2386F1', '#5E9AF9', '#5BABFF', '#EDC18B', '#DE914E', '#EACAAC'],
+    near: ['#3A7DE7', '#5C98F9', '#386DD2', '#59A9FF', '#F2C185', '#E38E44', '#F2C6B6', '#F0CAA8', '#F2D2A1', '#DFA67C'],
   };
   const to = (hexes: string[], token: string) => Object.fromEntries(hexes.map((h) => [h, token]));
   const farMap = rankMap(c.far, [T.n9], [1], to(glass.far, T.k));
-  const towersMap = rankMap(c.towers, [T.n9, T.g7], [1, 1], { ...to(glass.towers, T.k), ...to(['#C5B298', '#C48D71'], T.y4) });
-  const midMap = rankMap(c.mid, [T.n9, T.g7, T.g5], [2, 2, 1], { ...to([...glass.mid, '#B3D0FF'], T.k), ...to(['#EDC18B', '#DE914E', '#EACAAC'], T.y4) });
+  const towersMap = rankMap(c.towers, [T.n9, T.g7], [1, 1], to(glass.towers, T.k));
+  const midMap = rankMap(c.mid, [T.n9, T.g7, T.g5], [2, 2, 1], to([...glass.mid, '#B3D0FF'], T.k));
   const nearMap = rankMap(c.near, [T.n9, T.g7, T.g5], [35, 40, 25], {
     ...to([...glass.near, '#7796DC', '#95ACDC', '#B5D1FF', '#ACC6F2', '#AAC2E0'], T.k),
-    ...to(['#F2C185', '#E38E44', '#F2C6B6', '#F0CAA8', '#F2D2A1', '#DFA67C'], T.y4),
     '#E06B4E': T.g7,
     '#2D4365': T.k,
   });
   const pave = { '#E8DECF': T.g5, '#CBC3C7': T.g7, '#CBBFBF': T.g7, '#ACA5A8': T.g7, '#ABA3A3': T.g7, '#BB9147': T.g5, '#767272': T.g7, '#55575B': T.k, '#353535': T.k, '#777B80': T.g7, '#84C5FF': T.g5 };
-  const neonMap = { '#FF7B07': T.y4, '#F0A125': T.y4, '#D75B1E': T.y4, '#FFCF3B': T.y1, '#FFFFFF': T.dw, '#767272': T.g7 };
   const greens = { '#224100': T.n9, '#2E5700': T.n9, '#1F3B00': T.n9, '#457D07': T.n7, '#75A70D': T.n7 };
   const strips = new Map<Strip, Stepper>();
   for (const st of [c.molePhone, c.moleCoffee, c.molesChess, c.molesSofa, c.molePizza, c.dogBark, c.dog]) {
     strips.set(st, new Stepper(st.image, rankMap(st.image, [T.k, T.g7, T.g5], [1, 1, 1])));
   }
-  const full = (img: Drawable, map: Record<string, string>) => new Stepper(img, map).at(NIGHT_STEPS);
-  const neon = { vertical: full(c.vegaSign, neonMap), horizontal: full(c.vegaSignHorizontal, neonMap) };
   return {
     far: new Stepper(c.far, farMap),
+    javits: new Stepper(c.javits, rankMap(c.javits, [T.n9, T.g7], [1, 1], { '#5487E2': T.k, '#629EFB': T.k })),
     towers: new Stepper(c.towers, towersMap),
     mid: new Stepper(c.mid, midMap),
     near: new Stepper(c.near, nearMap),
@@ -213,12 +231,11 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
     poster: new Stepper(c.poster, rankMap(c.poster, [T.k, T.g7, T.g5])),
     tree: new Stepper(a.tree, rankMap(a.tree, [T.n9, T.n7], [1, 1], { '#58311B': T.k, '#834622': T.k, '#AE6228': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
     strips,
-    neon,
     lights: {
       far: new Lights(c.far, glass.far, T.y1),
       towers: new Lights(c.towers, glass.towers, T.y4),
-      mid: new Lights(c.mid, glass.mid, T.y4),
-      near: new Lights(c.near, glass.near, T.y4),
+      mid: new Lights(c.mid, glass.mid, T.y4, true),
+      near: new Lights(c.near, glass.near, T.y4, true),
     },
   };
 }
@@ -265,7 +282,7 @@ function alignOpening(
 const nearestEdge = (col: number) => Math.min(...MID_EDGES.map((e) => Math.abs(e - col)));
 const insideClear = (col: number) => Math.min(...TOWER_CLEAR.map(([a, b]) => (col >= a && col <= b ? 0 : Math.min(Math.abs(col - a), Math.abs(col - b)))));
 
-function drawTiled(
+export function drawTiled(
   ctx: CanvasRenderingContext2D,
   img: Drawable,
   scroll: number,
@@ -308,8 +325,14 @@ export class Level1 {
   /** Set once the city assets arrive; until then the city simply has not come into view. */
   city: CityAssets | null = null;
   private night: NightSet | null = null;
+  private signs: Signs | null = null;
+  /** The clouds and the far range, recoloured gradually with the sky. */
+  private readonly tints: Map<Drawable, Tinted>;
 
-  constructor(private readonly a: Level1Assets) {}
+  constructor(private readonly a: Level1Assets) {
+    this.tints = new Map([...a.small, ...a.medium, ...a.cumulus, a.cloudBank].map((img) => [img, new Tinted(img, CLOUD_ROLES)]));
+    this.tints.set(a.silhouette, new Tinted(a.silhouette, RANGE_ROLES));
+  }
 
   /** Build the night palettes and window lists off the frame once the city is here. */
   prepareNight(): void {
@@ -328,11 +351,8 @@ export class Level1 {
     const stepOf = (start: number) => Math.min(NIGHT_STEPS, Math.max(0, Math.floor(((t - start) / NIGHT.span) * NIGHT_STEPS)));
     const streetStep = stepOf(NIGHT.street);
     const lit = (l: Lights, range: readonly [number, number, number]) => l.at(clamp01((t - range[0]) / (range[1] - range[0])), range[2]);
-    const pm = a.afternoon;
-    const small = t >= AFTERNOON_STEPS.small ? pm.small : a.small;
-    const medium = t >= AFTERNOON_STEPS.small ? pm.medium : a.medium;
-    const cumulus = t >= AFTERNOON_STEPS.cumulus ? pm.cumulus : a.cumulus;
-    const cloudBank = t >= AFTERNOON_STEPS.bank ? pm.cloudBank : a.cloudBank;
+    /** A cloud (or the range) in its colours at t: the file itself through the morning. */
+    const tint = (img: Drawable) => this.tints.get(img)!.at(t);
     /** Layer-space u of the right edge of the screen when Sam is at world x — where a layer begins or ends. */
     const edgeAt = (p: number, x: number) => p * (x - sx) + bw;
     const place = (img: Drawable, p: number, u: number, bottom: number) => {
@@ -352,22 +372,22 @@ export class Level1 {
     // ── Clouds at every height: small and high, medium, the bank above the hills, big lobes mid sky ──
     const skyTop = Math.max(40, F - 300);
     for (const s of SMALL) {
-      const img = small[s.i]!;
+      const img = tint(a.small[s.i]!);
       const span = bw + img.width;
       const u = s.u + s.drift * (now / 1000) - STACK.small.p * camLeft;
       ctx.drawImage(img, Math.round(mod(u, span) - img.width), Math.round(skyTop * s.yFrac));
     }
     for (const s of MEDIUM) {
-      const img = medium[s.i]!;
+      const img = tint(a.medium[s.i]!);
       const span = bw + img.width;
       const u = s.u + s.drift * (now / 1000) - STACK.medium.p * camLeft;
       ctx.drawImage(img, Math.round(mod(u, span) - img.width), Math.round(skyTop * s.yFrac));
     }
-    drawTiled(ctx, a.silhouette, STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, bw);
-    drawTiled(ctx, cloudBank, STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - cloudBank.height, bw, { mirror: true });
+    drawTiled(ctx, tint(a.silhouette), STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, bw);
+    drawTiled(ctx, tint(a.cloudBank), STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - a.cloudBank.height, bw, { mirror: true });
     const period = Math.max(STACK.cumulus.period, bw + 400);
     for (const s of CUMULUS) {
-      const img = cumulus[s.i]!;
+      const img = tint(a.cumulus[s.i]!);
       const u = s.u + s.drift * (now / 1000) - STACK.cumulus.p * camLeft;
       const x = Math.round(mod(u, period) - img.width);
       if (x < bw) ctx.drawImage(img, x, Math.round(skyTop * s.yFrac));
@@ -392,7 +412,7 @@ export class Level1 {
       drawTiled(ctx, farImg, STACK.cityFar.p * camLeft, farY, bw, farOpts);
       const farLit = nt && lit(nt.lights.far, LIGHTS.far);
       if (farLit) drawTiled(ctx, farLit, STACK.cityFar.p * camLeft, farY, bw, farOpts);
-      place(c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
+      place(nt ? nt.javits.at(stepOf(NIGHT.towers)) : c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
       const towersBegin = edgeAt(STACK.towers.p, SEQ.towersBegin);
       const tw = alignOpening(STACK.towers.period, towersBegin, centreAt(STACK.towers.p), TOWER_GAPS, insideClear);
       const towersY = F + STACK.towers.bottom - c.towers.height;
@@ -430,7 +450,8 @@ export class Level1 {
         drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
       }
       place(nt ? nt.poster.at(streetStep) : c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
-      place(nt && t >= NEON_AT ? nt.neon.vertical : c.vegaSign, STACK.cityNear.p, nearBegin + VEGA_SIGN_U, F - 20);
+      const signs = this.signs ?? (this.signs = buildSigns(c));
+      place(t >= NEON_AT ? signs.billboard.neon : signs.billboard.day, STACK.cityNear.p, nearBegin + BILLBOARD.u, F + BILLBOARD.bottom);
     }
     ctx.restore();
 
@@ -473,7 +494,8 @@ export class Level1 {
       for (const x of PLANTS) place(plant, 1, x, base);
       const arcade = nt ? nt.arcade.at(streetStep) : c.arcade;
       for (const x of [...ARCADES, PARTY.x, PARTY.x + PARTY.arcadeGap]) place(arcade, 1, x, base);
-      place(nt && t >= NEON_AT ? nt.neon.horizontal : c.vegaSignHorizontal, 1, PARTY.x - 10, base - c.arcade.height - 6);
+      const party = this.signs ? (t >= NEON_AT ? this.signs.party.neon : this.signs.party.day) : null;
+      if (party) place(party, 1, PARTY.x + (PARTY.arcadeGap + c.arcade.width) / 2 - party.width / 2, base - c.arcade.height - 6);
       // Characters live on their own clocks, independent of Sam: idle loops, and the dog patrolling.
       const npc = (st: Strip) => (nt ? stripOver(nt.strips.get(st)!.at(streetStep), st) : st);
       const feet = F - 60 + FOOT_SINK;

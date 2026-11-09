@@ -210,10 +210,15 @@ export class Lights {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly litRgb: [number, number, number];
 
+  /**
+   * @param wrap true for a layer tiled plainly at its own width: a window cut by the tile edge
+   *   continues at the other edge of the next tile, so the two parts are one window
+   */
   constructor(
     readonly src: Drawable,
     private readonly glass: string[],
     private readonly lit: string,
+    private readonly wrap = false,
   ) {
     this.overlay = document.createElement('canvas');
     this.overlay.width = src.width;
@@ -313,7 +318,7 @@ export class Lights {
       }
       comps.push(runs);
     }
-    return shuffle(mergePanes(comps));
+    return shuffle(mergePanes(comps, this.wrap ? w : 0));
   }
 }
 
@@ -336,25 +341,29 @@ function box(runs: Run[]): { x0: number; y0: number; x1: number; y1: number } {
 const MULLION = 6;
 
 /**
- * Panes of one window are separate glass components split by a mullion: stacked panes
- * share their left and right edges, side-by-side panes share top and bottom. Merge them so a
- * window lights as one, pane by pane on its glass pixels only.
+ * Panes of one window are separate glass components split by a mullion: stacked panes share
+ * their left and right edges, side-by-side panes share their top or their sill (a balcony door
+ * whose glass runs on behind the railing stands beside the window panes under one lintel), and the
+ * glass seen between a balcony's slats lies within the columns of the pane right above it (a
+ * transom, within the window under it). Merge them so a window lights as one, on its glass pixels
+ * only. What is still narrow and short after that, or a single row, in a layer whose windows are
+ * big is a sliver by a drainpipe or a cut edge, not a window: it never lights.
  */
-function mergePanes(comps: Run[][]): LitWindow[] {
+function mergePanes(comps: Run[][], wrapWidth = 0): LitWindow[] {
   const boxes = comps.map(box);
   const parent = comps.map((_, i) => i);
   const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i]!)));
-  const order = boxes.map((_, i) => i).sort((a, b) => boxes[a]!.x0 - boxes[b]!.x0);
-  for (let oi = 0; oi < order.length; oi++) {
-    const i = order[oi]!;
-    const a = boxes[i]!;
-    for (let oj = oi + 1; oj < order.length; oj++) {
-      const j = order[oj]!;
-      const b = boxes[j]!;
-      if (b.x0 - a.x0 > 2) break;
-      const sameCols = Math.abs(a.x0 - b.x0) <= 1 && Math.abs(a.x1 - b.x1) <= 1;
-      const vGap = Math.max(a.y0, b.y0) - Math.min(a.y1, b.y1) - 1;
-      if (sameCols && vGap >= 0 && vGap <= MULLION) parent[root(i)] = root(j);
+  if (wrapWidth) {
+    // The tile edge cuts through windows: the part ending on the last column and the part starting
+    // on the first column of the next tile share their rows and are one window.
+    const atRight = boxes.map((_, i) => i).filter((i) => boxes[i]!.x1 === wrapWidth - 1);
+    const atLeft = boxes.map((_, i) => i).filter((i) => boxes[i]!.x0 === 0);
+    for (const i of atRight) {
+      for (const j of atLeft) {
+        const a = boxes[i]!;
+        const b = boxes[j]!;
+        if (Math.abs(a.y0 - b.y0) <= 1 && Math.abs(a.y1 - b.y1) <= 1) parent[root(i)] = root(j);
+      }
     }
   }
   const byRow = boxes.map((_, i) => i).sort((a, b) => boxes[a]!.y0 - boxes[b]!.y0);
@@ -364,10 +373,14 @@ function mergePanes(comps: Run[][]): LitWindow[] {
     for (let oj = oi + 1; oj < byRow.length; oj++) {
       const j = byRow[oj]!;
       const b = boxes[j]!;
-      if (b.y0 - a.y0 > 2) break;
-      const sameRows = Math.abs(a.y0 - b.y0) <= 1 && Math.abs(a.y1 - b.y1) <= 1;
+      if (b.y0 - a.y1 - 1 > MULLION) break; // sorted by top row: nothing later starts close enough
+      const vGap = b.y0 - a.y1 - 1;
       const hGap = Math.max(a.x0, b.x0) - Math.min(a.x1, b.x1) - 1;
-      if (sameRows && hGap >= 0 && hGap <= MULLION) parent[root(i)] = root(j);
+      const aligned = Math.abs(a.y0 - b.y0) <= 1 || Math.abs(a.y1 - b.y1) <= 1;
+      const sameCols = Math.abs(a.x0 - b.x0) <= 1 && Math.abs(a.x1 - b.x1) <= 1;
+      const inside = (n: typeof a, wide: typeof a) => n.x0 >= wide.x0 - 1 && n.x1 <= wide.x1 + 1 && n.x1 - n.x0 < wide.x1 - wide.x0;
+      if (aligned && hGap >= 0 && hGap <= MULLION) parent[root(i)] = root(j);
+      else if (vGap >= 0 && vGap <= MULLION && (sameCols || inside(b, a) || inside(a, b))) parent[root(i)] = root(j);
     }
   }
   const groups = new Map<number, Run[]>();
@@ -377,7 +390,19 @@ function mergePanes(comps: Run[][]): LitWindow[] {
     if (g) g.push(...runs);
     else groups.set(r, [...runs]);
   });
-  return [...groups.values()].map((runs) => ({ runs }));
+  const windows = [...groups.values()].map((runs) => ({ runs, ...box(runs) }));
+  const median = (vs: number[]) => vs.sort((a, b) => a - b)[vs.length >> 1] ?? 0;
+  const typicalW = median(windows.map((w) => w.x1 - w.x0 + 1));
+  const typicalH = median(windows.map((w) => w.y1 - w.y0 + 1));
+  return windows
+    .filter((w) => {
+      const ww = w.x1 - w.x0 + 1;
+      const hh = w.y1 - w.y0 + 1;
+      const sliver = typicalW > 2 * MULLION && ww <= MULLION && hh < 4 * MULLION;
+      const line = typicalH >= 8 && hh <= 2;
+      return !sliver && !line;
+    })
+    .map(({ runs }) => ({ runs }));
 }
 
 /** A deterministic shuffle, so windows light across the facade rather than in scan order. */

@@ -22,7 +22,8 @@ export type SkyStage = 'dawn' | 'morning' | 'afternoon' | 'golden' | 'dusk' | 'n
  * The sky is one flat colour that interpolates continuously between these keyframes over the
  * scroll range: no bands, no steps, no dither — a flat fill changing over time.
  * Morning Blue 300 holds through Level 1; the afternoon pales and warms through Level 2 into
- * golden, dusk and the Green 900 night; the real world is Daisy White.
+ * golden, dusk and the Green 900 night, which the game frame keeps to its last pixel. The real
+ * world behind the broken glass has its own flat sky, Daisy White (REAL_SKY), from its first.
  */
 export const skyKeyframes: readonly [number, string][] = [
   [0, '--color-blue-300'],
@@ -33,9 +34,56 @@ export const skyKeyframes: readonly [number, string][] = [
   [0.68, '--color-yellow-600'],
   [0.72, '--color-blue-900'],
   [0.77, '--color-green-900'],
-  [0.94, '--color-green-900'],
-  [0.97, '--color-daisy-white'],
 ];
+
+/** The real world's sky: flat Blue 100, with Daisy White only at the horizon behind the Javits roofline. */
+export const REAL_SKY = '--color-blue-100';
+export const REAL_HORIZON = '--color-daisy-white';
+
+/**
+ * The clouds and the far range change colour gradually with the sky. Each of their
+ * few colours is a role; a role's colour interpolates (RGB) between these keyframes on the sky's
+ * schedule, 'source' standing for the sprite's own colour, so the files show as drawn through the
+ * morning. Bodies stay lighter than the sky, shades darker, until the night turns them to dark
+ * shapes; the shade merges into the sky at the end of the day and at night.
+ */
+export type CloudRole = 'body' | 'shade' | 'deep' | 'range';
+export const cloudKeyframes: Record<CloudRole, readonly [number, string][]> = {
+  body: [
+    [0.34, 'source'],
+    [0.58, 'source'],
+    [0.63, '--color-yellow-200'],
+    [0.68, '--color-yellow-500'],
+    [0.72, '--color-grey-500'],
+    [0.77, '--color-grey-700'],
+  ],
+  shade: [
+    [0.34, 'source'],
+    [0.5, '--color-blue-300'],
+    [0.58, '--color-yellow-500'],
+    [0.63, '--color-yellow-500'],
+    [0.68, '--color-yellow-600'],
+    [0.72, '--color-grey-700'],
+    [0.77, '--color-green-900'],
+  ],
+  deep: [
+    [0.34, 'source'],
+    [0.5, '--color-blue-500'],
+    [0.58, '--color-yellow-600'],
+    [0.63, '--color-yellow-600'],
+    [0.68, '--color-grey-700'],
+    [0.72, '--color-grey-700'],
+    [0.77, '--color-green-900'],
+  ],
+  range: [
+    [0.5, 'source'],
+    [0.58, '--color-yellow-500'],
+    [0.63, '--color-yellow-600'],
+    [0.68, '--color-grey-500'],
+    [0.72, '--color-grey-700'],
+    [0.77, '--color-green-700'],
+  ],
+};
 
 /** Still-crop skies for the static page: one flat colour per scene. */
 export const skyColors: Record<SkyStage, string> = {

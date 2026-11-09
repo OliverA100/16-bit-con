@@ -7,7 +7,7 @@
  */
 import { sprites } from '../data/sprites.manifest';
 import { loadImage, makeStrip, type Drawable, type Strip } from './sprites';
-import { cropImage, dominantColor, patchTileSeam, remap, snapToPalette, type ColorMap } from './palette';
+import { cropImage, dominantColor, patchTileSeam, snapToPalette } from './palette';
 import { loadSamSheets, type SamSheets } from './sam';
 
 export interface Level1Assets {
@@ -40,8 +40,6 @@ export interface Level1Assets {
   dirt: string;
   /** The 28 px fill below the edge band: NEW dirt-fill tile (deep dirt, a darker top line, a sparse scatter). */
   dirtFill: Drawable;
-  /** The clouds again with their shading stepped to Blue 300 for the pale afternoon sky. */
-  afternoon: { small: Drawable[]; medium: Drawable[]; cumulus: Drawable[]; cloudBank: Drawable };
   daisyTiny: Drawable;
 }
 
@@ -72,13 +70,19 @@ export interface CityAssets {
   molesSofa: Strip;
   molePizza: Strip;
   dogBark: Strip;
-  vegaSign: Drawable;
   vegaSignHorizontal: Drawable;
+  /** The breakout and the arrival, all NEW art: the crack stages, the real Javits and its end annex, the cypress row, the sign post, the plaza → daisy-bed seam details. */
+  cracks: Strip;
+  facade: Drawable;
+  facadeBay: Drawable;
+  cypress: Drawable;
+  signPost: Drawable;
+  seamBack: Drawable;
+  /** The NEW letter set, and the signage composed from it at load. */
+  letters: Drawable;
 }
 
 /** Whole lobes of big-cloud.png (x, y, w, h), chosen where each lobe's own edges end. */
-/** Afternoon shading: the clouds' two blue shades step to Blue 300 / Blue 500 (exact remaps, the files untouched). */
-const CLOUD_AFTERNOON: ColorMap = { '#C8E2F2': '#8DCAFF', '#B9DEF1': '#8DCAFF', '#B6C8DD': '#5DB3FF' };
 const CUMULUS_LOBES: [number, number, number, number][] = [
   [292, 0, 187, 67],
   [486, 20, 281, 61],
@@ -92,6 +96,8 @@ const CITY_FAR_ROWS = 323;
 /** city-near: one 1152 px period, rows 434–1107 — all that a ≤ 720 px buffer can show with its base at F + 2. */
 const CITY_NEAR = { period: 1152, top: 434 } as const;
 const PLAIN_TOP = 100; // the hills' path ends at row 98
+/** The facade's first bay (one door, one structure line) repeats either side of it on wide screens. */
+const FACADE_BAY = 128; // the flat annex at the facade's left end
 export const STREET = { sidewalkRows: 8, kerbTop: 70, kerbRows: 12, roadTop: 12, roadRows: 28 } as const;
 
 async function loadAll(files: { file: string }[], onProgress?: (done: number, total: number) => void, extra = 0): Promise<HTMLImageElement[]> {
@@ -141,7 +147,6 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
   const small = [cloudF!, cloudG!, cloudH!, cloudFaint!];
   const medium = [cloudA!, cloudB!, cloudD!];
   const cumulus = CUMULUS_LOBES.map(([x, y, w, h]) => cropImage(bigCloud!, x, y, w, h));
-  const pm = (img: Drawable) => remap(img, CLOUD_AFTERNOON);
   return {
     sam,
     coin: makeStrip(coin, sprites.coin.fw, sprites.coin.fh, sprites.coin.pitch),
@@ -149,7 +154,6 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     medium,
     cumulus,
     cloudBank: cloudBank!,
-    afternoon: { small: small.map(pm), medium: medium.map(pm), cumulus: cumulus.map(pm), cloudBank: pm(cloudBank!) },
     silhouette: silhouette!,
     hills: hillsPatched,
     plain: cropImage(hillsPatched, 0, PLAIN_TOP, hillsPatched.width, hillsPatched.height - PLAIN_TOP),
@@ -187,10 +191,15 @@ export async function loadCity(): Promise<CityAssets> {
     sprites.molesSofa,
     sprites.molePizza,
     sprites.dogBark,
-    sprites.vegaSign,
     sprites.vegaSignHorizontal,
+    sprites.crtCracks,
+    sprites.javitsFacade,
+    sprites.cypress,
+    sprites.signPost,
+    sprites.seamStreetField,
+    sprites.letters,
   ];
-  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits, chess, sofa, pizza, dogBark, vegaSign, vegaSignH] =
+  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits, chess, sofa, pizza, dogBark, vegaSignH, cracks, facade, cypress, signPost, seamBack, letters] =
     await loadAll(files);
   const strip = (img: HTMLImageElement | undefined, fw = 60, fh = 60) => makeStrip(img!, fw, fh);
   return {
@@ -216,8 +225,14 @@ export async function loadCity(): Promise<CityAssets> {
     molesSofa: strip(sofa, sprites.molesSofa.fw, sprites.molesSofa.fh),
     molePizza: strip(pizza),
     dogBark: strip(dogBark),
-    vegaSign: withDaisy(vegaSign!, await loadImage(sprites.daisyIcon.file), 'above'),
     vegaSignHorizontal: withDaisy(vegaSignH!, await loadImage(sprites.daisyIcon.file), 'left'),
+    cracks: makeStrip(cracks!, sprites.crtCracks.fw, sprites.crtCracks.fh),
+    facade: facade!,
+    facadeBay: cropImage(facade!, 0, 0, FACADE_BAY, facade!.height),
+    cypress: cypress!,
+    signPost: signPost!,
+    seamBack: seamBack!,
+    letters: letters!,
   };
 }
 

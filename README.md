@@ -1,7 +1,7 @@
 # 16-Bit Con — Vega design-engineer take-home
 
 Landing page for a fictional retro tech convention, built on Vega's pixel-art brand.
-Live: https://16-bit-con-seven.vercel.app (Phase 3: Levels 1–3 — the field, the walk into town, the afternoon street, golden hour through the park opening, and the night with its windows lighting one by one up to the after party at Booth 630; scroll, or hold → to run and Space to jump; on phones the d-pad and A drive the pinned world; the static page remains the reduced-motion fallback. The "16-Bit Con" wordmark is Geist 900 with the daisy as its hyphen; OG image at /og.png.)
+Live: https://16-bit-con-seven.vercel.app (Phase 3 complete: the whole run — the field, the walk into town, the afternoon street, golden hour through the park opening, the night with its windows lighting one by one up to the after party, then the breakout — a CRT bezel, Sam on his propeller, six hits on the glass (mash Space, tap A, or just wait a second), a Bayer dissolve — and the arrival in front of the real Javits at the Booth 630 sign, where the pin releases into the registration. Scroll, or hold → to run and Space to jump; on phones the d-pad and A drive the pinned world; the static page remains the reduced-motion fallback. The "16-Bit Con" wordmark is Geist 900 with the daisy as its hyphen; OG image at /og.png.)
 See public/sprites/SOURCES.md for asset provenance.
 
 TODO before Phase 0:

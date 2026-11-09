@@ -101,6 +101,12 @@ const level3 = sessions[2]!;
 
   <p class="eyebrow world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
 
+  <div class="world__bezel" aria-hidden="true"></div>
+
+  <Window title="BREAK OUT · 0/6" class="world__prompt" aria-live="polite">
+    <p class="world__prompt-key"><span class="world__prompt-fine">Mash space</span><span class="world__prompt-coarse">Tap to break out</span></p>
+  </Window>
+
   <div class="world__touch" aria-hidden="true">
     <div class="world__dpad">
       <button type="button" class="world__dpad-arm world__dpad-arm--left" data-dpad="left" tabindex="-1"></button>
@@ -345,6 +351,7 @@ const level3 = sessions[2]!;
   .world__session,
   .world__hud,
   .world__hint,
+  .world__prompt,
   .world__loading {
     position: absolute;
     z-index: 3;
@@ -353,7 +360,8 @@ const level3 = sessions[2]!;
 
   .world--live .world__session,
   .world--live .world__hud,
-  .world--live .world__hint {
+  .world--live .world__hint,
+  .world--live .world__prompt {
     display: block;
     opacity: 0;
     transform: translateY(-8px);
@@ -374,6 +382,8 @@ const level3 = sessions[2]!;
   .world__touch,
   .world__hud,
   .world__hint,
+  .world__prompt,
+  .world__bezel,
   .world__loading,
   .world__session,
   .world--live .hero__row {
@@ -396,6 +406,7 @@ const level3 = sessions[2]!;
 
   .world__session,
   .world__hud,
+  .world__prompt,
   .world__loading,
   .world--live .hero__window {
     touch-action: manipulation;
@@ -411,9 +422,71 @@ const level3 = sessions[2]!;
     pointer-events: auto;
   }
 
-  .world--live :is(.world__session, .world__hud, .world__hint).is-visible {
+  .world--live :is(.world__session, .world__hud, .world__hint, .world__prompt).is-visible {
     opacity: 1;
     transform: none;
+  }
+
+  /* ── The breakout: a CRT bezel over the canvas, its opacity a function of t set by
+        the loop (--bezel); the outer spread fills the corners outside the rounded glass. ── */
+  .world__bezel {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    pointer-events: none;
+    opacity: var(--bezel, 0);
+  }
+
+  .world--live .world__bezel {
+    display: block;
+  }
+
+  .world__bezel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: calc(28px * var(--px));
+    box-shadow:
+      inset 0 0 0 calc(14px * var(--px)) var(--color-outline-black),
+      inset 0 0 0 calc(16px * var(--px)) var(--color-grey-700),
+      0 0 0 calc(40px * var(--px)) var(--color-outline-black);
+  }
+
+  /* Centred at the top under the nav, on the HUD's row; where the two would meet (below 48rem) it
+     drops under the HUD instead, still centred. */
+  .world__prompt {
+    top: calc(var(--nav-h) + var(--space-4));
+    left: 50%;
+    width: min(16rem, calc(100% - 2 * var(--gutter)));
+    translate: -50% 0;
+    text-align: center;
+  }
+
+  @media (max-width: 48rem) {
+    .world__prompt {
+      top: calc(var(--nav-h) + var(--space-4) + 4.5rem + var(--space-3));
+    }
+  }
+
+  .world__prompt-key {
+    font-family: var(--font-pixel);
+    font-size: var(--text-2xl);
+    line-height: var(--leading-tight);
+  }
+
+  .world__prompt-coarse {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .world__prompt-fine {
+      display: none;
+    }
+
+    .world__prompt-coarse {
+      display: inline;
+    }
   }
 
   .world__session {
@@ -436,7 +509,7 @@ const level3 = sessions[2]!;
   @media (max-width: 40rem) {
     /* Phones: HUD first, session window stacked under it. */
     .world__session {
-      top: calc(var(--nav-h) + var(--space-4) + 56px + var(--space-3));
+      top: calc(var(--nav-h) + var(--space-4) + 4.5rem + var(--space-3));
     }
   }
 

@@ -12,6 +12,27 @@ import { sprites } from '../data/sprites.manifest';
 <Base>
   <World />
 
+  <!-- Arrival: the world's pin releases into this section — Sam has reached Booth 630, so the booth and the registration come first. -->
+  <section class="section container" id="booth" aria-labelledby="booth-title">
+    <SectionMarker sprite="handMegaphone" />
+    <h2 id="booth-title">Find us at Booth 630</h2>
+    <p class="section__lede">Vega is at the con all weekend. Bring your high scores.</p>
+    <div class="cta">
+      <Window title="Booth 630" id="booth-window">
+        <img class="cta__sign" src="/sprites/ui/vega-logo.svg" alt="Vega" width="138" height="45" />
+        <p class="cta__copy">Stickers, demos, a very good mole. The after party starts at 6:00 PM and ends when the arcade does.</p>
+        <p class="eyebrow">Javits Center · Hall 3B · Booth 630</p>
+        <p class="mono cta__url">vega.io/16-bit-con</p>
+      </Window>
+      <RegisterForm />
+      <Window title="Player 1 bonus" id="bonus" class="bonus" hidden>
+        <p class="bonus__gg">12/12 coins. GG.</p>
+        <p class="bonus__copy">Say <span class="mono">16BIT-GG</span> at Booth 630 for the Player 1 bonus.</p>
+        <p class="eyebrow">Counted in this tab only. Nothing is sent or stored.</p>
+      </Window>
+    </div>
+  </section>
+
   <section class="section container" id="schedule" aria-labelledby="schedule-title">
     <SectionMarker sprite="handClipboard" />
     <h2 id="schedule-title">Schedule</h2>
@@ -25,21 +46,6 @@ import { sprites } from '../data/sprites.manifest';
         ))
       }
     </ol>
-  </section>
-
-  <section class="section container" id="booth" aria-labelledby="booth-title">
-    <SectionMarker sprite="handMegaphone" />
-    <h2 id="booth-title">Find us at Booth 630</h2>
-    <p class="section__lede">Vega is at the con all weekend. Bring your high scores.</p>
-    <div class="cta">
-      <Window title="Booth 630" id="booth-window">
-        <img class="cta__sign" src="/sprites/ui/vega-logo.svg" alt="Vega" width="138" height="45" />
-        <p class="cta__copy">Stickers, demos, a very good mole. The after party starts at 6:00 PM and ends when the arcade does.</p>
-        <p class="eyebrow">Javits Center · Hall 3B · Booth 630</p>
-        <p class="mono cta__url">vega.io/16-bit-con</p>
-      </Window>
-      <RegisterForm />
-    </div>
   </section>
 </Base>
 
@@ -94,5 +100,16 @@ import { sprites } from '../data/sprites.manifest';
     padding-top: var(--space-3);
     border-top: var(--border);
     font-size: var(--text-sm);
+  }
+
+  .bonus__gg {
+    margin-bottom: var(--space-2);
+    font-family: var(--font-pixel);
+    font-size: var(--text-2xl);
+    line-height: var(--leading-tight);
+  }
+
+  .bonus__copy {
+    margin-bottom: var(--space-3);
   }
 </style>
