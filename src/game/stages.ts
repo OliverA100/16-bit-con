@@ -1,22 +1,33 @@
 /**
- * Sky stages: one flat colour per stage, read from tokens.css so the canvas
- * never carries raw hex. Day (dawn → afternoon) is Blue 300; later stages swap the colour at
- * their boundary and the world layers step their palettes far → near afterwards.
+ * Sky colour over the run: a flat fill interpolated continuously (RGB) between the keyframes in
+ * src/data/layers.ts. Tokens are read from tokens.css once, so the canvas never
+ * carries raw hex; the in-between colours exist only as the fill changes over time.
  */
-import { skyColors, type SkyStage } from '../data/layers';
-import { readToken } from './palette';
+import { skyKeyframes } from '../data/layers';
+import { hexToRgb, readToken } from './palette';
 
-export function resolveSky(stage: SkyStage): string {
-  return readToken(skyColors[stage]);
+type Key = { t: number; rgb: [number, number, number] };
+let keys: Key[] | null = null;
+
+function resolve(): Key[] {
+  if (!keys) keys = skyKeyframes.map(([t, token]) => ({ t, rgb: hexToRgb(readToken(token)) }));
+  return keys;
 }
 
-/** The stage at timeline position t. */
-export function stageAt(t: number): SkyStage {
-  if (t < 0.06) return 'dawn';
-  if (t < 0.34) return 'morning';
-  if (t < 0.58) return 'afternoon';
-  if (t < 0.66) return 'golden';
-  if (t < 0.74) return 'dusk';
-  if (t < 0.94) return 'night';
-  return 'real';
+/** The sky at timeline position t, as an rgb() string for the canvas. */
+export function skyAt(t: number): string {
+  const k = resolve();
+  let a = k[0]!;
+  let b = k[k.length - 1]!;
+  for (let i = 0; i < k.length - 1; i++) {
+    if (t >= k[i]!.t && t <= k[i + 1]!.t) {
+      a = k[i]!;
+      b = k[i + 1]!;
+      break;
+    }
+  }
+  const span = b.t - a.t;
+  const u = span > 0 ? Math.min(1, Math.max(0, (t - a.t) / span)) : 0;
+  const c = a.rgb.map((v, i) => Math.round(v + (b.rgb[i]! - v) * u));
+  return `rgb(${c[0]} ${c[1]} ${c[2]})`;
 }

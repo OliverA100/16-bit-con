@@ -11,6 +11,8 @@ import type { Drawable } from './sprites';
 import { FOOT_SINK, type Sam } from './sam';
 import type { Coins } from './coins';
 import type { Dust } from './dust';
+import { Lights, NIGHT_STEPS, Stepper, nightTokens, rankMap, type NightTokens } from './night';
+import { makeStrip, type Strip } from './sprites';
 
 export interface Frame {
   /** Timeline position, for the palette steps. */
@@ -50,7 +52,7 @@ export const SEQ = {
   seam: 2000, // X0: the surface changes (grass → pavement); the edge at X0 + 28, the fill at X0 + 56
   subway: 2136, // the entrance stands on the pavement 80 px after the fill seam, like any prop
   nearBegin: 2150, // building fronts
-  fenceEnd: 3700,
+  fenceEnd: 5100,
 } as const;
 
 /** Parallax factor and where each layer's bottom sits (art px relative to the ground line F). */
@@ -119,11 +121,107 @@ const FIELD_TREES = [600, 900, 1250, 1600, 1900];
 /** Mid-layer trees in that layer's own space (u). */
 const MID_TREES = [260, 1000, 1760];
 const TINY_DAISIES = [560, 760, 1100, 1420, 1700];
-/** The street, world x. */
-const STREET_TREES = [2330, 2630, 2930, 3230, 3530];
-const PLANTS = [2400, 2950, 3350];
+/** The street, world x, through Level 3. */
+const STREET_TREES = [2330, 2630, 2930, 3230, 3530, 3830, 4130, 4430, 4730];
+const PLANTS = [2400, 2950, 3380, 3900, 4500];
 const ARCADES = [2620, 3420];
-const NPCS = { molePhone: 2380, moleCoffee: 2680, moleTyping: 3230 } as const;
+/** Level 2's life (one office-chair gag, then street chess) and Level 3's crowd toward the after party at Booth 630. */
+const NPCS = { molePhone: 2380, moleCoffee: 2680, molesChess: 3340, molesSofa: 4300, molePizza: 4450, dogBark: 4600, molePhone2: 4780 } as const;
+/** The after-party spot: vega-sign-horizontal over two arcade machines. */
+const PARTY = { x: 4950, arcadeGap: 56 } as const;
+/** The vertical vega-sign on a near front, in that layer's space. */
+const VEGA_SIGN_U = 1500;
+
+/**
+ * Night: each layer steps its palette over `span` in NIGHT_STEPS, far first and
+ * near last, ~150 world px apart; its windows light one by one once it has darkened; the signs
+ * flip to neon. All of it is a function of t.
+ */
+const NIGHT = { span: 0.06, far: 0.64, towers: 0.665, mid: 0.69, near: 0.715, street: 0.74 } as const;
+/** Window lighting: [from, to] in t, and the share of a layer's windows that end up lit — a night city is not fully lit, and the shuffled order leaves the dark ones scattered. */
+const LIGHTS = { far: [0.7, 0.76, 0.7], towers: [0.72, 0.78, 0.55], mid: [0.74, 0.8, 0.5], near: [0.76, 0.82, 0.45] } as const;
+const NEON_AT = 0.76;
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+interface NightSet {
+  far: Stepper;
+  towers: Stepper;
+  mid: Stepper;
+  near: Stepper;
+  fence: Stepper;
+  sidewalk: Stepper;
+  kerb: Stepper;
+  road: Stepper;
+  seam: Stepper;
+  subway: Stepper;
+  arcade: Stepper;
+  plant: Stepper;
+  poster: Stepper;
+  tree: Stepper;
+  strips: Map<Strip, Stepper>;
+  neon: { vertical: Drawable; horizontal: Drawable };
+  lights: { far: Lights; towers: Lights; mid: Lights; near: Lights };
+}
+
+const stripCache = new WeakMap<Drawable, Strip>();
+/** The same strip over a stepped variant of its sheet. */
+function stripOver(img: Drawable, like: Strip): Strip {
+  let st = stripCache.get(img);
+  if (!st) stripCache.set(img, (st = makeStrip(img, like.fw, like.fh, like.pitch)));
+  return st;
+}
+
+function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
+  const glass = {
+    far: ['#B9D6DF', '#B9C8E5'],
+    towers: ['#629EFB', '#4E88EF', '#5487E2', '#7FB0FF'],
+    mid: ['#3E81E8', '#2386F1', '#5E9AF9', '#5BABFF'],
+    near: ['#3A7DE7', '#5C98F9', '#386DD2', '#59A9FF'],
+  };
+  const to = (hexes: string[], token: string) => Object.fromEntries(hexes.map((h) => [h, token]));
+  const farMap = rankMap(c.far, [T.n9], [1], to(glass.far, T.k));
+  const towersMap = rankMap(c.towers, [T.n9, T.g7], [1, 1], { ...to(glass.towers, T.k), ...to(['#C5B298', '#C48D71'], T.y4) });
+  const midMap = rankMap(c.mid, [T.n9, T.g7, T.g5], [2, 2, 1], { ...to([...glass.mid, '#B3D0FF'], T.k), ...to(['#EDC18B', '#DE914E', '#EACAAC'], T.y4) });
+  const nearMap = rankMap(c.near, [T.n9, T.g7, T.g5], [35, 40, 25], {
+    ...to([...glass.near, '#7796DC', '#95ACDC', '#B5D1FF', '#ACC6F2', '#AAC2E0'], T.k),
+    ...to(['#F2C185', '#E38E44', '#F2C6B6', '#F0CAA8', '#F2D2A1', '#DFA67C'], T.y4),
+    '#E06B4E': T.g7,
+    '#2D4365': T.k,
+  });
+  const pave = { '#E8DECF': T.g5, '#CBC3C7': T.g7, '#CBBFBF': T.g7, '#ACA5A8': T.g7, '#ABA3A3': T.g7, '#BB9147': T.g5, '#767272': T.g7, '#55575B': T.k, '#353535': T.k, '#777B80': T.g7, '#84C5FF': T.g5 };
+  const neonMap = { '#FF7B07': T.y4, '#F0A125': T.y4, '#D75B1E': T.y4, '#FFCF3B': T.y1, '#FFFFFF': T.dw, '#767272': T.g7 };
+  const greens = { '#224100': T.n9, '#2E5700': T.n9, '#1F3B00': T.n9, '#457D07': T.n7, '#75A70D': T.n7 };
+  const strips = new Map<Strip, Stepper>();
+  for (const st of [c.molePhone, c.moleCoffee, c.molesChess, c.molesSofa, c.molePizza, c.dogBark, c.dog]) {
+    strips.set(st, new Stepper(st.image, rankMap(st.image, [T.k, T.g7, T.g5], [1, 1, 1])));
+  }
+  const full = (img: Drawable, map: Record<string, string>) => new Stepper(img, map).at(NIGHT_STEPS);
+  const neon = { vertical: full(c.vegaSign, neonMap), horizontal: full(c.vegaSignHorizontal, neonMap) };
+  return {
+    far: new Stepper(c.far, farMap),
+    towers: new Stepper(c.towers, towersMap),
+    mid: new Stepper(c.mid, midMap),
+    near: new Stepper(c.near, nearMap),
+    fence: new Stepper(c.fence, { '#353535': T.k, '#444444': T.k, '#565656': T.g7, '#777777': T.g7 }),
+    sidewalk: new Stepper(c.sidewalk, pave),
+    kerb: new Stepper(c.kerb, pave),
+    road: new Stepper(c.road, pave),
+    seam: new Stepper(c.seam, rankMap(c.seam, [T.k, T.n9, T.g7, T.g5])),
+    subway: new Stepper(c.subway, { ...greens, '#282828': T.k, '#464646': T.g7, '#FFCF3B': T.y1, '#FFF15B': T.y1, '#FFFFFF': T.y1 }),
+    arcade: new Stepper(c.arcade, rankMap(c.arcade, [T.k, T.g7], [1, 1], { ...greens, '#5DB3FF': T.y1, '#70A736': T.y4, '#FFCF3B': T.y4, '#FFD11B': T.y4, '#F0A125': T.y4 })),
+    plant: new Stepper(c.plant, rankMap(c.plant, [T.n9, T.n7], [1, 1], { '#834622': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
+    poster: new Stepper(c.poster, rankMap(c.poster, [T.k, T.g7, T.g5])),
+    tree: new Stepper(a.tree, rankMap(a.tree, [T.n9, T.n7], [1, 1], { '#58311B': T.k, '#834622': T.k, '#AE6228': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
+    strips,
+    neon,
+    lights: {
+      far: new Lights(c.far, glass.far, T.y1),
+      towers: new Lights(c.towers, glass.towers, T.y4),
+      mid: new Lights(c.mid, glass.mid, T.y4),
+      near: new Lights(c.near, glass.near, T.y4),
+    },
+  };
+}
 /** The dog patrols the sidewalk on its own clock, independent of Sam: world px and px/s. */
 const DOG = { from: 2700, to: 3100, speed: 28, stride: 8 } as const;
 const POSTER_U = 140; // on the leading near building, in that layer's space
@@ -209,13 +307,27 @@ function drawTiled(
 export class Level1 {
   /** Set once the city assets arrive; until then the city simply has not come into view. */
   city: CityAssets | null = null;
+  private night: NightSet | null = null;
 
   constructor(private readonly a: Level1Assets) {}
+
+  /** Build the night palettes and window lists off the frame once the city is here. */
+  prepareNight(): void {
+    if (!this.city || this.night) return;
+    const c = this.city;
+    const T = nightTokens();
+    this.night = buildNight(this.a, c, T);
+    for (const l of Object.values(this.night.lights)) l.prepare();
+  }
 
   draw(ctx: CanvasRenderingContext2D, f: Frame): void {
     const { t, X, camLeft, sx, F, bw, bh, now } = f;
     const a = this.a;
     const c = this.city;
+    const nt = this.night;
+    const stepOf = (start: number) => Math.min(NIGHT_STEPS, Math.max(0, Math.floor(((t - start) / NIGHT.span) * NIGHT_STEPS)));
+    const streetStep = stepOf(NIGHT.street);
+    const lit = (l: Lights, range: readonly [number, number, number]) => l.at(clamp01((t - range[0]) / (range[1] - range[0])), range[2]);
     const pm = a.afternoon;
     const small = t >= AFTERNOON_STEPS.small ? pm.small : a.small;
     const medium = t >= AFTERNOON_STEPS.small ? pm.medium : a.medium;
@@ -274,13 +386,22 @@ export class Level1 {
     const centreAt = (p: number) => p * (Xgap - sx) + bw / 2;
     if (c) {
       const farBegin = edgeAt(STACK.cityFar.p, SEQ.farBegin);
-      drawTiled(ctx, c.far, STACK.cityFar.p * camLeft, F + STACK.cityFar.bottom - c.far.height, bw, { mirror: true, from: farBegin, phase: farBegin });
+      const farImg = nt ? nt.far.at(stepOf(NIGHT.far)) : c.far;
+      const farOpts = { mirror: true, from: farBegin, phase: farBegin };
+      const farY = F + STACK.cityFar.bottom - c.far.height;
+      drawTiled(ctx, farImg, STACK.cityFar.p * camLeft, farY, bw, farOpts);
+      const farLit = nt && lit(nt.lights.far, LIGHTS.far);
+      if (farLit) drawTiled(ctx, farLit, STACK.cityFar.p * camLeft, farY, bw, farOpts);
       place(c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
       const towersBegin = edgeAt(STACK.towers.p, SEQ.towersBegin);
       const tw = alignOpening(STACK.towers.period, towersBegin, centreAt(STACK.towers.p), TOWER_GAPS, insideClear);
       const towersY = F + STACK.towers.bottom - c.towers.height;
-      drawTiled(ctx, c.towers, STACK.towers.p * camLeft, towersY, bw, { from: towersBegin, to: tw.gapL, phase: tw.phase });
-      drawTiled(ctx, c.towers, STACK.towers.p * camLeft, towersY, bw, { from: Math.max(towersBegin, tw.gapR), phase: tw.phase });
+      const towersImg = nt ? nt.towers.at(stepOf(NIGHT.towers)) : c.towers;
+      const towersLit = nt && lit(nt.lights.towers, LIGHTS.towers);
+      for (const img of towersLit ? [towersImg, towersLit] : [towersImg]) {
+        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, bw, { from: towersBegin, to: tw.gapL, phase: tw.phase });
+        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, bw, { from: Math.max(towersBegin, tw.gapR), phase: tw.phase });
+      }
     }
     drawTiled(ctx, a.plain, STACK.plain.p * camLeft, F + STACK.plain.top, bw);
 
@@ -294,13 +415,22 @@ export class Level1 {
       const midBegin = edgeAt(STACK.cityMid.p, SEQ.cityMidBegin);
       const md = alignOpening(STACK.cityMid.period, midBegin, centreAt(STACK.cityMid.p), MID_GAPS, nearestEdge);
       const midY = F + STACK.cityMid.bottom - c.mid.height;
-      drawTiled(ctx, c.mid, STACK.cityMid.p * camLeft, midY, bw, { from: midBegin, to: md.gapL, phase: md.phase });
-      drawTiled(ctx, c.mid, STACK.cityMid.p * camLeft, midY, bw, { from: Math.max(midBegin, md.gapR), phase: md.phase });
+      const midImg = nt ? nt.mid.at(stepOf(NIGHT.mid)) : c.mid;
+      const midLit = nt && lit(nt.lights.mid, LIGHTS.mid);
+      for (const img of midLit ? [midImg, midLit] : [midImg]) {
+        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, bw, { from: midBegin, to: md.gapL, phase: md.phase });
+        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, bw, { from: Math.max(midBegin, md.gapR), phase: md.phase });
+      }
       const nearPhase = nearBegin - STACK.cityNear.leadColumn;
       const nearY = F + STACK.cityNear.bottom - c.near.height;
-      drawTiled(ctx, c.near, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
-      drawTiled(ctx, c.near, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
-      place(c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
+      const nearImg = nt ? nt.near.at(stepOf(NIGHT.near)) : c.near;
+      const nearLit = nt && lit(nt.lights.near, LIGHTS.near);
+      for (const img of nearLit ? [nearImg, nearLit] : [nearImg]) {
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, bw, { from: nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
+      }
+      place(nt ? nt.poster.at(streetStep) : c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
+      place(nt && t >= NEON_AT ? nt.neon.vertical : c.vegaSign, STACK.cityNear.p, nearBegin + VEGA_SIGN_U, F - 20);
     }
     ctx.restore();
 
@@ -322,33 +452,44 @@ export class Level1 {
     drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, bw, { to: seamEdge, phase: g.daisyPhase });
     drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, bw, { to: SEQ.seam, phase: g.daisyPhase });
     if (c) {
-      drawTiled(ctx, c.sidewalk, camLeft, F, bw, { from: SEQ.seam });
-      drawTiled(ctx, c.kerb, camLeft, F + g.edgeTop, bw, { from: seamEdge });
-      drawTiled(ctx, c.road, camLeft, F + g.fillTop, bw, { from: seamFill });
+      const sw = nt ? nt.sidewalk.at(streetStep) : c.sidewalk;
+      drawTiled(ctx, sw, camLeft, F, bw, { from: SEQ.seam });
+      drawTiled(ctx, nt ? nt.kerb.at(streetStep) : c.kerb, camLeft, F + g.edgeTop, bw, { from: seamEdge });
+      drawTiled(ctx, nt ? nt.road.at(streetStep) : c.road, camLeft, F + g.fillTop, bw, { from: seamFill });
       // The seam details: tufts on the first slabs, a lighter kerb end-stone, dirt pixels on kerb and road.
-      place(c.seam, 1, SEQ.seam + g.seamTileLeft, F + g.seamTileTop + c.seam.height);
+      place(nt ? nt.seam.at(streetStep) : c.seam, 1, SEQ.seam + g.seamTileLeft, F + g.seamTileTop + c.seam.height);
     }
 
     for (const x of TINY_DAISIES) place(a.daisyTiny, 1, x, F);
     if (c) {
       // Everything on the street stands on the surface like a field prop; the fence starts on the grass.
       const base = F + STACK.near.bottom;
-      for (let x = SEQ.fenceBegin; x < SEQ.fenceEnd; x += c.fence.width) place(c.fence, 1, x, base);
-      place(c.subway, 1, SEQ.subway, base);
-      for (const x of STREET_TREES) place(a.tree, 1, x, base);
-      for (const x of PLANTS) place(c.plant, 1, x, base);
-      for (const x of ARCADES) place(c.arcade, 1, x, base);
+      const fence = nt ? nt.fence.at(streetStep) : c.fence;
+      for (let x = SEQ.fenceBegin; x < SEQ.fenceEnd; x += c.fence.width) place(fence, 1, x, base);
+      place(nt ? nt.subway.at(streetStep) : c.subway, 1, SEQ.subway, base);
+      const tree = nt ? nt.tree.at(streetStep) : a.tree;
+      for (const x of STREET_TREES) place(tree, 1, x, base);
+      const plant = nt ? nt.plant.at(streetStep) : c.plant;
+      for (const x of PLANTS) place(plant, 1, x, base);
+      const arcade = nt ? nt.arcade.at(streetStep) : c.arcade;
+      for (const x of [...ARCADES, PARTY.x, PARTY.x + PARTY.arcadeGap]) place(arcade, 1, x, base);
+      place(nt && t >= NEON_AT ? nt.neon.horizontal : c.vegaSignHorizontal, 1, PARTY.x - 10, base - c.arcade.height - 6);
       // Characters live on their own clocks, independent of Sam: idle loops, and the dog patrolling.
+      const npc = (st: Strip) => (nt ? stripOver(nt.strips.get(st)!.at(streetStep), st) : st);
       const feet = F - 60 + FOOT_SINK;
-      c.molePhone.draw(ctx, Math.floor(now / 500), NPCS.molePhone - camLeft, feet);
-      c.moleCoffee.draw(ctx, Math.floor(now / 125), NPCS.moleCoffee - camLeft, feet);
-      c.moleTyping.draw(ctx, Math.floor(now / 160), NPCS.moleTyping - camLeft, feet);
+      npc(c.molePhone).draw(ctx, Math.floor(now / 500), NPCS.molePhone - camLeft, feet);
+      npc(c.moleCoffee).draw(ctx, Math.floor(now / 125), NPCS.moleCoffee - camLeft, feet);
+      npc(c.molesChess).draw(ctx, Math.floor(now / 400), NPCS.molesChess - camLeft, F - c.molesChess.fh + FOOT_SINK);
+      npc(c.molesSofa).draw(ctx, Math.floor(now / 160), NPCS.molesSofa - camLeft, F - c.molesSofa.fh + FOOT_SINK);
+      npc(c.molePizza).draw(ctx, Math.floor(now / 140), NPCS.molePizza - camLeft, feet);
+      npc(c.dogBark).draw(ctx, Math.floor(now / 180), NPCS.dogBark - camLeft, feet, true);
+      npc(c.molePhone).draw(ctx, Math.floor(now / 700) + 1, NPCS.molePhone2 - camLeft, feet, true);
       const span = DOG.to - DOG.from;
       const travelled = (now / 1000) * DOG.speed;
       const leg = travelled % (2 * span);
       const goingLeft = leg < span;
       const dogX = goingLeft ? DOG.to - leg : DOG.from + (leg - span);
-      c.dog.draw(ctx, Math.floor(travelled / DOG.stride), dogX - camLeft, feet, goingLeft);
+      npc(c.dog).draw(ctx, Math.floor(travelled / DOG.stride), dogX - camLeft, feet, goingLeft);
     }
 
     f.coins.draw(ctx, a.coin, camLeft, F, bw, now);

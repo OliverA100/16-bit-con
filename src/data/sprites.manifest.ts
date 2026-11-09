@@ -87,7 +87,7 @@ export const sprites = {
 
   // ── New art ──────────────────────────────────────────────────────────────────
   dirtFill: { file: '/sprites/new/dirt-fill_256x28.png', w: 256, h: 28, period: 256, parallax: 1, scale: 'world', note: 'NEW: the 28 px dirt fill — deep dirt, a 1 px darker top line, a sparse scatter of the daisy row\'s dirt tones at the road\'s speck density' },
-  javitsSilhouette: { file: '/sprites/new/javits-silhouette_320x96.png', w: 320, h: 96, parallax: 0.2, scale: 'world', note: 'NEW: the far-horizon Javits, Grey 700 glass with a Grey 500 space frame and an Outline Black edge; sits on the city-far base line' },
+  javitsSilhouette: { file: '/sprites/new/javits-silhouette_300x100.png', w: 300, h: 100, parallax: 0.35, scale: 'world', note: 'NEW: Javits as a long low black-glass box (3:1) with a slightly raised central block and a faint Grey 700 space-frame grid every 8 px; sits on the far city\'s base line at the towers\' depth' },
   seamFieldStreet: { file: '/sprites/new/seam-field-street_72x52.png', w: 72, h: 52, scale: 'world', note: 'NEW: the seam details only — tufts after X0, a lighter kerb end-stone at X0+28, dirt pixels after X0+56; F at row 4, X0 at x 8' },
 
   // ── CMS illustrations: DOM only ─────────────────────────────────────────────

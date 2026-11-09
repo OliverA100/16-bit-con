@@ -67,6 +67,13 @@ export interface CityAssets {
   moleCoffee: Strip;
   moleTyping: Strip;
   dog: Strip;
+  /** Level 3's crowd and signs. */
+  molesChess: Strip;
+  molesSofa: Strip;
+  molePizza: Strip;
+  dogBark: Strip;
+  vegaSign: Drawable;
+  vegaSignHorizontal: Drawable;
 }
 
 /** Whole lobes of big-cloud.png (x, y, w, h), chosen where each lobe's own edges end. */
@@ -82,6 +89,8 @@ const DAISY_SURFACE_ROWS = 55;
 const DAISY_DIRT = { top: 55, rows: 6 } as const;
 const DAISY_FILL_ROW = 60;
 const CITY_FAR_ROWS = 323;
+/** city-near: one 1152 px period, rows 434–1107 — all that a ≤ 720 px buffer can show with its base at F + 2. */
+const CITY_NEAR = { period: 1152, top: 434 } as const;
 const PLAIN_TOP = 100; // the hills' path ends at row 98
 export const STREET = { sidewalkRows: 8, kerbTop: 70, kerbRows: 12, roadTop: 12, roadRows: 28 } as const;
 
@@ -174,14 +183,21 @@ export async function loadCity(): Promise<CityAssets> {
     sprites.dogWalk,
     sprites.seamFieldStreet,
     sprites.javitsSilhouette,
+    sprites.molesChess,
+    sprites.molesSofa,
+    sprites.molePizza,
+    sprites.dogBark,
+    sprites.vegaSign,
+    sprites.vegaSignHorizontal,
   ];
-  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits] = await loadAll(files);
-  const strip = (img: HTMLImageElement | undefined) => makeStrip(img!, 60, 60);
+  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits, chess, sofa, pizza, dogBark, vegaSign, vegaSignH] =
+    await loadAll(files);
+  const strip = (img: HTMLImageElement | undefined, fw = 60, fh = 60) => makeStrip(img!, fw, fh);
   return {
     far: cropImage(far!, 0, 0, far!.width, CITY_FAR_ROWS),
     towers: towers!,
     mid: mid!,
-    near: near!,
+    near: cropImage(near!, 0, CITY_NEAR.top, CITY_NEAR.period, near!.height - CITY_NEAR.top),
     fence: fence!,
     sidewalk: cropImage(sidewalk!, 0, 0, sidewalk!.width, STREET.sidewalkRows),
     kerb: cropImage(sidewalk!, 0, STREET.kerbTop, sidewalk!.width, STREET.kerbRows),
@@ -196,5 +212,31 @@ export async function loadCity(): Promise<CityAssets> {
     moleCoffee: strip(moleCoffee),
     moleTyping: strip(moleTyping),
     dog: strip(dog),
+    molesChess: strip(chess, sprites.molesChess.fw, sprites.molesChess.fh),
+    molesSofa: strip(sofa, sprites.molesSofa.fw, sprites.molesSofa.fh),
+    molePizza: strip(pizza),
+    dogBark: strip(dogBark),
+    vegaSign: withDaisy(vegaSign!, await loadImage(sprites.daisyIcon.file), 'above'),
+    vegaSignHorizontal: withDaisy(vegaSignH!, await loadImage(sprites.daisyIcon.file), 'left'),
   };
+}
+
+/**
+ * Vega's wordmark is never shown on its own (brand rule): wherever the vega tiles appear,
+ * the Vega daisy stands beside them — composed at load, Vega's files untouched.
+ */
+function withDaisy(sign: Drawable, daisy: Drawable, at: 'left' | 'above'): HTMLCanvasElement {
+  const gap = 3;
+  const c = document.createElement('canvas');
+  c.width = at === 'left' ? daisy.width + gap + sign.width : Math.max(sign.width, daisy.width);
+  c.height = at === 'left' ? Math.max(sign.height, daisy.height) : daisy.height + gap + sign.height;
+  const ctx = c.getContext('2d')!;
+  if (at === 'left') {
+    ctx.drawImage(daisy, 0, Math.round((c.height - daisy.height) / 2));
+    ctx.drawImage(sign, daisy.width + gap, Math.round((c.height - sign.height) / 2));
+  } else {
+    ctx.drawImage(daisy, Math.round((c.width - daisy.width) / 2), 0);
+    ctx.drawImage(sign, Math.round((c.width - sign.width) / 2), daisy.height + gap);
+  }
+  return c;
 }

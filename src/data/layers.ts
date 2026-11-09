@@ -19,16 +19,30 @@ import type { SpriteKey } from './sprites.manifest';
 export type SkyStage = 'dawn' | 'morning' | 'afternoon' | 'golden' | 'dusk' | 'night' | 'real';
 
 /**
- * One flat sky colour per palette stage: no bands, no gradients — depth in the
- * sky comes from clouds. A stage change swaps the colour; the world layers then step their
- * own palettes far → near. Morning is Blue 300; the afternoon pales to Blue 100 and the clouds'
- * shading steps to Blue 300 behind it (bank, lobes, small clouds), farthest first.
+ * The sky is one flat colour that interpolates continuously between these keyframes over the
+ * scroll range: no bands, no steps, no dither — a flat fill changing over time.
+ * Morning Blue 300 holds through Level 1; the afternoon pales and warms through Level 2 into
+ * golden, dusk and the Green 900 night; the real world is Daisy White.
  */
+export const skyKeyframes: readonly [number, string][] = [
+  [0, '--color-blue-300'],
+  [0.34, '--color-blue-300'],
+  [0.5, '--color-blue-100'],
+  [0.58, '--color-yellow-200'],
+  [0.63, '--color-yellow-500'],
+  [0.68, '--color-yellow-600'],
+  [0.72, '--color-blue-900'],
+  [0.77, '--color-green-900'],
+  [0.94, '--color-green-900'],
+  [0.97, '--color-daisy-white'],
+];
+
+/** Still-crop skies for the static page: one flat colour per scene. */
 export const skyColors: Record<SkyStage, string> = {
   dawn: '--color-blue-300',
   morning: '--color-blue-300',
   afternoon: '--color-blue-100',
-  golden: '--color-yellow-200',
+  golden: '--color-yellow-500',
   dusk: '--color-blue-900',
   night: '--color-green-900',
   real: '--color-daisy-white',

@@ -18,12 +18,12 @@ import { Sam, SAM_CELL } from './sam';
 import { Coins, LEVEL1_COINS, TOTAL_COINS } from './coins';
 import { loadCity, loadLevel1 } from './assets';
 import { Level1 } from './world';
-import { resolveSky, stageAt } from './stages';
-import { GROUND_BAND, type SkyStage } from '../data/layers';
+import { skyAt } from './stages';
+import { GROUND_BAND } from '../data/layers';
 
 const W = 6000;
-/** Levels 1 and 2 are exposed: the field, the walk into town and the afternoon street (world x 0–3480). */
-const T_MAX = 0.58;
+/** Levels 1–3 are exposed: the field, the walk into town, the afternoon street and the night (world x 0–5040). */
+const T_MAX = 0.84;
 const X_MAX = T_MAX * W;
 /** A scroll we did not cause suspends keys for this long. */
 const SCROLL_OVERRIDE_MS = 150;
@@ -161,15 +161,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   loadCity()
     .then((c) => {
       level.city = c;
+      level.prepareNight();
     })
     .catch((err) => console.error('[world] city assets failed to load', err));
-  const skyCache = new Map<SkyStage, string>();
-  const skyFor = (stage: SkyStage) => {
-    let v = skyCache.get(stage);
-    if (!v) skyCache.set(stage, (v = resolveSky(stage)));
-    return v;
-  };
-
   let D1 = Math.round(pinnedDistance(window.innerHeight) * T_MAX);
   let expectedY = Number.NaN;
   let scrollOverrideUntil = 0;
@@ -275,14 +269,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     prevSamX = X;
 
     if (input.active) {
-      const sky = skyFor(stageAt(timeline.t));
+      const sky = skyAt(timeline.t);
       level.draw(bctx, { t: timeline.t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, now, sky, sam, samX: X, coins, dust });
       sctx.clearRect(0, 0, o.canvas.width, o.canvas.height);
       sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
 
-      // Title slides out over t 0.05–0.08 in six hard steps; HUD and session window follow.
+      // The title overlay is a pure function of the scroll position (not the eased visual, so a
+      // scrollbar jump removes it at once): six hard steps over t 0.05–0.08, gone by 0.08.
       const t = timeline.t;
-      const out = steps((t - 0.05) / 0.03, 6);
+      const out = steps((timeline.tTarget - 0.05) / 0.03, 6);
       o.copy.style.transform = `translateY(${-out * 48}px)`;
       o.copy.style.opacity = String(1 - out);
       o.windowRow.style.transform = `translateY(${-out * 32}px)`;
@@ -292,7 +287,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.
       for (const el of o.sessions) {
         const level = el.dataset.session;
-        el.classList.toggle('is-visible', level === '1' ? t >= 0.08 && t < 0.34 : level === '2' ? t >= 0.36 && t < 0.6 : false);
+        el.classList.toggle('is-visible', level === '1' ? t >= 0.08 && t < 0.34 : level === '2' ? t >= 0.36 && t < 0.6 : level === '3' ? t >= 0.62 && t < 0.83 : false);
       }
       o.hint?.classList.toggle('is-visible', t > 0.005 && t < 0.14);
       const clock = clockFor(t);

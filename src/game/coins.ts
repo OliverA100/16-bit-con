@@ -24,6 +24,10 @@ export const LEVEL1_COINS: CoinDef[] = [
   { id: 'l2-b', x: 2560, y: 76, high: true },
   { id: 'l2-c', x: 2900, y: 24, high: false },
   { id: 'l2-d', x: 3300, y: 76, high: true },
+  { id: 'l3-a', x: 3800, y: 24, high: false },
+  { id: 'l3-b', x: 4100, y: 76, high: true },
+  { id: 'l3-c', x: 4400, y: 24, high: false },
+  { id: 'l3-d', x: 4700, y: 76, high: true },
 ];
 
 export const TOTAL_COINS = 12;

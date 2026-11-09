@@ -20,6 +20,7 @@ const clouds = [
 
 const level1 = sessions[0]!;
 const level2 = sessions[1]!;
+const level3 = sessions[2]!;
 ---
 
 <section class="hero world" id="world" aria-labelledby="hero-title" data-world>
@@ -84,6 +85,10 @@ const level2 = sessions[1]!;
   <Window title="Level 2 · 2:00 PM" class="world__session" data-session="2" aria-live="polite">
     <p class="world__session-title">{level2.title}</p>
     <p class="eyebrow">{level2.place}</p>
+  </Window>
+  <Window title="Level 3 · 6:00 PM" class="world__session" data-session="3" aria-live="polite">
+    <p class="world__session-title">{level3.title}</p>
+    <p class="eyebrow">{level3.place}</p>
   </Window>
 
   <Window title="HUD" class="world__hud" aria-label="Coins and time">
