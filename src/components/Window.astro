@@ -1,0 +1,109 @@
+---
+/**
+ * Window — the one container of the site. Retro OS window: 1 px Green 900 border,
+ * hard offset shadow, no radius, a Geist Mono title bar with three small squares.
+ * Nav, dialogs, session cards, HUD panels and modals are all Windows.
+ */
+type Tag = 'div' | 'section' | 'article' | 'nav' | 'aside' | 'header' | 'footer' | 'form';
+
+interface Props {
+  title: string;
+  as?: Tag;
+  tone?: 'light' | 'dark';
+  id?: string;
+  class?: string;
+  /** Remove body padding when the content is an image or a canvas crop. */
+  flush?: boolean;
+  [key: string]: unknown;
+}
+
+const {
+  title,
+  as: Element = 'div',
+  tone = 'light',
+  id,
+  class: className,
+  flush = false,
+  ...rest
+} = Astro.props;
+
+const titleId = id ? `${id}-title` : undefined;
+---
+
+<Element
+  class:list={['window', `window--${tone}`, { 'window--flush': flush }, className]}
+  id={id}
+  aria-labelledby={titleId}
+  {...rest}
+>
+  <div class="window__bar">
+    <span class="window__title" id={titleId}>{title}</span>
+    <span class="window__squares" aria-hidden="true"><i></i><i></i><i></i></span>
+  </div>
+  <div class="window__body">
+    <slot />
+  </div>
+</Element>
+
+<style>
+  .window {
+    background: var(--surface);
+    color: var(--text);
+    border: var(--border);
+    border-radius: 0;
+    box-shadow: var(--shadow-hard);
+  }
+
+  .window__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    height: var(--window-bar-h);
+    padding: 0 var(--space-2);
+    border-bottom: var(--border);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-mono);
+    line-height: 1;
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  .window__title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .window__squares {
+    display: flex;
+    flex: none;
+    gap: var(--space-1);
+  }
+
+  .window__squares i {
+    display: block;
+    width: var(--window-square);
+    height: var(--window-square);
+    border: 1px solid currentColor;
+  }
+
+  .window__body {
+    padding: var(--space-4);
+  }
+
+  .window--flush .window__body {
+    padding: 0;
+  }
+
+  .window--dark {
+    background: var(--surface-dark);
+    color: var(--text-on-dark);
+  }
+
+  .window--dark .window__bar {
+    color: var(--text-on-dark-accent);
+    border-bottom-color: var(--color-green-700);
+  }
+</style>

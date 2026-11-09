@@ -6,9 +6,12 @@ and CMS images used across marketing pages). Vega's take-home brief asks to buil
 their brand assets; this file keeps the provenance honest.
 
 Grid: every Sam animation sheet is a horizontal strip of 60x60 frames.
-Goggles: run / jump / idle / sam-watering / sam-smoking come from the careers game and
-have GREEN goggles. Brand canon is BLUE (#5DB3FF-ish lens, see sam-propeller-idle).
-Palette-swap at build time.
+Goggles: run / jump / idle / portrait-sam / sam-watering / sam-smoking come from the careers
+game and have GREEN goggles (four tones: #D5FB19 rim, #75A70D lens, #457D07 strap, #2E5700 frame).
+Brand canon is BLUE (#0BECFF rim, #097FCA lens, measured in sam-propeller-idle).
+Swapped at load by src/game/palette.ts, together with the body colours (#AE6228 -> #BE6627,
+#834622 -> #944F1E, #BD8A51/#C58F53 -> #C09564, #000000 -> #1A0505) so every Sam sheet
+matches; the files in this folder are untouched.
 
 ## sam/
 | file | frames | notes |
@@ -24,7 +27,7 @@ Palette-swap at build time.
 | sam-watering.png / sam-smoking.png | 1 / 28 | spare poses |
 | sam-large-newspaper/phone/suit/labcoat.png | 1 | big dressed poses (bandana + outfit) |
 | sam-suit-small.png | 1 | |
-| portrait-sam.png | 1 | careers dialog portrait |
+| portrait-sam.png | 1 | careers dialog portrait (green -> swap) |
 | sam-walk-side_29x44.png | 1 | side walking pose (green -> swap) |
 | sam-front_31x44.png | 1 | facing front (green -> swap) |
 | sam-three-quarter_27x44.png | 1 | three-quarter, arms crossed (green -> swap) |
@@ -32,7 +35,9 @@ Palette-swap at build time.
 ## world/
 - bg-*_480x320 / 509x200: Vega's own world backgrounds (green hills, city skyline, canyon,
   lake, desert, floating island, mountain/rock silhouettes, clouds strip)
-- city-far / city-towers / city-mid / city-near / city-near-fill: 5-layer NYC parallax (2304 wide)
+- city-far 1152x590 / city-towers 2304x510 / city-mid 1151x650 / city-near 2304x1108 /
+  city-near-fill 2304x144: 5-layer NYC parallax. near and near-fill repeat every 1152 px (the
+  files hold two copies), mid loops at 1151; far and towers do not loop (mirror-tile them)
 - big-cloud, cloud-* : clouds, many sizes
 - ground-daisy-row-strip, ground-grass-underground, ground-bushes-strip, tile-grass-dirt*: ground
 - daisy-tiny-a..g: 9-18px daisies for ground decoration

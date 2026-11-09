@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import Window from '../../components/Window.astro';
+---
+
+<Base title="Sprite check — 16-Bit Con" noindex>
+  <section class="container dev">
+    <h1>Sprite check</h1>
+    <p class="eyebrow">Sam sheets at 4× — original vs. brand-corrected (goggles + body). Not linked from the site.</p>
+    <Window title="SAM_BRAND_MAP · RESULT" id="result">
+      <p class="mono" id="result-text">Loading…</p>
+    </Window>
+    <div id="sheets" class="sheets"></div>
+  </section>
+</Base>
+
+<script>
+  import { sprites } from '../../data/sprites.manifest';
+  import { loadImage } from '../../game/sprites';
+  import { remap, countColors, SAM_BRAND_MAP } from '../../game/palette';
+  import { fitPixelCanvas } from '../../game/scale';
+
+  const host = document.getElementById('sheets')!;
+  const result = document.getElementById('result-text')!;
+  const sheets = [sprites.samRun, sprites.samJump, sprites.samIdle, sprites.samPortrait, sprites.samPropeller];
+  const careers = Object.keys(SAM_BRAND_MAP);
+
+  const show = (label: string, img: HTMLImageElement | HTMLCanvasElement) => {
+    const wrap = document.createElement('figure');
+    const cap = document.createElement('figcaption');
+    cap.className = 'eyebrow';
+    cap.textContent = label;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'pixel';
+    const w = Math.min(img.width, 480);
+    const { k, ctx } = fitPixelCanvas(canvas, w, img.height, 4);
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.drawImage(img, 0, 0, w, img.height, 0, 0, w, img.height);
+    wrap.append(cap, canvas);
+    host.append(wrap);
+  };
+
+  (async () => {
+    let stray = 0;
+    for (const entry of sheets) {
+      const img = await loadImage(entry.file);
+      const fixed = remap(img, SAM_BRAND_MAP);
+      const before = countColors(img, careers);
+      const after = countColors(fixed, careers);
+      stray += after;
+      show(`${entry.file} · original (${before} careers-palette px)`, img);
+      show(`${entry.file} · brand-corrected (${after} left)`, fixed);
+    }
+    result.textContent = stray === 0 ? '0 careers-palette pixels left after remap ✓' : `${stray} careers-palette pixels left ✗`;
+  })().catch((err) => {
+    result.textContent = String(err);
+  });
+</script>
+
+<style>
+  .dev {
+    display: grid;
+    gap: var(--space-6);
+    padding-block: var(--space-12);
+  }
+
+  .sheets {
+    display: grid;
+    gap: var(--space-6);
+  }
+
+  .sheets :global(figure) {
+    display: grid;
+    gap: var(--space-2);
+    overflow-x: auto;
+  }
+</style>

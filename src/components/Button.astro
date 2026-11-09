@@ -1,0 +1,88 @@
+---
+/**
+ * Button — small, Florets Yellow fill, 1 px Green 900 border, hard shadow, Geist Mono
+ * label. Renders an <a> when `href` is given, otherwise a <button>.
+ * Hover/active snap the shadow in (transform only, no blur, no colour transition).
+ */
+interface Props {
+  href?: string;
+  type?: 'button' | 'submit' | 'reset';
+  variant?: 'primary' | 'ghost';
+  size?: 'sm' | 'md';
+  class?: string;
+  [key: string]: unknown;
+}
+
+const {
+  href,
+  type = 'button',
+  variant = 'primary',
+  size = 'md',
+  class: className,
+  ...rest
+} = Astro.props;
+
+const Element = href ? 'a' : 'button';
+---
+
+<Element
+  class:list={['btn', `btn--${variant}`, `btn--${size}`, className]}
+  href={href}
+  type={href ? undefined : type}
+  {...rest}
+>
+  <slot />
+</Element>
+
+<style>
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: var(--space-8);
+    padding: 0 var(--space-3);
+    background: var(--accent);
+    color: var(--text);
+    border: var(--border);
+    border-radius: 0;
+    box-shadow: var(--shadow-hard-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-mono);
+    line-height: 1;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .btn:hover {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--outline);
+  }
+
+  .btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: none;
+  }
+
+  /* The global ring uses box-shadow; keep both the hard shadow and the ring here. */
+  .btn:focus-visible {
+    box-shadow:
+      var(--shadow-hard-sm),
+      0 0 0 6px var(--focus-ring);
+  }
+
+  .btn--ghost {
+    background: var(--surface);
+  }
+
+  .btn--sm {
+    min-height: var(--space-6);
+    padding: 0 var(--space-2);
+    font-size: var(--text-xs);
+  }
+</style>

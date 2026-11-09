@@ -1,0 +1,105 @@
+/*
+  16-Bit Con — design tokens.
+  Brand colours are law: components use these variables only, never raw hex.
+  Blues are for sky and sky illustrations ONLY — never UI, never text, never a surface.
+*/
+:root {
+  /* Core four */
+  --color-florets-yellow: #FFD11B; /* primary  (= Yellow 400) */
+  --color-leaf-green: #0D5500;     /* secondary (= Green 700) */
+  --color-sky-blue: #8DCAFF;       /* accent, sky/backgrounds only (= Blue 300) */
+  --color-daisy-white: #FFFAEB;    /* neutral, default page surface */
+
+  /* Yellows */
+  --color-yellow-100: #FFFC42;
+  --color-yellow-200: #FFE634;
+  --color-yellow-400: #FFD11B;
+  --color-yellow-500: #FF9823;
+  --color-yellow-600: #FF7B07;
+
+  /* Greens */
+  --color-green-100: #D5FB19;
+  --color-green-300: #75A70D;
+  --color-green-500: #457D07;
+  --color-green-700: #0D5500;
+  --color-green-900: #0F3301;
+
+  /* Neutrals */
+  --color-cloud-white: #FAFAF9;
+  --color-daisy-white: #FFFAEB;
+  --color-grey-500: #8A8880;
+  --color-grey-700: #3C3B38;
+  --color-outline-black: #151514;
+
+  /* Blues — sky and sky illustrations only */
+  --color-blue-100: #CAE6FF;
+  --color-blue-300: #8DCAFF;
+  --color-blue-500: #5DB3FF;
+  --color-blue-700: #2189E5;
+  --color-blue-900: #0072D6;
+
+  /* Semantic aliases */
+  --surface: var(--color-daisy-white);
+  --surface-raised: var(--color-cloud-white);
+  --surface-dark: var(--color-green-900);
+  --text: var(--color-green-900);
+  --text-muted: var(--color-grey-700);
+  --text-subtle: var(--color-grey-500);
+  --text-on-dark: var(--color-daisy-white);
+  --text-on-dark-accent: var(--color-green-100);
+  --accent: var(--color-yellow-400);
+  --accent-strong: var(--color-yellow-500);
+  --outline: var(--color-green-900);
+  --focus-ring: var(--color-yellow-400);
+  --sky: var(--color-sky-blue);
+
+  /* Grid: 4 px base for spacing and borders */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* Retro OS window chrome: 1 px border, hard offset shadow, no radius */
+  --border: 1px solid var(--outline);
+  --shadow-hard: 4px 4px 0 var(--outline);
+  --shadow-hard-sm: 2px 2px 0 var(--outline);
+  --shadow-hard-lg: 8px 8px 0 var(--outline);
+  --window-bar-h: 24px;
+  --window-square: 8px;
+
+  /* Type */
+  --font-display: 'Signifier', 'Iowan Old Style', Georgia, serif;
+  --font-pixel: 'PP Mondwest', 'Signifier', Georgia, serif; /* 8-bit spice, mixed in */
+  --font-body: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-3xl: 2.75rem;
+  --text-display: clamp(3.5rem, 13vw, 9.5rem);
+  --leading-tight: 1.05;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --tracking-mono: 0.04em;
+
+  /* Layout */
+  --container: 72rem; /* 1152 px: one city tile period */
+  --gutter: var(--space-4);
+
+  /* Motion: smooth easing for UI, steps() where things should feel 16-bit */
+  --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --steps-16bit: steps(4, end);
+}

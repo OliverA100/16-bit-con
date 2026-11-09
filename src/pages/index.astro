@@ -1,0 +1,248 @@
+---
+import Base from '../layouts/Base.astro';
+import Window from '../components/Window.astro';
+import Button from '../components/Button.astro';
+
+const sessions = [
+  { level: 1, time: '10:00 AM', title: 'Opening Keynote: The Future of Retro' },
+  { level: 2, time: '2:00 PM', title: 'Panel: Pixel Art in the Age of AI' },
+  { level: 3, time: '6:00 PM', title: 'Vega After Party — Booth 630' },
+];
+---
+
+<Base>
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="container hero__copy">
+      <p class="eyebrow">October 3–5, 2026 · Javits Center, New York</p>
+      <h1 id="hero-title">16-Bit Con</h1>
+      <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
+    </div>
+
+    <div class="hero__sky" aria-hidden="true">
+      <img class="hero__cloud hero__cloud--a pixel" src="/sprites/world/cloud-b_219x63.png" alt="" width="219" height="63" />
+      <img class="hero__cloud hero__cloud--b pixel" src="/sprites/world/cloud-f_69x44.png" alt="" width="69" height="44" />
+    </div>
+
+    <div class="container hero__stage">
+      <Window title="PRESS START" id="press-start" class="hero__window">
+        <div class="hero__row">
+          <canvas
+            class="hero__sam pixel"
+            id="hero-sam"
+            width="60"
+            height="60"
+            role="img"
+            aria-label="Sam, Vega's pixel-art mole, idling in blue ski goggles"></canvas>
+          <div class="hero__actions">
+            <Button href="#register">Register now</Button>
+            <Button href="#booth" variant="ghost">Find us at Booth 630</Button>
+          </div>
+        </div>
+        <p class="eyebrow hero__status">Loading world… Phase 1/5 · Insert coin to continue</p>
+      </Window>
+    </div>
+  </section>
+
+  <section class="section container" id="schedule" aria-labelledby="schedule-title">
+    <h2 id="schedule-title">Schedule</h2>
+    <p class="section__lede">Three sessions. One day. Save states not included.</p>
+    <ol class="sessions">
+      {
+        sessions.map((s) => (
+          <li>
+            <Window as="article" title={`Level ${s.level} · ${s.time}`} id={`session-${s.level}`}>
+              <h3 class="session__title">{s.title}</h3>
+              <p class="eyebrow">{s.time} · Javits Center</p>
+            </Window>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="section container" id="booth" aria-labelledby="booth-title">
+    <h2 id="booth-title">Find us at Booth 630</h2>
+    <p class="section__lede">Vega is at the con all weekend. Bring your high scores.</p>
+    <div class="cta">
+      <Window title="BOOTH 630" id="booth-window">
+        <img class="cta__sign" src="/sprites/ui/vega-logo.svg" alt="Vega" width="138" height="45" />
+        <p>Come say hi, grab a sticker, and stay for the after party at 6:00 PM.</p>
+      </Window>
+      <Window title="REGISTER" id="register" tone="dark">
+        <p>Registration opens in Phase 2. Until then, the official page has you covered.</p>
+        <div class="cta__actions">
+          <Button href="https://vega.io/16-bit-con">Register now</Button>
+        </div>
+      </Window>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { loadSamSheets } from '../game/sam';
+  import { fitPixelCanvas } from '../game/scale';
+
+  const canvas = document.getElementById('hero-sam') as HTMLCanvasElement | null;
+  if (canvas) {
+    const { k, ctx } = fitPixelCanvas(canvas, 60, 60, 2);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    loadSamSheets()
+      .then(({ idle }) => {
+        const fps = 8;
+        let last = 0;
+        let frame = 0;
+        const paint = () => {
+          ctx.setTransform(k, 0, 0, k, 0, 0);
+          ctx.clearRect(0, 0, 60, 60);
+          idle.draw(ctx, frame, 0, 0);
+        };
+        paint();
+        if (reduceMotion) return;
+        const tick = (now: number) => {
+          if (now - last >= 1000 / fps) {
+            last = now;
+            frame = (frame + 1) % idle.frames;
+            if (!document.hidden) paint();
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      })
+      .catch((err) => console.error(err));
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    padding-top: var(--space-16);
+  }
+
+  .hero__copy {
+    display: grid;
+    gap: var(--space-4);
+    justify-items: center;
+    text-align: center;
+  }
+
+  .hero__tagline {
+    max-width: 36rem;
+    font-size: var(--text-lg);
+    color: var(--text-muted);
+  }
+
+  .hero__sky {
+    position: relative;
+    height: var(--space-32);
+    margin-top: var(--space-10);
+    background: var(--sky);
+    border-top: var(--border);
+    border-bottom: var(--border);
+    overflow: hidden;
+  }
+
+  .hero__cloud {
+    position: absolute;
+    width: calc(2 * var(--w));
+    height: auto;
+  }
+
+  .hero__cloud--a {
+    --w: 219px;
+    top: var(--space-4);
+    left: 8%;
+  }
+
+  .hero__cloud--b {
+    --w: 69px;
+    top: var(--space-12);
+    right: 12%;
+  }
+
+  .hero__stage {
+    display: flex;
+    justify-content: center;
+    margin-top: calc(-1 * var(--space-16));
+  }
+
+  .hero__window {
+    width: min(100%, 36rem);
+  }
+
+  .hero__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4) var(--space-6);
+  }
+
+  .hero__sam {
+    flex: none;
+  }
+
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .hero__status {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: var(--border);
+  }
+
+  .section {
+    padding-top: var(--space-24);
+    display: grid;
+    gap: var(--space-6);
+    justify-items: center;
+  }
+
+  .section__lede {
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  .sessions {
+    display: grid;
+    gap: var(--space-6);
+    width: 100%;
+    padding: 0;
+    list-style: none;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  }
+
+  .session__title {
+    margin-bottom: var(--space-2);
+    text-align: left;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: var(--text-lg);
+    line-height: var(--leading-snug);
+  }
+
+  .cta {
+    display: grid;
+    gap: var(--space-6);
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  }
+
+  .cta__sign {
+    width: calc(2 * 138px);
+    height: auto;
+    margin-bottom: var(--space-4);
+  }
+
+  .cta__actions {
+    margin-top: var(--space-4);
+  }
+
+  @media (max-width: 40rem) {
+    .hero__cloud--a {
+      left: -10%;
+    }
+  }
+</style>
