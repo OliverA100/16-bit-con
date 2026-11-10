@@ -197,6 +197,17 @@ p {
   margin-inline: auto;
 }
 
+/* Agent Sam's typewriter (src/game/typing.ts): the part of the line still to come keeps its place but
+   hides, and the cursor is a half block drawn over the next character in the text's own colour. */
+.type-rest {
+  visibility: hidden;
+}
+
+.type-caret {
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(to right, currentColor 0 55%, transparent 55%);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

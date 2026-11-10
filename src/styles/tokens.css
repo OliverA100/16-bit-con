@@ -64,6 +64,10 @@
   --space-10: 40px;
   --space-12: 48px;
   --space-24: 96px;
+  /* The page's one rhythm between sections: as airy as the hero's gap to the Register window (the hero's
+     own room under its tagline plus --space-24), a quarter of the screen's height. svh, so a phone's toolbar
+     showing or hiding never moves the page. */
+  --section-gap: clamp(7rem, 25svh, 14rem);
 
   /* Frame lines at vega.io's scale: 1 px Green 900, no radius, hard offset shadow. */
   --border: 1px solid var(--outline);

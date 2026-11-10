@@ -50,6 +50,7 @@ import type { BreakoutState, Hero } from '../monitor/hero';
 import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, hitTarget, playMs, playP, scrollLengths, smooth } from './segments';
 import { drawCell, idleOnPerch, queryPerch } from './landing';
 import { createRegisterDialog, focusRegister } from './register-dialog';
+import { typeOut } from './typing';
 import { GL_ATTRIBUTES } from '../monitor/spec';
 
 const W = 6000;
@@ -688,6 +689,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   //    window's title bar as the pin releases, at whole device px per art px again. In flight his box stays
   //    on the perch and a transform carries him, so the page never lays anything out again: no layout shift.
   const perch = queryPerch();
+  /** Agent Sam's line on the Register window: typed out once he lands (the full line stays for screen readers). */
+  const landingTyped = document.querySelector<HTMLElement>('[data-landing-typed]');
+  let landingLine = '';
+  let landingSince = -1;
+  let landingShown = -1;
   let perchBox = '';
   /** Where the page took Sam over, on screen: the top of his jump out of the monitor. */
   let flightFrom: { x: number; y: number } | null = null;
@@ -700,7 +706,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     if (perch.root.classList.contains('is-landed') !== landed) {
       perch.root.classList.toggle('is-landed', landed);
       perchFrame = '';
-      if (landed) perch.root.dispatchEvent(new Event('landed'));
+      if (landed) {
+        perch.root.dispatchEvent(new Event('landed'));
+        // Agent Sam's line on the Register window types out as his lines in the game do
+        if (landingTyped) {
+          landingLine = landingTyped.textContent ?? '';
+          typeOut(landingTyped, landingLine, 0);
+          landingSince = clockNow();
+        }
+      }
     }
     const c = perch.canvas;
     if (c.classList.contains('is-flying') !== flying) c.classList.toggle('is-flying', flying);
@@ -1489,7 +1503,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         const n = Math.min(samLine.text.length, Math.floor((now - samSince) / TYPE_MS));
         if (n !== samShown) {
           samShown = n;
-          o.samTyped.textContent = samLine.text.slice(0, n) + (n < samLine.text.length ? '▌' : '');
+          typeOut(o.samTyped, samLine.text, n);
         }
       }
 
@@ -1520,6 +1534,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     stepLanding(now);
     // Sam on the page, wherever the page is (below the pin the world no longer draws).
     updatePerch(q);
+    if (landingSince >= 0 && landingTyped) {
+      const n = Math.min(landingLine.length, Math.floor((now - landingSince) / TYPE_MS));
+      if (n !== landingShown) {
+        landingShown = n;
+        typeOut(landingTyped, landingLine, n);
+      }
+      if (n >= landingLine.length) landingSince = -1;
+    }
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

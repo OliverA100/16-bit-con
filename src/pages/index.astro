@@ -20,7 +20,12 @@ import { sessions } from '../data/sessions';
       <div class="landing__perch" data-landing>
         <canvas class="landing__sam pixel" width="60" height="60" aria-hidden="true" data-landing-sam></canvas>
         <Window size="compact" title="Agent Sam" class="landing__bubble" data-landing-bubble>
-          <p class="mono landing__line">Made it. Find me at Booth 630.</p>
+          <!-- Typed out like his lines in the game once he lands (src/game/typing.ts: the whole line keeps its
+               layout while it types); whole for screen readers, on the static page and without JS. -->
+          <p class="mono landing__line">
+            <span aria-hidden="true" data-landing-typed>Made it. Find me at Booth 630.</span>
+            <span class="sr-only">Made it. Find me at Booth 630.</span>
+          </p>
         </Window>
       </div>
       <RegisterForm />
@@ -48,17 +53,17 @@ import { sessions } from '../data/sessions';
 
 <style>
   /* ── Sections ── */
-  /* 96 px above a section; the last one keeps 48 px under it, which with the footer's own 48 px
-     gives the page the same 96 px at its end. */
+  /* One rhythm between sections (--section-gap); the last keeps room under it so that, with the footer's
+     own --space-12, the page ends on the same gap. Inside a section the closer --space-6 groups its parts. */
   .section {
     display: grid;
     gap: var(--space-6);
     justify-items: center;
-    padding-top: var(--space-24);
+    padding-top: var(--section-gap);
   }
 
   .section:last-of-type {
-    padding-bottom: var(--space-12);
+    padding-bottom: calc(var(--section-gap) - var(--space-12));
   }
 
   .section__lede {
@@ -82,17 +87,12 @@ import { sessions } from '../data/sessions';
 
   /* ── The landing: the Register window with Sam on its title bar (--sam-px: CSS px per art px, whole
         device px; set by the world, else the page's own k at 2×) and Agent Sam beside him. ── */
-  /* The page's own rhythm above the Register window while Sam is not on it; room for him on his perch
-     in the game (from PRESS START on, while the landing is far below the view) and after he has landed,
-     and on the static page, where he stands there from the start. */
+  /* Above the Register window: --space-24, which with the hero's own room under its tagline makes the
+     page's airy gap. The same in every mode: Sam and Agent Sam's bubble stand in it once he has landed. */
   .landing {
     position: relative;
     z-index: 2;
     padding-top: var(--space-24);
-  }
-
-  :global(:root:is(.is-playing, .is-exiting, .is-done, :not(.has-game))) .landing {
-    padding-top: calc(var(--space-12) + 64 * var(--sam-px, 1.5px));
   }
 
   .landing__window {
@@ -136,6 +136,19 @@ import { sessions } from '../data/sessions';
      and scale). The static page shows him there from the start. */
   :global(:root.has-game) .landing__perch:not(.is-landed) :is(.landing__sam, .landing__bubble) {
     visibility: hidden;
+  }
+
+  /* Agent Sam's bubble comes in as his window does in the game (World.astro .world__sam): down 8 px into
+     place as it fades in, on the 16-bit steps; its line types out from the same moment. */
+  :global(:root.has-game) .landing__bubble {
+    transition:
+      opacity var(--dur-base) var(--steps-16bit),
+      transform var(--dur-base) var(--steps-16bit);
+  }
+
+  :global(:root.has-game) .landing__perch:not(.is-landed) .landing__bubble {
+    opacity: 0;
+    transform: translateY(-8px);
   }
 
   :global(:root.has-game) .landing__perch .landing__sam.is-flying {

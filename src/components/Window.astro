@@ -8,6 +8,8 @@
  *
  * `size="compact"`: the one-square frame for small UI (HUD, rail, PRESS START, Agent Sam), as
  * vega.io's notepad.exe. `bare`: the frame without a title bar, as vega.io's own nav.
+ * The title sits left on a full window and centred on a compact one; `titleAlign` overrides it (the
+ * Register window keeps a centred title).
  * `closable`: inside a <dialog> the third square becomes a real close button (the same square with an
  * X in it, `data-window-close`); anywhere else it is the plain square and the button is not rendered visible.
  */
@@ -26,6 +28,8 @@ interface Props {
   flush?: boolean;
   /** In a <dialog>, the third square is the close button. */
   closable?: boolean;
+  /** The title's place in the bar: left on a full window, centred on a compact one, unless set. */
+  titleAlign?: 'start' | 'center';
   [key: string]: unknown;
 }
 
@@ -39,15 +43,17 @@ const {
   class: className,
   flush = false,
   closable = false,
+  titleAlign,
   ...rest
 } = Astro.props;
 
 const titleId = id ? `${id}-title` : undefined;
 const squares = size === 'compact' ? 1 : 3;
+const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) === 'start';
 ---
 
 <Element
-  class:list={['window', `window--${tone}`, `window--${size}`, { 'window--flush': flush, 'window--bare': bare }, className]}
+  class:list={['window', `window--${tone}`, `window--${size}`, { 'window--flush': flush, 'window--bare': bare, 'window--title-start': titleStart }, className]}
   id={id}
   aria-labelledby={titleId}
   {...rest}
@@ -112,6 +118,14 @@ const squares = size === 'compact' ? 1 : 3;
     font-size: var(--text-ui);
     line-height: var(--leading-ui);
     user-select: none;
+  }
+
+  /* A left title runs from the bar's start up to the squares; its text lines up with the body's (the bar's
+     8 px and its own 12 px make the body's 20 px). */
+  .window--title-start .window__title {
+    grid-column: 1 / 3;
+    justify-self: start;
+    padding-inline-start: var(--space-3);
   }
 
   .window__title {
