@@ -16,7 +16,7 @@ const tickets = [
 ];
 ---
 
-<Window as="section" title="Register" id="register" class="register" aria-labelledby="register-heading">
+<Window as="section" title="Register" id="register" class="register" aria-labelledby="register-heading" tabindex="-1" closable>
   <h3 id="register-heading" class="register__heading">Player 1, enter your details</h3>
 
   <form id="register-form" class="register__form" novalidate>
@@ -147,6 +147,11 @@ const tickets = [
 </script>
 
 <style>
+  /* "Register now" focuses the window after scrolling it into view; it is a target, not a control. */
+  .register:focus {
+    outline: none;
+  }
+
   .register__heading {
     margin-bottom: var(--space-4);
     text-align: left;

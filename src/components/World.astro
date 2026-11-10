@@ -4,7 +4,8 @@
  * The opening is real DOM on the Daisy White page: the eyebrow and the wordmark above the monitor,
  * the tagline below, PRESS START laid on the monitor's screen. The monitor is a poster painted into
  * a canvas (so it is never the LCP element) until the 3D takes over; with the world live, the
- * canvas world sits under the opening and the overlays come in as it plays.
+ * canvas world sits under the opening. The game is opt-in: the overlays (HUD with Exit game, rail,
+ * hint, d-pad) exist only in play mode, :root.is-playing, after PRESS START (src/game/index.ts).
  */
 import Window from './Window.astro';
 import Button from './Button.astro';
@@ -20,7 +21,6 @@ const icons: Record<RailIcon, string> = {
   moon: '<path d="M11 2a6 6 0 1 0 3 8A5 5 0 0 1 11 2z"/>',
   crt: '<rect x="1" y="2" width="14" height="10"/><path d="M4 5l2 2-2 2M6 15h4M8 12v3"/>',
   booth: '<rect x="2" y="2" width="12" height="6"/><path d="M8 8v7M5 15h6"/>',
-  ticket: '<path d="M1 4h14v3a1 1 0 0 0 0 2v3H1V9a1 1 0 0 0 0-2z"/><path d="M10 4v8" stroke-dasharray="1 1"/>',
 };
 
 const level1 = sessions[0]!;
@@ -56,6 +56,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       <noscript><img class="hero__poster" src="/monitor/monitor-on.webp" width={POSTER.w} height={POSTER.h} style={posterStyle} alt={monitorLabel} /></noscript>
     </div>
     <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
+    <!-- After the breakout: the eyebrow, the h1 and the tagline move in here (the same nodes) and the broken monitor glides into the slot. -->
+    <div class="hero__mast" data-mast>
+      <div class="hero__mast-copy" data-mast-copy></div>
+      <div class="hero__mast-slot" style={`--slot-aspect: ${1 / POSTER.slotAspect};`} aria-hidden="true" data-mast-slot></div>
+    </div>
     <Window size="compact" title="Player 1" class="hero__start" data-start>
       <Button class="hero__start-btn" data-start-button>Press start</Button>
     </Window>
@@ -64,15 +69,18 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     // The poster, painted into its canvas as soon as it decodes (canvas pixels are never an LCP
     // candidate, so the wordmark stays the LCP element). Screen off while the 3D loads; screen on
     // wherever there will be no 3D. Mirrors shouldRunWorld() in src/game/index.ts, plus WebGL 2.
+    // The <script> below this section removes .has-game again if the world does not run after all.
     (function () {
       var c = document.querySelector('[data-poster]');
       if (!c) return;
       var n = navigator;
-      var live =
+      var game =
         !matchMedia('(prefers-reduced-motion: reduce)').matches &&
         !(n.connection && n.connection.saveData) &&
-        !((n.deviceMemory || 8) <= 2) &&
-        !!window.WebGL2RenderingContext;
+        !((n.deviceMemory || 8) <= 2);
+      // the game will run: the page takes its game layout now (the Register spacing, an empty perch), not when it boots
+      if (game) document.documentElement.classList.add('has-game');
+      var live = game && !!window.WebGL2RenderingContext;
       var which = live ? 'off' : 'on';
       c.dataset.state = which;
       var img = new Image();
@@ -106,6 +114,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       <span class="mono" data-hud-coins>00/12</span>
       <span class="mono world__clock" data-hud-clock>07:00 AM</span>
       <span class="mono world__level" data-hud-level>LVL 1</span>
+      <Button variant="ghost" class="world__exit" data-exit>Exit game</Button>
     </p>
   </Window>
 
@@ -146,6 +155,9 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     <button type="button" class="world__a" data-button="a" tabindex="-1"></button>
   </div>
 
+  <!-- The game's mode changes, announced (the overlays' own live regions are hidden outside the game). -->
+  <p class="sr-only" aria-live="polite" data-world-status></p>
+
   <Window title="Loading" class="world__loading" hidden>
     <p class="mono" data-loading-text>LOADING… 0%</p>
   </Window>
@@ -157,8 +169,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   import { perchStill, queryPerch } from '../game/landing';
 
   const section = document.querySelector<HTMLElement>('[data-world]');
-  const toRegister = () => document.getElementById('register')?.scrollIntoView({ block: 'start' });
-  // The static page: Sam is already on the Register window.
+  // The static page: the game is never offered (no PRESS START), and Sam is already on the Register window.
+  const staticPage = (d: NonNullable<ReturnType<typeof queryHero>>) => {
+    d.start.hidden = true;
+    staticHero(d);
+  };
   const perch = () => {
     const p = queryPerch();
     if (p) void perchStill(p).catch(() => {});
@@ -167,22 +182,17 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   if (section && shouldRunWorld()) {
     bootWorld(section).catch((err) => {
       console.error('[world] boot failed, the static opening stays', err);
-      document.documentElement.classList.remove('has-breakout');
+      document.documentElement.classList.remove('has-game', 'is-playing');
       const d = queryHero(section);
-      if (d && !section.classList.contains('world--live')) {
-        staticHero(d);
-        d.startButton.addEventListener('click', toRegister);
-      }
+      if (d && !section.classList.contains('world--live')) staticPage(d);
       perch();
     });
   } else if (section) {
-    // Reduced motion, save-data or a small device: the static page, the monitor powered on, and
-    // PRESS START goes straight to the Register section, where Sam already stands.
+    document.documentElement.classList.remove('has-game');
+    // Reduced motion, save-data or a small device: the static page, the monitor powered on, nothing
+    // animating, and no PRESS START; Sam already stands on the Register window.
     const d = queryHero(section);
-    if (d) {
-      staticHero(d);
-      d.startButton.addEventListener('click', toRegister);
-    }
+    if (d) staticPage(d);
     perch();
   }
 </script>
@@ -365,6 +375,93 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     inset: calc(-1 * var(--window-bar-h) - var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
   }
 
+  /* ── The masthead the landing ends in (src/game/index.ts layoutMast): under the nav at the load's
+        distance, as tall as the room above Sam on the Register window (--mast-h). Desktop: the copy on
+        the left, the broken monitor's slot on the right; phones: the load's stack in miniature. ── */
+  .hero__mast {
+    position: absolute;
+    top: calc(var(--nav-h) + var(--space-6));
+    left: 50%;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: var(--space-8);
+    width: min(100% - 2 * var(--gutter), 44rem);
+    height: var(--mast-h, 0px);
+    translate: -50% 0;
+    text-align: left;
+    pointer-events: none;
+  }
+
+  .hero__mast-copy {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+  }
+
+  .hero__mast-slot {
+    height: var(--mast-h, 0px);
+    aspect-ratio: var(--slot-aspect);
+  }
+
+  .hero__mast :is(.hero__copy, .hero__tagline) {
+    pointer-events: auto;
+  }
+
+  .hero__mast .hero__copy {
+    justify-items: start;
+    gap: var(--space-2);
+  }
+
+  .hero__mast .hero__copy :global(.wm--hero) {
+    font-size: clamp(2rem, min(7vw, 9vh), 4.5rem);
+  }
+
+  .hero__mast .hero__tagline {
+    max-width: 22rem;
+    font-size: var(--text-base);
+  }
+
+  @media (max-width: 40rem) {
+    .hero__mast {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      grid-template-areas: 'copy' 'slot' 'tag';
+      justify-items: center;
+      align-items: stretch;
+      row-gap: var(--space-2);
+      width: calc(100% - 2 * var(--gutter));
+      text-align: center;
+    }
+
+    .hero__mast-copy {
+      display: contents;
+    }
+
+    .hero__mast .hero__copy {
+      grid-area: copy;
+      justify-items: center;
+      gap: var(--space-1);
+    }
+
+    .hero__mast-slot {
+      grid-area: slot;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .hero__mast .hero__tagline {
+      grid-area: tag;
+      max-width: 18rem;
+      font-size: var(--text-sm);
+    }
+
+    .hero__mast .hero__copy :global(.wm--hero) {
+      font-size: clamp(1.75rem, 8.5vw, 2.25rem);
+    }
+  }
+
   /* ── Live world: the canvas world under the opening, which lies over it and steps out as the run starts ── */
   .world__canvas {
     position: absolute;
@@ -479,9 +576,14 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     transform: none;
   }
 
-  /* Hidden overlays take no clicks or focus. */
-  .world--live :is(.world__rail, .world__sam):not(.is-visible) {
+  /* Hidden overlays take no clicks or focus (the HUD holds Exit game). */
+  .world--live :is(.world__rail, .world__sam, .world__hud):not(.is-visible) {
     visibility: hidden;
+  }
+
+  /* By default the page is a landing page: nothing of the game is there, nothing in it focusable. */
+  :global(:root:not(.is-playing)) :is(.world__hud, .world__rail, .world__hint, .world__touch, .world__sam, .world__session, .world__prompt) {
+    display: none !important;
   }
 
   /* ── Progress rail: a Levels window on the left edge, one stop per level, the current
@@ -660,6 +762,14 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     padding: var(--space-2) var(--space-3);
   }
 
+  /* Exit game: a ghost button at the HUD's text size, at the end of its row. */
+  .world__hud :global(.world__exit) {
+    min-height: 0;
+    margin-left: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
+  }
+
   .world__hud-row {
     display: flex;
     align-items: center;
@@ -705,7 +815,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   @media (pointer: coarse) {
-    .world--live:not(.world--opening) .world__touch {
+    :global(:root.is-playing) .world--live:not(.world--opening) .world__touch {
       position: absolute;
       inset: auto var(--gutter) calc(76px * var(--px));
       z-index: 3;

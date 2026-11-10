@@ -28,6 +28,9 @@ import { sessions } from '../data/sessions';
     </div>
   </section>
 
+  <!-- In the game, "Register now" moves the Register window in here, over the paused game, and back on close. -->
+  <dialog class="register-dialog" aria-labelledby="register-title" data-register-dialog></dialog>
+
   <section class="section container" id="schedule" aria-labelledby="schedule-title">
     <h2 id="schedule-title">Schedule</h2>
     <p class="section__lede">Three sessions. Zero save states.</p>
@@ -80,10 +83,17 @@ import { sessions } from '../data/sessions';
 
   /* ── The landing: the Register window with Sam on its title bar (--sam-px: CSS px per art px, whole
         device px; set by the world, else the page's own k at 2×) and Agent Sam beside him. ── */
+  /* The page's own rhythm above the Register window while Sam is not on it; room for him on his perch
+     in the game (from PRESS START on, while the landing is far below the view) and after he has landed,
+     and on the static page, where he stands there from the start. */
   .landing {
     position: relative;
     z-index: 2;
     margin-top: calc(-1 * var(--rise, 0px));
+    padding-top: var(--space-24);
+  }
+
+  :global(:root:is(.is-playing, .is-exiting, .is-done, :not(.has-game))) .landing {
     padding-top: calc(var(--space-12) + 64 * var(--sam-px, 1.5px));
   }
 
@@ -123,14 +133,39 @@ import { sessions } from '../data/sessions';
     font-size: var(--text-sm);
   }
 
-  /* With the breakout, Sam is in the game until he lands: the perch waits for him. In flight his box
-     stays here and the world carries him by a transform from it (translate and scale). */
-  :global(:root.has-breakout) .landing__perch:not(.is-landed) :is(.landing__sam, .landing__bubble) {
+  /* With the game on the page, Sam is in it until he escapes and lands: the perch (his bubble too) waits
+     for him. In flight his box stays here and the world carries him by a transform from it (translate
+     and scale). The static page shows him there from the start. */
+  :global(:root.has-game) .landing__perch:not(.is-landed) :is(.landing__sam, .landing__bubble) {
     visibility: hidden;
   }
 
-  :global(:root.has-breakout) .landing__perch .landing__sam.is-flying {
+  :global(:root.has-game) .landing__perch .landing__sam.is-flying {
     transform-origin: 0 0;
     visibility: visible;
+  }
+
+  /* ── Register over the game: the Register window itself, moved in; the page behind holds still ── */
+  .register-dialog {
+    width: min(36rem, 100% - 2 * var(--gutter));
+    max-width: none;
+    max-height: calc(100dvh - 2 * var(--space-4));
+    margin: auto;
+    overflow: auto;
+    overscroll-behavior: contain;
+    background: none;
+    border: 0;
+    color: var(--text);
+    /* room for the window's hard shadow inside the scroll box */
+    padding: 0 var(--space-1) var(--space-1) 0;
+  }
+
+  .register-dialog::backdrop {
+    background: color-mix(in srgb, var(--color-green-900) 45%, transparent);
+  }
+
+  /* The page holds still under the dialog, and while the camera zooms out of the game. */
+  :global(:root:is(.is-paused, .is-exiting)) {
+    overflow: hidden;
   }
 </style>

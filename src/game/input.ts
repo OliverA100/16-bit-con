@@ -14,16 +14,13 @@ export class Input {
   dpadDir = 0;
   /** True while the world section is on screen. */
   active = false;
+  /** True only in play mode (src/game/index.ts): until PRESS START the keys belong to the page, so Space scrolls it. */
+  enabled = false;
 
   constructor(canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', this.onKey, { passive: false });
     window.addEventListener('keyup', this.onKey);
-    window.addEventListener('blur', () => {
-      this.keys.clear();
-      this.jumpKeys.clear();
-      this.pointerJumps = 0;
-      this.dpadDir = 0;
-    });
+    window.addEventListener('blur', () => this.reset());
     // A finger or pen on the world jumps (tap = hop, hold = full); the mouse is left to scroll.
     this.bindJumpSurface(canvas, (e) => e.pointerType !== 'mouse');
   }
@@ -55,9 +52,20 @@ export class Input {
     return r;
   }
 
+  /** Let go of everything held or queued (leaving play mode, or a dialog opening over the game). */
+  reset(): void {
+    this.keys.clear();
+    this.jumpKeys.clear();
+    this.pointerJumps = 0;
+    this.dpadDir = 0;
+    this.pressQueued = false;
+    this.rightQueued = false;
+  }
+
   bindDpad(left: HTMLElement, right: HTMLElement, a: HTMLElement): void {
     const hold = (el: HTMLElement, dir: number) => {
       const on = (e: PointerEvent) => {
+        if (!this.enabled) return;
         e.preventDefault();
         capture(el, e.pointerId);
         this.dpadDir = dir;
@@ -81,7 +89,7 @@ export class Input {
   private bindJumpSurface(el: HTMLElement, accept: (e: PointerEvent) => boolean = () => true): void {
     let held = false;
     const down = (e: PointerEvent) => {
-      if (!accept(e)) return;
+      if (!this.enabled || !accept(e)) return;
       e.preventDefault();
       capture(el, e.pointerId);
       if (held) return;
@@ -104,7 +112,7 @@ export class Input {
   }
 
   private onKey = (e: KeyboardEvent): void => {
-    if (!this.active) return;
+    if (!this.active || !this.enabled) return;
     const target = e.target as HTMLElement | null;
     const tag = target?.tagName ?? '';
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || target?.isContentEditable) return;

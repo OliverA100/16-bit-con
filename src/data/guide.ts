@@ -3,13 +3,13 @@
  * Agent Sam is casual and short (brand rule: "Speech bubbles from Sam are windows titled
  * 'Agent Sam' with typewriter mono text"); each line shows while t is inside its window.
  */
-export type RailIcon = 'sun' | 'city' | 'moon' | 'crt' | 'booth' | 'ticket';
+export type RailIcon = 'sun' | 'city' | 'moon' | 'crt' | 'booth';
 
 export interface RailStop {
   id: string;
   label: string;
-  /** Where a click lands: a timeline position, or 'register' for the section below the world. */
-  jump: number | 'register';
+  /** Where a click lands: a timeline position. */
+  jump: number;
   /** The stop is current while t is in [from, to). */
   from: number;
   to: number;
@@ -21,7 +21,6 @@ export const railStops: RailStop[] = [
   { id: 'panel', label: '2:00 Panel', jump: 0.36, from: 0.34, to: 0.62, icon: 'city' },
   { id: 'party', label: '6:00 Party', jump: 0.62, from: 0.62, to: 0.84, icon: 'moon' },
   { id: 'booth', label: 'Booth 630', jump: 1, from: 0.84, to: 1.01, icon: 'booth' },
-  { id: 'register', label: 'Register', jump: 'register', from: 2, to: 2, icon: 'ticket' },
 ];
 
 /** The level shown in the HUD on phones, where the rail is hidden. */

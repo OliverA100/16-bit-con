@@ -10,9 +10,31 @@ import Wordmark from './Wordmark.astro';
       <img src="/favicon.svg" alt="" width="20" height="18" />
       <Wordmark size="nav" />
     </a>
-    <Button href="#register">Register now</Button>
+    <!-- In the game it opens the form in a dialog over it (src/game/index.ts); otherwise it scrolls to it. -->
+    <Button href="#register" data-register-link>Register now</Button>
   </Window>
 </div>
+
+<script>
+  // "Register now" centres the Register window on screen (smoothly, or at once with reduced motion: the
+  // page's own scroll-behavior) and moves focus there. In the game it opens the form in a dialog over it
+  // instead (src/game/index.ts).
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-register-link]')) {
+    link.addEventListener('click', (e) => {
+      const root = document.documentElement;
+      if (root.classList.contains('is-playing')) return;
+      if (root.classList.contains('is-exiting')) {
+        e.preventDefault();
+        return;
+      }
+      const target = document.getElementById('register');
+      if (!target) return;
+      e.preventDefault();
+      target.scrollIntoView({ block: 'center' });
+      target.focus({ preventScroll: true });
+    });
+  }
+</script>
 
 <style>
   .nav-slot {

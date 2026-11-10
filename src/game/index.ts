@@ -1,6 +1,15 @@
 /**
- * Boot the world: feature gate, load Level 1, take over the hero area, pin the section with
- * ScrollTrigger, and run the loop. The static hero stays as the fallback when this never runs.
+ * Boot the world: feature gate, load Level 1, take over the hero area and run the loop. The static
+ * hero stays as the fallback when this never runs.
+ *
+ * Two modes, on :root (src/components/World.astro styles from them). By default the page is a normal
+ * landing page: the monitor powered on with the game live on its screen, then Register and Schedule,
+ * no pin and no extra scroll; the keys belong to the page. PRESS START enters play mode (.is-playing):
+ * only then is the ScrollTrigger pin created, and the enter segment plays from the top — the dive, the
+ * run, the breakout. Exit game or Esc leaves it (the pin reverted, back at the top of the hero); when
+ * Sam lands on the Register window the game closes itself ('done'), the scroll shifted by the pin's
+ * length in the same frame so nothing moves. In play mode "Register now" opens the form in a dialog
+ * over the paused game (src/game/register-dialog.ts).
  *
  * Who moves what: native scroll sets the timeline's target and the visual eases
  * toward it — nothing here ever scrolls the page back. Keys and the d-pad run Sam with real
@@ -38,8 +47,9 @@ import { ScreenFrame } from './screen-frame';
 import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
 import type { BreakoutState, Hero } from '../monitor/hero';
-import { AUTO_HIT_MS, AUTO_IDLE_MS, BREAKOUT, BREAK_PLAY_MS, CRACK_STAGES, ENTER, clamp01, crackStage, hitTarget, playMs, playP, scrollLengths, smooth } from './segments';
+import { AUTO_HIT_MS, AUTO_IDLE_MS, BREAKOUT, BREAK_PLAY_MS, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, hitTarget, playMs, playP, scrollLengths, smooth } from './segments';
 import { drawCell, idleOnPerch, queryPerch } from './landing';
+import { createRegisterDialog, focusRegister } from './register-dialog';
 import { GL_ATTRIBUTES } from '../monitor/spec';
 
 const W = 6000;
@@ -91,6 +101,8 @@ interface Overlay {
   dpadLeft: HTMLElement | null;
   dpadRight: HTMLElement | null;
   buttonA: HTMLElement | null;
+  exit: HTMLButtonElement | null;
+  status: HTMLElement | null;
 }
 
 function query(section: HTMLElement): Overlay {
@@ -118,6 +130,8 @@ function query(section: HTMLElement): Overlay {
     dpadLeft: q('[data-dpad="left"]'),
     dpadRight: q('[data-dpad="right"]'),
     buttonA: q('[data-button="a"]'),
+    exit: q<HTMLButtonElement>('[data-exit]'),
+    status: q('[data-world-status]'),
   };
 }
 
@@ -254,28 +268,65 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     screen.fit(vp.bw, vp.bh);
   };
 
+  const root = document.documentElement;
   section.classList.add('world--live');
+  root.classList.add('has-game');
   // The opening is up: the touch controls belong to the run and wait until it has gone.
   if (o.hero) section.classList.add('world--opening');
   fit();
 
   // ── Timeline, pin, inputs ───────────────────────────────────────────────
-  // The pin: the enter segment (D_E), the run (D_W) and, where the monitor's 3D can run, the breakout
-  // (D_B). The timeline's t runs below 0 through the enter segment, from −D_E / D_W at the top of the
-  // page, and above 1 through the breakout, to 1 + D_B / D_W.
+  // The pin (play mode only): the enter segment (D_E), the run (D_W) and, where the monitor's 3D can
+  // run, the breakout (D_B). The timeline's t runs below 0 through the enter segment, from −D_E / D_W
+  // at the top of the page, and above 1 through the breakout, to 1 + D_B / D_W. By default it rests at
+  // the top (the monitor at rest); after the landing, at the end (the broken monitor glided up).
   // Dev only: ?hero=poster holds the poster (the swap check), ?hero=static is the no-3D opening.
   const devHero = import.meta.env.DEV ? new URLSearchParams(location.search).get('hero') : null;
   let wantBreakout = !!o.hero && 'WebGL2RenderingContext' in window && devHero !== 'static' && devHero !== 'poster';
   let { DE, DW, DB, D } = scrollLengths(window.innerHeight, wantBreakout);
   const timeline = new Timeline(W, T_MAX + DB / DW, -DE / DW);
+  /** The lengths for this viewport, and the timeline's ends with them. */
+  const syncLengths = () => {
+    ({ DE, DW, DB, D } = scrollLengths(window.innerHeight, wantBreakout));
+    timeline.tMin = -DE / DW;
+    timeline.tMax = T_MAX + DB / DW;
+    setLandingVars();
+  };
   const tOf = (progress: number) => (progress * D - DE) / DW;
+  /** The breakout's q at timeline position tl (0 before it). */
+  const qAt = (tl: number) => (DB > 0 ? clamp01(((tl - T_MAX) * DW) / DB) : 0);
+  /** The timeline position of a saved spot, for this viewport's lengths. */
+  const tlOf = (spot: { t: number; q: number }) => (spot.q > 0 ? T_MAX + (spot.q * DB) / DW : spot.t);
+  /** The enter progress the monitor shows at timeline position tl: 1 in the run, pulling back through the breakout. */
+  const heroPAt = (tl: number) => {
+    const q = qAt(tl);
+    return q > 0 ? 1 - clamp01(q / BREAKOUT.pullBack[1]) : clamp01(1 + (tl * DW) / DE);
+  };
+  /** 'default': a normal page, no pin. 'play': after PRESS START, the pin and the game. 'done': Sam has landed, the pin is gone for good. */
+  let mode: 'default' | 'play' | 'done' = 'default';
+  /** The Register dialog is open over the game: no input, no plays, no auto-hit. */
+  let paused = false;
+  let pausedAt = 0;
+  /** The pin, only while playing. */
+  let trigger: ScrollTrigger | null = null;
+  /** Exit game is zooming the camera back out of the screen; the pin goes when it is done. */
+  let exiting = false;
+  /**
+   * The camera along the dive without the page: in when the game resumes, out when it closes. p from p0 to
+   * p1 at PRESS START's pace (segments.ts PLAY; the camera's DIVE curve does the easing), then `done`.
+   */
+  let zoom: { p0: number; p1: number; t0: number; done: () => void } | null = null;
+  /** Where the player left the game (Exit game): the run's t and the breakout's q. In memory only, so a reload starts over. */
+  let saved: { t: number; q: number } | null = null;
+  /** The enter progress the monitor shows (the last frame's), where an exit's zoom starts. */
+  let lastHeroP = 0;
+  const pinTop = () => trigger?.start ?? 0;
   // The landing section rises into the pin through the breakout's landing (--rise: exactly its
-  // stretch of scroll), and Sam stands on it at the game's own scale (--sam-px, CSS px per art px).
-  const root = document.documentElement;
+  // stretch of scroll; from PRESS START on, and kept after the landing, where it is what the page
+  // shows), and Sam stands on it at the game's own scale (--sam-px, CSS px per art px).
   const setLandingVars = () => {
-    root.style.setProperty('--rise', `${wantBreakout ? Math.round((1 - BREAKOUT.land[0]) * DB) : 0}px`);
+    root.style.setProperty('--rise', `${wantBreakout && mode !== 'default' ? Math.round((1 - BREAKOUT.land[0]) * DB) : 0}px`);
     root.style.setProperty('--sam-px', `${vp.k / (window.devicePixelRatio || 1)}px`);
-    root.classList.toggle('has-breakout', wantBreakout);
   };
   setLandingVars();
   const motion = new Motion();
@@ -315,41 +366,33 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let wasHitZone = false;
   /** A tap or click on the monitor's screen during the cracks (its DOM hit target). */
   let pendingHit = false;
-  const trigger = ScrollTrigger.create({
-    trigger: section,
-    start: 'top top',
-    end: () => `+=${D}`,
-    pin: true,
-    pinSpacing: true,
-    anticipatePin: 1,
-    invalidateOnRefresh: true,
-    onUpdate: (self) => {
-      // Our own scrollTo (keys, d-pad, a hit, the auto-break) echoes back here; anything else is the user, and the user wins.
-      if (Math.abs(window.scrollY - expectedY) <= ECHO_PX) return;
-      scrollOverrideUntil = clockNow() + SCROLL_OVERRIDE_MS;
-      motion.cancel();
-      autoArmed = false;
-      playing = null;
-      breakPlay = null;
-      timeline.setScrollTarget(tOf(self.progress));
-    },
-    onRefresh: (self) => {
-      ({ DE, DW, DB, D } = scrollLengths(window.innerHeight, wantBreakout));
-      timeline.tMin = -DE / DW;
-      timeline.tMax = T_MAX + DB / DW;
-      setLandingVars();
-      expectedY = Number.NaN;
-      timeline.jumpTo(tOf(self.progress));
-    },
-  });
-  // A link to a section (/#register) was resolved by the browser before the pin added its scroll
-  // length: jump there again now that the page has its real height, and snap the world to match.
-  const target = location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
-  if (target && !section.contains(target)) {
-    window.scrollTo({ top: Math.round(target.getBoundingClientRect().top + window.scrollY), behavior: 'instant' });
-    ScrollTrigger.update();
-  }
-  timeline.jumpTo(tOf(trigger.progress));
+  /** The pin, created by PRESS START (never on load), so the page is only as long as its content until then. */
+  const createPin = () =>
+    ScrollTrigger.create({
+      trigger: section,
+      start: 'top top',
+      end: () => `+=${D}`,
+      pin: true,
+      pinSpacing: true,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => {
+        // Our own scrollTo (keys, d-pad, a hit, the auto-break) echoes back here; anything else is the user, and the user wins.
+        if (paused || exiting || Math.abs(window.scrollY - expectedY) <= ECHO_PX) return;
+        scrollOverrideUntil = clockNow() + SCROLL_OVERRIDE_MS;
+        motion.cancel();
+        autoArmed = false;
+        playing = null;
+        breakPlay = null;
+        timeline.setScrollTarget(tOf(self.progress));
+      },
+      onRefresh: (self) => {
+        syncLengths();
+        expectedY = Number.NaN;
+        timeline.jumpTo(tOf(self.progress));
+      },
+    });
+  timeline.jumpTo(timeline.tMin);
 
   const io = new IntersectionObserver((entries) => {
     input.active = entries.some((e) => e.isIntersecting);
@@ -368,25 +411,27 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       const heightOnly = w === lastViewW && touch;
       lastViewW = w;
       fit();
-      if (!heightOnly) ScrollTrigger.refresh();
+      if (trigger) {
+        if (!heightOnly) ScrollTrigger.refresh();
+      } else if (!heightOnly) {
+        // no pin: the lengths only place the landing (after it) and the timeline's resting end
+        syncLengths();
+        timeline.jumpTo(mode === 'done' ? timeline.tMax : saved ? tlOf(saved) : timeline.tMin);
+      }
       hero3d?.frameChanged(true);
       layoutHero();
     },
     { passive: true },
   );
 
-  // ── Progress rail: a click jumps the world (or the page, for Register) with no smear ──
+  // ── Progress rail: a click jumps the world to a level with no smear ──
   for (const btn of o.railStops) {
     btn.addEventListener('click', () => {
-      const jump = btn.dataset.jump!;
-      if (jump === 'register') {
-        document.getElementById('register')?.scrollIntoView({ behavior: 'instant', block: 'start' });
-        return;
-      }
-      const t = Number(jump);
+      if (mode !== 'play' || paused || zoom) return;
+      const t = Number(btn.dataset.jump);
       motion.cancel();
       playing = null;
-      window.scrollTo({ top: Math.round(trigger.start + DE + t * DW), behavior: 'instant' });
+      window.scrollTo({ top: Math.round(pinTop() + DE + t * DW), behavior: 'instant' });
       expectedY = window.scrollY;
       timeline.jumpTo(t);
     });
@@ -424,10 +469,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const start = () => {
     motion.cancel();
     d?.startButton.blur();
-    const y1 = Math.round(trigger.start + DE);
-    if (window.scrollY < y1 - 1) playing = { from: playMs((window.scrollY - trigger.start) / DE), y1, t0: -1 };
+    const y1 = Math.round(pinTop() + DE);
+    if (window.scrollY < y1 - 1) playing = { from: playMs((window.scrollY - pinTop()) / DE), y1, t0: -1 };
   };
-  d?.startButton.addEventListener('click', start);
+  // PRESS START: by default it opens the game (enterPlay, below); in the game, at the monitor, it plays the dive again.
+  d?.startButton.addEventListener('click', () => {
+    if (mode === 'default') enterPlay();
+    else if (mode === 'play' && !paused && !zoom) start();
+  });
 
   let hero3d: Hero | null = null;
   let heroMode: 'poster' | '3d' | 'static' = 'poster';
@@ -439,8 +488,36 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let lastFade = -1;
   /** Sam where the run ends, on the monitor's screen: his cell's centre (screen UV) and size (screen heights) — where the cracks start. */
   let samOnScreen: { centre: [number, number]; size: number } | null = null;
-  /** The landing: how far the monitor glides up the page, and how much smaller it ends, to sit between the nav and the rising section. */
-  let glideTo = { up: 0, scale: 1 };
+  /** The landing: how far the monitor glides up (and sideways) and how much smaller it ends, into the masthead's slot. */
+  let glideTo = { up: 0, left: 0, scale: 1 };
+  /** The masthead the landing ends in (World.astro): the copy moves into it, the monitor glides into its slot. */
+  const mast = d?.stage.querySelector<HTMLElement>('[data-mast]') ?? null;
+  const mastCopy = mast?.querySelector<HTMLElement>('[data-mast-copy]') ?? null;
+  const mastSlot = mast?.querySelector<HTMLElement>('[data-mast-slot]') ?? null;
+  const heroCopy = d?.stage.querySelector<HTMLElement>('.hero__copy') ?? null;
+  const heroTagline = d?.stage.querySelector<HTMLElement>('.hero__tagline') ?? null;
+  let inMast = false;
+  // While the copy is in the masthead, empty boxes of its height hold its place round the monitor's slot,
+  // so the slot (the 3D's rest pose) never moves: no layout shift.
+  const placeholder = () => Object.assign(document.createElement('div'), { ariaHidden: 'true' });
+  const holdCopy = placeholder();
+  const holdTagline = placeholder();
+  /** The eyebrow, the h1 and the tagline: in the masthead from the landing on, else home round the monitor. The same nodes, never copies. */
+  const toMast = (on: boolean) => {
+    if (on === inMast || !d || !mastCopy || !heroCopy || !heroTagline) return;
+    inMast = on;
+    if (on) {
+      holdCopy.style.height = `${heroCopy.offsetHeight}px`;
+      holdTagline.style.height = `${heroTagline.offsetHeight}px`;
+      heroCopy.replaceWith(holdCopy);
+      heroTagline.replaceWith(holdTagline);
+      mastCopy.append(heroCopy, heroTagline);
+    } else {
+      holdCopy.replaceWith(heroCopy);
+      holdTagline.replaceWith(heroTagline);
+    }
+  };
+  let glideLeft = '';
   /** The monitor's screen as a tap target through the cracks (the 3D canvas itself takes no pointer events). */
   const hitEl = d ? d.stage.querySelector<HTMLElement>('[data-hit]') : null;
   let hitBox = '';
@@ -477,12 +554,49 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // The crack pattern starts from him: laid out (and uploaded) in idle time, never on a scroll frame.
     const w = window as IdleWindow;
     (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200)))(() => hero3d?.prepareBreakout(centre));
-    // The glide: between the nav and where the landing section's top ends (it rises by --rise), the
-    // monitor centred, no taller than 85 % of that room.
-    const navH = parseFloat(getComputedStyle(root).getPropertyValue('--nav-h')) || 64;
+    layoutMast(b);
+  };
+  /**
+   * The masthead's room, at the end of the landing: from the load's distance under the nav (CSS) down to
+   * where the risen landing section starts, or Agent Sam's bubble on the Register window if that is higher.
+   * The monitor glides to the centre of its slot there, at 95 % of the slot's height.
+   */
+  const layoutMast = (b: { x: number; y: number; w: number; h: number }) => {
+    if (!d || !mast || !mastSlot) return;
+    const css = getComputedStyle(root);
+    const px = (name: string) => parseFloat(css.getPropertyValue(name)) || 0;
+    const top = px('--nav-h') + px('--space-6');
     const sectionTop = d.gl.clientHeight - Math.round((1 - BREAKOUT.land[0]) * DB);
-    const room = Math.max(1, sectionTop - navH);
-    glideTo = { up: b.y + b.h / 2 - (navH + room / 2), scale: Math.min(1, (0.85 * room) / b.h) };
+    let bottom = sectionTop;
+    const win = document.querySelector('.landing__window');
+    const bubble = perch?.bubble;
+    if (win && bubble) {
+      // the window's top at the landing: the section's top plus the perch room it has in the game (index.astro)
+      const windowTop = sectionTop + px('--space-12') + 64 * (vp.k / (window.devicePixelRatio || 1));
+      bottom = Math.min(bottom, windowTop + (bubble.getBoundingClientRect().top - win.getBoundingClientRect().top) - px('--space-4'));
+    }
+    d.stage.style.setProperty('--mast-h', `${Math.max(1, Math.round(bottom - top))}px`);
+    // The slot as it is with the copy in the masthead (on phones the copy takes rows above and below it).
+    // Until the landing the copy is home, so hidden stand-ins without ids are measured in its place: the
+    // real h1 (the page's LCP element) is never moved for a measurement.
+    let ghosts: HTMLElement[] = [];
+    if (!inMast && mastCopy && heroCopy && heroTagline) {
+      ghosts = [heroCopy, heroTagline].map((el) => el.cloneNode(true) as HTMLElement);
+      for (const g of ghosts) {
+        g.removeAttribute('id');
+        g.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+        g.setAttribute('aria-hidden', 'true');
+        g.style.visibility = 'hidden';
+      }
+      mastCopy.append(...ghosts);
+    }
+    const s = mastSlot.getBoundingClientRect();
+    for (const g of ghosts) g.remove();
+    const st = d.stage.getBoundingClientRect();
+    const tx = s.left - st.left + s.width / 2;
+    const ty = s.top - st.top + s.height / 2;
+    glideTo = { up: b.y + b.h / 2 - ty, left: tx - (b.x + b.w / 2), scale: Math.min(1, (0.95 * s.height) / b.h) };
+    glideLeft = '';
   };
   /** No 3D after all (no WebGL 2, an error, too slow): the powered-on poster, PRESS START on it. */
   const toStatic = (why: unknown) => {
@@ -495,8 +609,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // No 3D, no breakout: the run ends at the plaza and the pin releases into the Register section.
     if (wantBreakout) {
       wantBreakout = false;
-      setLandingVars();
-      ScrollTrigger.refresh();
+      syncLengths();
+      if (trigger) ScrollTrigger.refresh();
     }
   };
   if (d) {
@@ -567,7 +681,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     }
     if (hero3d.phase === 'off' && now >= shownAt + POWER_DELAY_MS) hero3d.powerOn(now);
     const phase = hero3d.render(now);
-    if (!b && p < ENTER.copyOut[1]) placeStart(d, hero3d.quad(...startUV));
+    if (p < ENTER.copyOut[1]) placeStart(d, hero3d.quad(...startUV));
     if (phase === 'on' && !startShown) {
       startShown = true;
       d.start.classList.add('is-ready');
@@ -596,8 +710,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     return { stage: crackStage(q), shatter, sam: samB, glide: { up: g * glideTo.up, scale: 1 + g * (glideTo.scale - 1) } };
   };
 
-  // ── Sam on the page (src/game/landing.ts): perched on the Register window; with the breakout, away in
-  //    the game until he leaps out, then in flight from the monitor — shrinking smoothly from twice the
+  // ── Sam on the page (src/game/landing.ts): perched on the Register window only once he has escaped
+  //    the game (the 'done' mode, for the rest of the visit); until then the perch is empty. With the
+  //    breakout he leaps out, then in flight from the monitor — shrinking smoothly from twice the
   //    game's scale (where the page takes him from the billboard, exactly) to its own — landing on the
   //    window's title bar as the pin releases, at whole device px per art px again. In flight his box stays
   //    on the perch and a transform carries him, so the page never lays anything out again: no layout shift.
@@ -607,11 +722,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   if (perch) idleOnPerch(perch, assets.sam.idle, () => perch.root.classList.contains('is-landed'));
   const updatePerch = (q: number) => {
     if (!perch) return;
-    // past the pin he is on the window, whatever the eased picture still shows: a jump down the page
-    // (a link, the Register button) never sees him fly in over the form
-    const pastPin = window.scrollY >= trigger.start + D - 1;
-    const landed = !wantBreakout || pastPin || q >= 1 - 1e-4;
-    const flying = wantBreakout && !landed && q >= BREAKOUT.leap[1];
+    const landed = mode === 'done';
+    const flying = mode === 'play' && wantBreakout && q >= BREAKOUT.leap[1];
     if (perch.root.classList.contains('is-landed') !== landed) {
       perch.root.classList.toggle('is-landed', landed);
       perchFrame = '';
@@ -657,6 +769,228 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   };
 
 
+  // ── The two modes ───────────────────────────────────────────────────────
+  const announce = (message: string) => {
+    if (o.status) o.status.textContent = message;
+  };
+  /**
+   * Where PRESS START was pressed, px: the stage starts there, so adding the pin never moves the view, and
+   * comes to its place along the camera's own dive curve, so the two are one motion into the screen.
+   */
+  let entryShift = 0;
+  /** The canvas world under the opening is shown only once the dive draws it (it keeps the last frame it drew). */
+  let worldShown = true;
+  /** The opening as it is at rest (p 0), at once: a hidden PRESS START could not take focus. */
+  const resetStage = () => {
+    entryShift = 0;
+    toMast(false);
+    if (!d) return;
+    d.stage.style.translate = '';
+    d.gl.style.translate = '';
+    glideLeft = '';
+    d.stage.style.setProperty('--out', '0');
+    d.stage.classList.remove('is-copy-gone');
+    d.stage.style.opacity = '';
+    d.stage.style.pointerEvents = '';
+    lastOut = 0;
+    lastFade = 1;
+    section.classList.add('world--opening');
+    o.prompt?.classList.remove('is-visible');
+    hitEl?.classList.remove('is-active');
+  };
+  /** Stop everything that moves the page or the world by itself. */
+  const stopPlays = () => {
+    input.enabled = false;
+    input.reset();
+    motion.cancel();
+    playing = null;
+    breakPlay = null;
+    autoArmed = false;
+    wasHitZone = false;
+    pendingHit = false;
+  };
+
+  /**
+   * PRESS START on the page: the pin, created now. From the top, the enter segment plays as the page
+   * scrolls; after an Exit game, the page goes straight to where the player left (the section stays
+   * pinned at the top of the view, so nothing moves) and the camera dives into the screen there.
+   */
+  const enterPlay = () => {
+    if (mode !== 'default' || trigger) return;
+    const y0 = Math.max(0, Math.round(window.scrollY));
+    mode = 'play';
+    root.classList.add('is-playing');
+    syncLengths();
+    const resume = saved ? tlOf(saved) : null;
+    saved = null;
+    timeline.jumpTo(resume ?? timeline.tMin);
+    motion.cancel();
+    input.reset();
+    input.enabled = true;
+    // the page goes to its top as the pin takes the section there; the stage keeps its place on screen
+    entryShift = y0;
+    if (d && y0 > 0) d.stage.style.translate = `0 ${-y0}px`;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    expectedY = window.scrollY;
+    trigger = createPin();
+    expectedY = window.scrollY;
+    if (resume === null) start();
+    else {
+      window.scrollTo({ top: Math.round(pinTop() + DE + resume * DW), behavior: 'instant' });
+      expectedY = window.scrollY;
+      // the pin's refresh put the timeline at the page's top (scroll 0 when it was made): back to the spot
+      timeline.jumpTo(resume);
+      const p1 = heroPAt(resume);
+      if (p1 > 0) zoom = { p0: 0, p1, t0: -1, done: () => {} };
+    }
+    announce('Game started. Scroll or use the arrow keys to play. Press Escape to exit.');
+  };
+
+  /** The pin's last step, at once: Sam lands on the Register window and the game closes. */
+  const landNow = () => {
+    stopPlays();
+    timeline.jumpTo(timeline.tMax);
+    window.scrollTo({ top: pinTop() + D, behavior: 'instant' });
+    expectedY = window.scrollY;
+    finish();
+  };
+
+  /**
+   * Exit game or Esc: the spot is saved, the game's UI goes, and the camera pulls back out of the screen
+   * to the monitor (the dive backwards, at its pace); then the pin goes and the page is the hero again,
+   * the monitor showing the game frozen where the player left. The skip link does it at once. Through the
+   * breakout's finale (it plays itself out in ~2.4 s) Esc does nothing; the skip link lands Sam instead.
+   */
+  const exitPlay = (focus: 'start' | 'main') => {
+    if (mode !== 'play' || regDialog?.open) return;
+    if (exiting) {
+      if (focus === 'main') {
+        zoom = null;
+        finishExit('main');
+      }
+      return;
+    }
+    const tl = timeline.t;
+    const q = qAt(tl);
+    if (wantBreakout && q >= BREAKOUT.shatter[0]) {
+      if (focus === 'main') {
+        landNow();
+        document.getElementById('main')?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    saved = tl >= 0 ? { t: Math.min(T_MAX, tl), q } : null;
+    stopPlays();
+    timeline.jumpTo(tl);
+    exiting = true;
+    root.classList.add('is-exiting');
+    root.classList.remove('is-playing');
+    const from = lastHeroP;
+    if (focus === 'main' || from <= 0) {
+      zoom = null;
+      finishExit(focus);
+    } else zoom = { p0: from, p1: 0, t0: -1, done: () => finishExit(focus) };
+  };
+
+  /** The zoom out has landed on the monitor at rest: the pin goes, the page is at the top of the hero. */
+  const finishExit = (focus: 'start' | 'main') => {
+    exiting = false;
+    trigger?.kill(true);
+    trigger = null;
+    mode = 'default';
+    root.classList.remove('is-exiting', 'is-playing');
+    syncLengths();
+    timeline.jumpTo(saved ? tlOf(saved) : timeline.tMin);
+    resetStage();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    expectedY = Number.NaN;
+    if (focus === 'start' && d?.start.classList.contains('is-ready')) d.startButton.focus({ preventScroll: true });
+    else document.getElementById('main')?.focus({ preventScroll: true });
+    announce('Game closed.');
+  };
+
+  /**
+   * Sam has landed: the game closes itself. Removing the pin's spacer shortens the page above the
+   * landing by the pin's length; the page scrolls back by exactly what the landing moved, in the same
+   * frame, so nothing on screen moves. The world stays at its end (the broken monitor in the masthead),
+   * focus stays put.
+   */
+  const finish = () => {
+    if (mode !== 'play' || !trigger) return;
+    const ref = perch?.root ?? document.getElementById('register');
+    const before = ref?.getBoundingClientRect().top ?? 0;
+    // The page keeps its height through the swap: otherwise layout clamps the scroll to the shorter
+    // page before it is set, and the browser sees the landing jump in from off screen (a layout shift).
+    document.body.style.minHeight = `${document.documentElement.scrollHeight}px`;
+    trigger.kill(true);
+    trigger = null;
+    const after = ref?.getBoundingClientRect().top ?? 0;
+    window.scrollTo({ top: window.scrollY + after - before, behavior: 'instant' });
+    document.body.style.minHeight = '';
+    expectedY = Number.NaN;
+    mode = 'done';
+    root.classList.add('is-done');
+    root.classList.remove('is-playing');
+    stopPlays();
+    timeline.jumpTo(timeline.tMax);
+    announce('Sam made it. Register below.');
+  };
+
+  // ── Register over the game: the dialog pauses it, and the plays pick up where they were ──
+  const regDialog = createRegisterDialog({
+    onOpen: () => {
+      paused = true;
+      pausedAt = clockNow();
+      input.enabled = false;
+      input.reset();
+      motion.cancel();
+    },
+    onClose: () => {
+      const away = clockNow() - pausedAt;
+      if (playing && playing.t0 >= 0) playing.t0 += away;
+      if (breakPlay && breakPlay.t0 >= 0) breakPlay.t0 += away;
+      lastInputAt = lastHitAt = clockNow();
+      paused = false;
+      input.enabled = mode === 'play';
+    },
+  });
+  /**
+   * "Register now" in play mode: the form in the dialog, over the game. From the leap on, the Register
+   * window is on screen with Sam flying to it, so the form stays there: he lands at once and the game
+   * closes, focus in the form. While the camera zooms out it does nothing. Outside the game the nav's own
+   * script centres the Register window (Nav.astro).
+   */
+  const openRegister = (from: HTMLElement | null): boolean => {
+    if (mode !== 'play') return false;
+    if (paused || exiting) return true;
+    if (wantBreakout && qAt(timeline.tTarget) >= BREAKOUT.leap[0]) {
+      landNow();
+      focusRegister();
+      return true;
+    }
+    if (!regDialog) return false;
+    regDialog.show(from);
+    return true;
+  };
+  for (const link of document.querySelectorAll<HTMLElement>('[data-register-link]')) {
+    link.addEventListener('click', (e) => {
+      if (mode === 'play') e.preventDefault();
+      openRegister(link);
+    });
+  }
+  o.exit?.addEventListener('click', () => exitPlay('start'));
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || mode !== 'play' || paused || exiting || regDialog?.open) return;
+    e.preventDefault();
+    exitPlay('start');
+  });
+  // The skip link in the game: out of it first, then to the content.
+  document.querySelector<HTMLAnchorElement>('.skip-link')?.addEventListener('click', (e) => {
+    if (mode !== 'play') return;
+    e.preventDefault();
+    exitPlay('main');
+  });
+
   // ── Loop ────────────────────────────────────────────────────────────────
   let last = performance.now();
   let prevSamX = timeline.X;
@@ -671,26 +1005,28 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // 'instant' overrides the page's CSS scroll-behavior: smooth, which would otherwise restart
     // a smooth animation every frame and never move. X is world px; below 0 it is in the enter segment.
     const scrollToX = (X: number) => {
-      window.scrollTo({ top: trigger.start + DE + X * pxPerWorld, behavior: 'instant' });
+      window.scrollTo({ top: pinTop() + DE + X * pxPerWorld, behavior: 'instant' });
       expectedY = window.scrollY;
     };
 
+    /** Only in play mode, and not while the Register dialog is open, does anything move the page or the world. */
+    const live = mode === 'play' && !paused && !zoom;
     // PRESS START playing the enter segment: the page scrolls on, the visual follows it exactly.
-    if (playing) {
+    if (playing && live) {
       if (playing.t0 < 0) playing.t0 = now;
       const pp = playP(playing.from + now - playing.t0);
-      const y = pp >= 1 ? playing.y1 : trigger.start + pp * DE;
+      const y = pp >= 1 ? playing.y1 : pinTop() + pp * DE;
       window.scrollTo({ top: y, behavior: 'instant' });
       expectedY = window.scrollY;
-      timeline.drive((y - trigger.start - DE) / pxPerWorld, 0, 'auto');
+      timeline.drive((y - pinTop() - DE) / pxPerWorld, 0, 'auto');
       if (pp >= 1) playing = null;
     }
 
     // ── The breakout, after the run (src/game/segments.ts BREAKOUT): q from the page, its plays, the hits ──
     const qOf = (tt: number) => (DB > 0 ? clamp01(((tt - T_MAX) * DW) / DB) : 0);
-    const yOfQ = (qq: number) => trigger.start + DE + DW + qq * DB;
+    const yOfQ = (qq: number) => pinTop() + DE + DW + qq * DB;
     const xOfQ = (qq: number) => (T_MAX + (qq * DB) / DW) * W;
-    if (breakPlay) {
+    if (breakPlay && live) {
       if (breakPlay.t0 < 0) breakPlay.t0 = now;
       const k = Math.min(1, (now - breakPlay.t0) / Math.max(1, breakPlay.ms));
       const qq = breakPlay.q0 + (breakPlay.q1 - breakPlay.q0) * k;
@@ -750,8 +1086,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const wall = base >= X_MAX ? 1 : base <= 0 ? -1 : 0;
     // Turning away from an end of the level: he was stopped there, so no momentum and no skid.
     if (wall !== 0 && held === -wall && motion.vx * wall > 0) motion.cancel();
-    const endY = trigger.start + D;
-    if (window.scrollY > endY + 1) {
+    const endY = pinTop() + D;
+    if (!live) {
+      // by default, after the landing and under the dialog nothing here moves the page
+    } else if (window.scrollY > endY + 1) {
       // Past the end of the pin, in the Arrival section with the world still partly in view: the keys
       // scroll the page with Sam's run physics and nothing in the world moves — never back to the wall.
       if (held !== 0 || motion.moving) {
@@ -789,7 +1127,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
     // Space / tap / A: a jump, all the way to the plaza; there, out to the monitor; at the monitor, a
     // hit on the glass (as is a tap or click on its screen).
-    if (input.active) {
+    if (input.active && live) {
       if (input.consumeJumpPress() || pendingHit) {
         lastInputAt = now;
         if (hitZone) hit(false);
@@ -807,7 +1145,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     }
     wasHitZone = hitZone;
     if (!hitZone) autoArmed = false;
-    if (autoArmed && hitZone && input.active && now >= scrollOverrideUntil && now - lastInputAt >= AUTO_IDLE_MS && now - lastHitAt >= AUTO_HIT_MS) hit(true);
+    if (live && autoArmed && hitZone && input.active && now >= scrollOverrideUntil && now - lastInputAt >= AUTO_IDLE_MS && now - lastHitAt >= AUTO_HIT_MS) hit(true);
 
     timeline.step(dt);
     // The world's own t (0 through the enter segment, 1 through the breakout), the enter segment's
@@ -816,7 +1154,20 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const p = clamp01(1 + (timeline.t * DW) / DE);
     const q = qOf(timeline.t);
     const inBreakout = q > 0;
-    const heroP = inBreakout ? 1 - clamp01(q / BREAKOUT.pullBack[1]) : p;
+    // What the monitor shows: the page's enter progress in the game; a zoom's while one plays (the world
+    // frozen where it is); the monitor at rest on the page, showing the game where the player left it.
+    let zoomEnded = false;
+    let heroP = inBreakout ? 1 - clamp01(q / BREAKOUT.pullBack[1]) : p;
+    if (zoom) {
+      if (zoom.t0 < 0) zoom.t0 = now;
+      const dir = zoom.p1 >= zoom.p0 ? 1 : -1;
+      const zp = playP(playMs(zoom.p0) + dir * (now - zoom.t0));
+      heroP = dir > 0 ? Math.min(zp, zoom.p1) : Math.max(zp, zoom.p1);
+      zoomEnded = heroP === zoom.p1;
+    } else if (mode === 'default') heroP = 0;
+    lastHeroP = heroP;
+    /** From the landing on, the copy is in the masthead and fades in there as the monitor glides into its slot. */
+    const mastOn = wantBreakout && (mode === 'done' || (mode === 'play' && !exiting && q >= BREAKOUT.land[0]));
     // While catching up the visual still follows the ease, so Sam faces the way he actually moves.
     sam.update(dt, timeline.t > 0 && !inBreak && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
 
@@ -831,25 +1182,39 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       // opening hands over to the canvas world under it — only the top layer fades, over an opaque world.
       const fade = d ? 1 - smooth(heroP, ENTER.handover) : 0;
       if (d) {
-        // the opening's copy and PRESS START never come back: the breakout's monitor stands alone
-        const out = inBreakout ? 1 : Math.round(smooth(p, ENTER.copyOut) * 100) / 100;
-        if (out !== lastOut) {
+        // The copy goes with the dive and comes back with a zoom out; through the breakout it stays away
+        // until the landing, where it fades into the masthead. PRESS START: never after the landing, nor
+        // through the breakout in the game; on the page it shows over the monitor wherever the game was left.
+        toMast(mastOn);
+        const rawOut =
+          mode === 'done' ? 0 : mastOn ? 1 - smooth(q, BREAKOUT.land) : inBreakout && mode === 'play' && !exiting ? 1 : smooth(heroP, ENTER.copyOut);
+        const out = Math.round(rawOut * 100) / 100;
+        const startGone = mode === 'done' || (mode === 'play' && !exiting && (out >= 1 || inBreakout));
+        if (out !== lastOut || d.stage.classList.contains('is-copy-gone') !== startGone) {
           lastOut = out;
           d.stage.style.setProperty('--out', String(out));
-          d.stage.classList.toggle('is-copy-gone', out >= 1);
+          d.stage.classList.toggle('is-copy-gone', startGone);
         }
+        // the monitor's sideways glide into its masthead slot (the 3D does the rest of the glide)
+        const gx = mastOn || mode === 'done' ? Math.round(smooth(q, BREAKOUT.land) * glideTo.left) : 0;
+        const gl = gx ? `${gx}px 0` : '';
+        if (gl !== glideLeft) {
+          glideLeft = gl;
+          d.gl.style.translate = gl;
+        }
+        // Faded out, the stage stays in the accessibility tree (the h1 is in it): only clicks pass through.
         const f2 = Math.round(fade * 1000) / 1000;
         if (f2 !== lastFade) {
           lastFade = f2;
           d.stage.style.opacity = f2 < 1 ? String(f2) : '';
-          d.stage.style.visibility = f2 <= 0 ? 'hidden' : '';
+          d.stage.style.pointerEvents = f2 <= 0 ? 'none' : '';
         }
         section.classList.toggle('world--opening', heroP < ENTER.overlays);
         if (fade > 0) {
           const b = inBreakout ? breakState(q, now) : null;
           drawHero({ ...view, samX: X, hideSam: !!b?.sam }, now, heroP, b);
           // the monitor's screen takes taps through the cracks; BREAK OUT · n/6 labels it
-          const prompting = !!b && q >= BREAKOUT.cracks[0] - 0.005 && b.stage < CRACK_STAGES && !breakPlay;
+          const prompting = live && !!b && q >= BREAKOUT.cracks[0] - 0.005 && b.stage < CRACK_STAGES && !breakPlay;
           o.prompt?.classList.toggle('is-visible', prompting);
           const count = `BREAK OUT · ${b ? b.stage : 0}/${CRACK_STAGES}`;
           if (o.promptTitle && o.promptTitle.textContent !== count) o.promptTitle.textContent = count;
@@ -869,7 +1234,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           }
         } else o.prompt?.classList.remove('is-visible');
       }
-      if (!d || heroP >= ENTER.drawWorld) {
+      // Until the dive draws it, the canvas world still holds its last frame (where the game was left): hidden,
+      // so a stage lifted by a scrolled start never shows it under its bottom edge.
+      const showWorld = !d || heroP >= ENTER.drawWorld;
+      if (showWorld !== worldShown) {
+        worldShown = showWorld;
+        o.canvas.style.visibility = showWorld ? '' : 'hidden';
+      }
+      if (showWorld) {
         // Through the enter segment (and the breakout) the far sky snaps to whole art px, as on the monitor's
         // screen, so the two agree at the handover; it glides at device px while the run moves (where the switch can't be seen).
         const glide = !d || (t > 0 && !inBreakout);
@@ -880,12 +1252,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
 
       // The game's overlays come in at the end of the enter segment.
-      const inGame = (!d || p >= ENTER.overlays) && (!inBreakout || heroP >= ENTER.overlays);
+      const inGame = mode === 'play' && !exiting && (!d || heroP >= ENTER.overlays);
       o.hud?.classList.toggle('is-visible', inGame);
       // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.
       for (const el of o.sessions) {
         const level = el.dataset.session;
-        el.classList.toggle('is-visible', level === '1' ? t >= 0.08 && t < 0.34 : level === '2' ? t >= 0.36 && t < 0.6 : level === '3' ? t >= 0.62 && t < 0.83 : false);
+        el.classList.toggle('is-visible', inGame && (level === '1' ? t >= 0.08 && t < 0.34 : level === '2' ? t >= 0.36 && t < 0.6 : level === '3' ? t >= 0.62 && t < 0.83 : false));
       }
       o.hint?.classList.toggle('is-visible', inGame && t < 0.14);
       // The rail: each stop done, current or next by t.
@@ -929,6 +1301,26 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         lastClock = clock;
       }
     }
+    // The stage starts where it was when PRESS START was pressed and comes to its place at the camera's
+    // pace (DIVE, as the camera's own view offset does), landing with it: one motion, not two.
+    if (entryShift > 0 && d) {
+      const e = DIVE(clamp01((heroP - ENTER.camera[0]) / (ENTER.camera[1] - ENTER.camera[0])));
+      const shift = entryShift * (1 - e);
+      d.stage.style.translate = shift > 0.01 ? `0 ${(-shift).toFixed(2)}px` : '';
+      if (shift <= 0.01) entryShift = 0;
+    }
+    // The end of the game: the page at the pin's end and the world there too (or off screen, where it
+    // can snap). Sam is on the Register window; the game closes itself.
+    if (live && trigger && window.scrollY >= trigger.end - 1) {
+      if (!input.active) timeline.jumpTo(timeline.tMax);
+      if (timeline.t >= timeline.tMax - 1e-4) finish();
+    }
+    // A zoom has reached its end: the game goes on (resume), or the page takes over (exit).
+    if (zoomEnded && zoom) {
+      const then = zoom.done;
+      zoom = null;
+      then();
+    }
     // Sam on the page, wherever the page is (below the pin the world no longer draws).
     updatePerch(q);
     requestAnimationFrame(frame);
@@ -942,7 +1334,20 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       motion,
       sam,
       coins,
-      trigger,
+      get trigger() {
+        return trigger;
+      },
+      get mode() {
+        return { mode, paused };
+      },
+      enterPlay,
+      exitPlay,
+      get saved() {
+        return saved;
+      },
+      get zoom() {
+        return zoom ? { ...zoom, p: lastHeroP } : null;
+      },
       input,
       get F() {
         return F;
