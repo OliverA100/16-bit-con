@@ -1,5 +1,6 @@
 /**
- * The master timeline: one number t in [0, 1] is the single source of truth.
+ * The master timeline: one number t is the single source of truth: the run
+ * is t 0–1, and below 0 lies the enter segment (from tMin), where the camera dives into the monitor.
  *
  * Two regimes, and scroll always wins:
  *  - scroll  Native scroll (wheel, scrollbar, swipe, anchor) sets tTarget, and only the VISUAL t
@@ -34,6 +35,8 @@ export class Timeline {
     public readonly W: number,
     /** Highest t the current build exposes (Level 1 gate: 0.34). */
     public tMax: number,
+    /** Lowest t: the top of the enter segment, −D_E / D_W (0 when there is none). */
+    public tMin = 0,
   ) {}
 
   /** Sam's world x. */
@@ -43,13 +46,13 @@ export class Timeline {
 
   /** A scroll we did not cause: the page is already there, the visual follows. */
   setScrollTarget(t: number): void {
-    this.tTarget = clamp(t, 0, this.tMax);
+    this.tTarget = clamp(t, this.tMin, this.tMax);
     this.source = 'scroll';
   }
 
   /** Keys / d-pad: X comes from Sam's run physics; the loop scrolls the page to match. */
   drive(X: number, vx: number, source: Exclude<Source, 'idle' | 'scroll'>): void {
-    this.t = this.tTarget = clamp(X / this.W, 0, this.tMax);
+    this.t = this.tTarget = clamp(X / this.W, this.tMin, this.tMax);
     this.speed = vx;
     this.driven = true;
     this.source = source;
@@ -60,13 +63,13 @@ export class Timeline {
    * page) from where the user left it, and the visual catches up through the ease — no snap back.
    */
   driveTarget(X: number, source: Exclude<Source, 'idle' | 'scroll'>): void {
-    this.tTarget = clamp(X / this.W, 0, this.tMax);
+    this.tTarget = clamp(X / this.W, this.tMin, this.tMax);
     this.source = source;
   }
 
   /** Snap without smearing (boot, refresh, anchor jumps). */
   jumpTo(t: number): void {
-    this.t = this.tTarget = clamp(t, 0, this.tMax);
+    this.t = this.tTarget = clamp(t, this.tMin, this.tMax);
     this.speed = 0;
     this.driven = false;
     this.source = 'idle';

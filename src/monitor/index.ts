@@ -34,7 +34,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { readToken } from '../game/palette';
 import { buildMonitor, measure, type MonitorParts } from './build';
 import { createCrtMaterial, coverRect } from './crt';
-import { DIMS, FOV, OPENING_Y, type Slot, type View } from './spec';
+import { CENTRE, DIMS, FOV, OPENING_Y, REST, restWidth, type Slot, type View } from './spec';
 
 export { FOV, REST, restWidth, VIEWS, type Slot, type View } from './spec';
 
@@ -50,6 +50,28 @@ export interface Box {
   y1: number;
 }
 
+/**
+ * A camera pose: looking at `target` from `dist` away along the direction yaw / pitch (degrees, from
+ * the front), through a lens of `fov` (vertical, degrees), its picture shifted by (ox, oy) CSS px.
+ */
+export interface Pose {
+  target: Vector3;
+  dist: number;
+  yaw: number;
+  pitch: number;
+  fov: number;
+  ox: number;
+  oy: number;
+}
+
+/** The game's screen frame as the native pose needs it: its size in texels and where the viewport frame sits in it. */
+export interface FrameGeom {
+  W: number;
+  H: number;
+  mx: number;
+  mt: number;
+}
+
 export interface Monitor {
   renderer: WebGLRenderer;
   scene: Scene;
@@ -58,8 +80,25 @@ export interface Monitor {
   crt: ReturnType<typeof createCrtMaterial>;
   lights: { key: DirectionalLight; rim: DirectionalLight };
   setSize(cssW: number, cssH: number): void;
+  /** The drawing buffer, bufW × bufH px, under a CSS box of cssW × cssH. */
+  setBuffer(cssW: number, cssH: number, bufW: number, bufH: number): void;
   /** Place the camera for `view` with the monitor on `slot`; returns its silhouette box and the screen's projected size (CSS px). */
   frame(view: View, slot: Slot): { box: Box; screenW: number; screenH: number };
+  /**
+   * The rest pose on `slot`. The camera stands where the posters were rendered from (DIST_REST, the
+   * distance the 30° lens needs at 1440 × 900) and only the lens changes to fit the slot: from the
+   * same point the picture is the same up to scale, so the 3D lands on the poster at every size.
+   */
+  restPose(slot: Slot): Pose;
+  /**
+   * The native pose: straight at the flat screen, one texel of the game's frame exactly k device px
+   * and the viewport frame's top-left texel on the buffer's top-left pixel — what the canvas world
+   * shows, pixel for pixel, at a buffer of devW × devH.
+   */
+  nativePose(frame: FrameGeom, k: number, devW: number, devH: number, fov: number): Pose;
+  applyPose(p: Pose): void;
+  /** The screen's projected size at the current pose, CSS px. */
+  screenSize(): { w: number; h: number };
   setFrame(texture: Texture, aspect: number): void;
   /**
    * A point on the tube's surface in world space (the bulged cap, as the vertex shader moves it):
@@ -144,6 +183,10 @@ function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, pre
   const camera = new PerspectiveCamera(FOV, 1, 0.02, 40);
   let cssW = 1;
   let cssH = 1;
+  let bufW = 1;
+  let bufH = 1;
+  const dirOf = (yaw: number, pitch: number) =>
+    new Vector3(Math.sin(yaw * DEG) * Math.cos(pitch * DEG), Math.sin(pitch * DEG), Math.cos(yaw * DEG) * Math.cos(pitch * DEG));
 
   // Silhouette samples (body space, so they turn with the monitor): every third casing and foot vertex.
   const silhouette: Vector3[] = [];
@@ -191,8 +234,76 @@ function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, pre
       cssW = w;
       cssH = h;
       renderer.setSize(w, h, false);
+      bufW = renderer.domElement.width;
+      bufH = renderer.domElement.height;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+    },
+    setBuffer(w, h, bw, bh) {
+      cssW = w;
+      cssH = h;
+      if (bw !== bufW || bh !== bufH || renderer.getPixelRatio() !== 1) {
+        renderer.setPixelRatio(1);
+        renderer.setSize(bw, bh, false);
+      }
+      bufW = bw;
+      bufH = bh;
+      camera.aspect = bw / bh;
+      camera.updateProjectionMatrix();
+    },
+    restPose(slot) {
+      const turned = parts.pivot.quaternion.clone();
+      parts.pivot.quaternion.identity();
+      parts.pivot.updateMatrixWorld(true);
+      const target = new Vector3(0, 0, 0);
+      camera.clearViewOffset();
+      camera.aspect = bufW / bufH;
+      camera.position.copy(target).addScaledVector(dirOf(REST.yaw, REST.pitch), DIST_REST);
+      camera.lookAt(target);
+      camera.updateMatrixWorld();
+      // From a fixed point the picture scales exactly with the lens's focal length.
+      let fov = FOV;
+      for (let i = 0; i < 2; i++) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+        const box = project(silhouette, 'body');
+        fov = (2 * Math.atan((Math.tan((fov * DEG) / 2) * (box.x1 - box.x0)) / slot.w)) / DEG;
+      }
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+      const box = project(silhouette, 'body');
+      parts.pivot.quaternion.copy(turned);
+      parts.pivot.updateMatrixWorld(true);
+      return { target, dist: DIST_REST, yaw: REST.yaw, pitch: REST.pitch, fov, ox: (box.x0 + box.x1) / 2 - slot.cx, oy: (box.y0 + box.y1) / 2 - slot.cy };
+    },
+    nativePose(fr, k, devW, devH, fov) {
+      const f = crt.uniforms.uFrame.value;
+      const s = scaleAt(-DIMS.recess);
+      const { w, h } = DIMS.opening;
+      // world units per texel (the cover fit keeps texels square), and the lens's focal length in device px
+      const texel = (h * s) / ((f.w - f.y) * fr.H);
+      const fpx = devH / 2 / Math.tan((fov * DEG) / 2);
+      // the texel under the buffer's centre; the texture is flipped, so v counts up from the bottom
+      const cx = fr.mx + devW / (2 * k);
+      const cy = fr.mt + devH / (2 * k);
+      const u = (cx / fr.W - f.x) / (f.z - f.x);
+      const v = (1 - cy / fr.H - f.y) / (f.w - f.y);
+      const target = new Vector3((u - 0.5) * w * s - CENTRE.x, (OPENING_Y + (v - 0.5) * h) * s - CENTRE.y, -DIMS.recess - CENTRE.z);
+      return { target, dist: (fpx * texel) / k, yaw: 0, pitch: 0, fov, ox: 0, oy: 0 };
+    },
+    applyPose(p) {
+      camera.fov = p.fov;
+      camera.aspect = bufW / bufH;
+      camera.position.copy(p.target).addScaledVector(dirOf(p.yaw, p.pitch), p.dist);
+      camera.lookAt(p.target);
+      if (p.ox !== 0 || p.oy !== 0) camera.setViewOffset(cssW, cssH, p.ox, p.oy, cssW, cssH);
+      else camera.clearViewOffset();
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
+    },
+    screenSize() {
+      const s = project(corners.map(([u, v]) => monitor.screenPoint(u, v)), 'world');
+      return { w: s.x1 - s.x0, h: s.y1 - s.y0 };
     },
     frame(view, slot) {
       // Framed with the monitor square to the world (no parallax turn), so the rest pose never moves.
@@ -269,6 +380,14 @@ function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, pre
       renderer.dispose();
     },
   };
+  // The posters' camera distance: what the 30° lens needs to fit the rest slot at 1440 × 900 (where
+  // they were rendered). The page keeps it and fits the slot with the lens instead.
+  // (Only the projection is set up for it: the drawing buffer is left alone.)
+  cssW = 1440;
+  cssH = 900;
+  monitor.frame(REST, { cx: 720, cy: 450, w: restWidth(1440) });
+  const DIST_REST = camera.position.length();
+
   return monitor;
 }
 

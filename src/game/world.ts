@@ -396,11 +396,15 @@ export class Level1 {
    * instead of art pixels, so a cloud drifting 1 art px a second glides instead of jumping k device
    * px at a time. Everything nearer is drawn in the buffer over it.
    */
-  drawFar(sctx: CanvasRenderingContext2D, f: Frame, k: number): void {
+  /**
+   * @param glide true: positions round to device px (the clouds glide); false: to whole art px, as on
+   *   the monitor's screen — while the 3D shows, so the two agree at the handover
+   */
+  drawFar(sctx: CanvasRenderingContext2D, f: Frame, k: number, glide = true): void {
     const { t, camLeft, F, now, range: r, span } = f;
     const a = this.a;
     const tint = (img: Drawable) => this.tints.get(img)!.at(t);
-    const snap = (v: number) => Math.round(v * k) / k;
+    const snap = glide ? (v: number) => Math.round(v * k) / k : Math.round;
     sctx.save();
     sctx.scale(k, k);
     sctx.imageSmoothingEnabled = false;
@@ -467,6 +471,12 @@ export class Level1 {
     const lit = (l: Lights, range: readonly [number, number, number]) => l.at(clamp01((t - range[0]) / (range[1] - range[0])), range[2]);
     /** Layer-space u of the right edge of the screen when Sam is at world x — where a layer begins or ends. */
     const edgeAt = (p: number, x: number) => p * (x - sx) + bw;
+    // Those starts and ends are cut to fall just past the viewport's right edge. The monitor's wider
+    // frame draws what lies past that edge as if nothing had begun or ended there yet, so no cut shows
+    // in its margin; the viewport itself is unchanged.
+    const past = (u: number, p: number) => u - p * camLeft >= bw;
+    const begin = (u: number, p: number) => (past(u, p) ? Infinity : u);
+    const end = (u: number, p: number) => (past(u, p) ? Infinity : u);
     const place = (img: Drawable, p: number, u: number, bottom: number) => {
       const x = Math.round(u - p * camLeft);
       if (x + img.width > r.x0 && x < r.x1) ctx.drawImage(img, x, Math.round(bottom - img.height));
@@ -483,7 +493,7 @@ export class Level1 {
 
     // ── Hills: full saturation, plain tiling, ending at a tile boundary and scrolling off ──
     const hillsEnd = edgeAt(STACK.hills.p, SEQ.hillsEnd);
-    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, r, { to: hillsEnd, phase: mod(hillsEnd, a.hills.width) });
+    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, r, { to: end(hillsEnd, STACK.hills.p), phase: mod(hillsEnd, a.hills.width) });
 
     // ── The far city and the towers scroll in on the horizon, each at its own speed; the plain in
     //    front of them hides where their art ends ──
@@ -495,7 +505,7 @@ export class Level1 {
     if (c) {
       const farBegin = edgeAt(STACK.cityFar.p, SEQ.farBegin);
       const farImg = nt ? nt.far.at(stepOf(NIGHT.far)) : c.far;
-      const farOpts = { mirror: true, from: farBegin, phase: farBegin };
+      const farOpts = { mirror: true, from: begin(farBegin, STACK.cityFar.p), phase: farBegin };
       const farY = F + STACK.cityFar.bottom - c.far.height;
       drawTiled(ctx, farImg, STACK.cityFar.p * camLeft, farY, r, farOpts);
       const farLit = nt && lit(nt.lights.far, LIGHTS.far);
@@ -507,8 +517,9 @@ export class Level1 {
       const towersImg = nt ? nt.towers.at(stepOf(NIGHT.towers)) : c.towers;
       const towersLit = nt && lit(nt.lights.towers, LIGHTS.towers);
       for (const img of towersLit ? [towersImg, towersLit] : [towersImg]) {
-        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: towersBegin, to: tw.gapL, phase: tw.phase });
-        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: Math.max(towersBegin, tw.gapR), phase: tw.phase });
+        const tb = begin(towersBegin, STACK.towers.p);
+        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: tb, to: tw.gapL, phase: tw.phase });
+        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: Math.max(tb, tw.gapR), phase: tw.phase });
       }
     }
     drawTiled(ctx, a.plain, STACK.plain.p * camLeft, F + STACK.plain.top, r);
@@ -516,7 +527,7 @@ export class Level1 {
     // ── Mid layer: bushes and trees at 0.45, ending as the mid buildings arrive ──
     const midHedgeEnd = edgeAt(STACK.midHedge.p, SEQ.midHedgeEnd);
     const midScroll = STACK.midHedge.p * camLeft;
-    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, r, { to: midHedgeEnd, phase: mod(midHedgeEnd, a.hedge.width) });
+    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, r, { to: end(midHedgeEnd, STACK.midHedge.p), phase: mod(midHedgeEnd, a.hedge.width) });
     for (const u of MID_TREES) if (u + a.treeField.width <= midHedgeEnd) place(a.treeField, STACK.midHedge.p, u, F + STACK.midHedge.treeBottom);
 
     if (c) {
@@ -526,16 +537,18 @@ export class Level1 {
       const midImg = nt ? nt.mid.at(stepOf(NIGHT.mid)) : c.mid;
       const midLit = nt && lit(nt.lights.mid, LIGHTS.mid);
       for (const img of midLit ? [midImg, midLit] : [midImg]) {
-        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: midBegin, to: md.gapL, phase: md.phase });
-        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: Math.max(midBegin, md.gapR), phase: md.phase });
+        const mb = begin(midBegin, STACK.cityMid.p);
+        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: mb, to: md.gapL, phase: md.phase });
+        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: Math.max(mb, md.gapR), phase: md.phase });
       }
       const nearPhase = nearBegin - STACK.cityNear.leadColumn;
       const nearY = F + STACK.cityNear.bottom - c.near.height;
       const nearImg = nt ? nt.near.at(stepOf(NIGHT.near)) : c.near;
       const nearLit = nt && lit(nt.lights.near, LIGHTS.near);
       for (const img of nearLit ? [nearImg, nearLit] : [nearImg]) {
-        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nearBegin, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
-        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
+        const nb = begin(nearBegin, STACK.cityNear.p);
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb === Infinity ? Infinity : nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
       }
       place(nt ? nt.poster.at(streetStep) : c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
       const signs = this.signs ?? (this.signs = buildSigns(c));

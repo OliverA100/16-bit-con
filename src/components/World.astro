@@ -270,6 +270,12 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     opacity: 1;
   }
 
+  /* At full resolution the 3D's buffer is the canvas world's, pixel for pixel: scaled like it (with a
+     fractional pixel ratio the page stretches both by a hair), so the handover matches exactly. */
+  .hero__gl.is-native {
+    image-rendering: pixelated;
+  }
+
   /* PRESS START: laid on the screen by a matrix3d from the camera (src/game/quad.ts) and hidden
      until the screen has powered on. Designed 8rem wide; the transform scales it with the monitor. */
   .hero__start {
@@ -345,7 +351,23 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     position: absolute;
     inset: 0;
     min-height: 0;
-    will-change: transform, opacity;
+    will-change: opacity;
+  }
+
+  /* The enter segment (src/game/segments.ts): the copy and PRESS START go as the camera starts to dive
+     (--out 0 → 1, set by the loop); then the whole opening hands over to the canvas world under it. */
+  .world--live .hero__copy,
+  .world--live .hero__tagline {
+    opacity: calc(1 - var(--out, 0));
+    translate: 0 calc(var(--out, 0) * -24px);
+  }
+
+  .world--live .hero__start {
+    opacity: calc(1 - var(--out, 0));
+  }
+
+  .world--live .hero__stage.is-copy-gone .hero__start {
+    visibility: hidden;
   }
 
   .world__session,

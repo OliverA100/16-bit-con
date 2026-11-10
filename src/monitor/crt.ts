@@ -228,16 +228,31 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
 export const SCAN_PX = 4;
 
 /**
- * The sizes set in device px of the screen at rest (w × h device px): a dark gap every 4 px, an RGB
- * triad every 3 px, a ~6 px bloom, red and blue ~1.2 px apart at the centre, a 1 px grain. Defined
- * in screen space, so they grow with the zoom as on a real tube.
+ * The sizes set in device px of the screen at rest (w × h device px): a dark gap every 4 px and an
+ * RGB triad every 3 px — counts across the tube, so they grow with the zoom as a real tube's would
+ * (the reference's lines grow the same way) — and the sizes tuneOnScreen holds.
  */
 export function tuneAtRest(crt: CrtMaterial, w: number, h: number): void {
   const u = crt.uniforms;
   u.uScanLines.value = h / SCAN_PX;
   u.uMaskCols.value = w / 3;
+  tuneOnScreen(crt, w, h);
+}
+
+/** Red and blue this far apart at the centre at rest, px, and at most this far apart on the page as the screen grows. */
+const ABERR_PX = 1.2;
+const ABERR_MAX_PX = 3;
+
+/**
+ * A ~6 px bloom and a 1 px grain, for a screen now w × h px (px of the canvas at rest; restW its width
+ * at rest). Called through the zoom with the screen's size on the page, these keep their size on the
+ * page — grown with the tube, the 8-tap bloom would ghost — while the convergence error grows with
+ * the tube as the reference's does, up to ABERR_MAX_PX on the page.
+ */
+export function tuneOnScreen(crt: CrtMaterial, w: number, h: number, restW = w): void {
+  const u = crt.uniforms;
   u.uGlowR.value.set(6 / w, 6 / h);
-  u.uAberr.value = 1.2 / w;
+  u.uAberr.value = Math.min(ABERR_PX / restW, ABERR_MAX_PX / w);
   u.uRes.value.set(w, h);
 }
 

@@ -1,0 +1,104 @@
+---
+/**
+ * /dev/dawn — the plaza mocks for the Gate 3 stop: the game's last level in the morning,
+ * in the two compositions that keep the far skyline (city-far moves at 0.2 of Sam's speed and cannot
+ * scroll off before the plaza) — ?variant=A: Javits at the mid layer's depth (p 0.5), the towers behind
+ * it; B: Javits at p 0.25 as built, the towers ended — and ?variant=night, the night-plaza fallback
+ * (PLAZA_TIME 'night'). ?x= the world x. Drawn with the engine's own art and placement; the city's
+ * near and mid fronts have ended by the plaza (they are designed in Gate 4). Review page only.
+ */
+import Base from '../../layouts/Base.astro';
+---
+
+<Base title="Dawn plaza mocks (review)" description="Review page" noindex>
+  <style is:inline>
+    body > .nav-slot, .skip-link, .site-footer { display: none !important; }
+  </style>
+  <canvas class="dev-dawn pixel" id="dev-dawn" aria-label="The plaza mock" role="img"></canvas>
+</Base>
+
+<script>
+  import { loadCity, loadLevel1 } from '../../game/assets';
+  import { Arrival } from '../../game/arrival';
+  import { Coins } from '../../game/coins';
+  import { Dust } from '../../game/dust';
+  import { NIGHT_STEPS, Stepper, nightTokens, rank } from '../../game/night';
+  import { readToken } from '../../game/palette';
+  import { Sam } from '../../game/sam';
+  import { worldBuffer } from '../../game/scale';
+  import type { Drawable } from '../../game/sprites';
+  import { drawTiled, SEQ, STACK, type Frame } from '../../game/world';
+  import { GROUND_BAND } from '../../data/layers';
+
+  const params = new URLSearchParams(location.search);
+  const variant = (params.get('variant') ?? 'B') as 'A' | 'B' | 'night';
+  const X = Number(params.get('x') ?? 6000);
+  const canvas = document.getElementById('dev-dawn') as HTMLCanvasElement;
+
+  const assets = await loadLevel1();
+  const c = await loadCity();
+  const real = new Arrival(assets);
+  real.city = c;
+  const sam = new Sam(assets.sam);
+  sam.update(0, 0, 0, 0, false);
+
+  const vp = worldBuffer(document.documentElement.clientWidth, window.innerHeight);
+  const F = vp.bh - GROUND_BAND;
+  const sx = Math.round(0.3 * vp.bw);
+  const camLeft = X - sx;
+  const range = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
+  const f: Frame = { t: X / 6000, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, range, span: range, now: 0, sky: '', sam, samX: X, coins: new Coins([]), dust: new Dust() };
+
+  // ── Night: the engine's own palette steps, built in its worker (the night plaza does not exist yet) ──
+  const night = new Map<Drawable, Stepper>();
+  let far: Drawable = c.far;
+  if (variant === 'night') {
+    const T = nightTokens();
+    const spec = (img: Drawable, s: ReturnType<typeof rank>) => night.set(img, new Stepper(img, s).prepare());
+    spec(c.facade, rank([T.k, T.n9, T.g7], [3, 2, 1]));
+    spec(c.facadeBay, rank([T.k, T.n9, T.g7], [3, 2, 1]));
+    for (const img of [c.cypress, assets.tree, c.plant, assets.daisyTiny]) spec(img, rank([T.n9, T.n7], [2, 1]));
+    for (const img of [c.sidewalk, c.kerb, c.road, c.seamBack, c.signPost]) spec(img, rank([T.k, T.g7, T.g5], [1, 1, 1]));
+    for (const img of [assets.dirtFill, assets.dirtRows]) spec(img, rank([T.k, T.n9], [1, 1]));
+    spec(assets.daisySurface, rank([T.n9, T.n7, T.g7], [2, 1, 1]));
+    const farNight = new Stepper(c.far, rank([T.n9], [1], { '#B9D6DF': T.k, '#B9C8E5': T.k })).prepare();
+    for (let i = 0; i < 200 && (![...night.values()].every((s) => s.ready) || !farNight.ready); i++) await new Promise((r) => setTimeout(r, 50));
+    far = farNight.at(NIGHT_STEPS);
+    real.look = (img) => night.get(img)?.at(NIGHT_STEPS) ?? img;
+    const n9 = readToken('--color-green-900');
+    real.skyColors = { top: n9, horizon: n9, clouds: false };
+  }
+  real.facadeP = variant === 'A' ? 0.5 : 0.25;
+  // Behind the facade: the far skyline (as in the game, from where it began), the towers in A, and the plain hiding their bases.
+  real.behind = (ctx) => {
+    const farBegin = STACK.cityFar.p * (SEQ.farBegin - sx) + vp.bw;
+    drawTiled(ctx, far, STACK.cityFar.p * camLeft, F + STACK.cityFar.bottom - c.far.height, range, { mirror: true, from: farBegin, phase: farBegin });
+    if (variant === 'A') {
+      const towersBegin = STACK.towers.p * (SEQ.towersBegin - sx) + vp.bw;
+      drawTiled(ctx, c.towers, STACK.towers.p * camLeft, F + STACK.towers.bottom - c.towers.height, range, { from: towersBegin, phase: towersBegin });
+    }
+    drawTiled(ctx, assets.plain, STACK.plain.p * camLeft, F + STACK.plain.top, range);
+  };
+
+  const buf = document.createElement('canvas');
+  buf.width = vp.bw;
+  buf.height = vp.bh;
+  const bctx = buf.getContext('2d')!;
+  bctx.imageSmoothingEnabled = false;
+  real.draw(bctx, f, true);
+  canvas.width = vp.devW;
+  canvas.height = vp.devH;
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(buf, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
+  document.body.dataset.ready = '1';
+</script>
+
+<style>
+  .dev-dawn {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+</style>

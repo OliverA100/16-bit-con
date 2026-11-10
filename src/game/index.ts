@@ -10,15 +10,17 @@
  *
  * The opening: a Daisy White page with the monitor, the copy and PRESS START lies over
  * the canvas world. Once the page has loaded and gone idle, the monitor's 3D (three.js, its own
- * chunk) is built a step per task, takes the poster's place in one frame and powers on with the live game
- * on its screen: this loop draws the game into the screen frame and renders the 3D while the
- * opening shows, and only the canvas world after. Until the zoom (Gate 3) the opening steps out over
- * t 0.05–0.08 and PRESS START jumps to the world start.
+ * chunk) is built a step per task, takes the poster's place in one frame and powers on with the live
+ * game on its screen. The pin starts with the enter segment (src/game/segments.ts): scrolling it, the
+ * camera dives into the screen and lands on the native pose, and the opening hands over to the canvas
+ * world beneath it pixel for pixel. This loop draws the game into the screen frame and renders the 3D
+ * while the opening shows, and only the canvas world after. PRESS START plays the segment at the
+ * reference's pace (segments.ts PLAY: the dive in 770 ms, 970 ms in all).
  */
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { worldBuffer } from './scale';
-import { Timeline, pinnedDistance } from './timeline';
+import { Timeline } from './timeline';
 import { Input } from './input';
 import { Motion } from './motion';
 import { Dust } from './dust';
@@ -38,6 +40,7 @@ import { ScreenFrame } from './screen-frame';
 import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
 import type { Hero } from '../monitor/hero';
+import { ENTER, clamp01, playMs, playP, scrollLengths, smooth } from './segments';
 import { GL_ATTRIBUTES } from '../monitor/spec';
 
 const W = 6000;
@@ -48,10 +51,6 @@ const X_MAX = T_MAX * W;
 const SCROLL_OVERRIDE_MS = 150;
 /** Our own scrollTo echoes back through ScrollTrigger; within this many px it is ours. */
 const ECHO_PX = 1.5;
-/** The opening steps out over this stretch of t, in six hard steps (until the zoom replaces it, Gate 3). */
-const HERO_OUT: readonly [number, number] = [0.05, 0.08];
-/** Where PRESS START lands until the zoom plays it in (Gate 3): the opening gone, the run begun. */
-const WORLD_START = HERO_OUT[1];
 /**
  * The 3D shows its dark glass this long before it powers on. It takes the poster's place in one frame,
  * with no fade: the two match (a mean 1.7 / 255 apart), and a fade would make both half-transparent at
@@ -123,7 +122,6 @@ function query(section: HTMLElement): Overlay {
   };
 }
 
-const steps = (p: number, n: number) => Math.ceil(Math.min(1, Math.max(0, p)) * n) / n;
 const clamp1 = (v: number) => Math.min(1, Math.max(-1, v));
 
 type IdleWindow = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
@@ -221,7 +219,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const realBuf = document.createElement('canvas');
   const rctx = realBuf.getContext('2d')!;
   const sctx = o.canvas.getContext('2d')!;
-  let vp = worldBuffer(window.innerWidth, window.innerHeight);
+  // The layout width (without a classic scrollbar), so the canvas world's buffer maps 1:1 onto device
+  // pixels under its CSS box — and onto the 3D's buffer at the handover.
+  const viewW = () => document.documentElement.clientWidth || window.innerWidth;
+  let vp = worldBuffer(viewW(), window.innerHeight);
   let F = vp.bh - GROUND_BAND;
   let sx = Math.round(0.3 * vp.bw);
   let viewport: Rect = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
@@ -229,7 +230,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const screen = new ScreenFrame();
 
   const fit = () => {
-    vp = worldBuffer(window.innerWidth, window.innerHeight);
+    vp = worldBuffer(viewW(), window.innerHeight);
     F = vp.bh - GROUND_BAND;
     sx = Math.round(0.3 * vp.bw);
     viewport = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
@@ -249,7 +250,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   fit();
 
   // ── Timeline, pin, inputs ───────────────────────────────────────────────
-  const timeline = new Timeline(W, T_MAX);
+  // The pin: the enter segment (D_E) and the run (D_W). The timeline's t runs below 0 through the
+  // enter segment, from −D_E / D_W at the top of the page.
+  let { DE, DW, D } = scrollLengths(window.innerHeight);
+  const timeline = new Timeline(W, T_MAX, -DE / DW);
+  const tOf = (progress: number) => (progress * D - DE) / DW;
   const motion = new Motion();
   const dust = new Dust();
   const input = new Input(o.canvas);
@@ -270,14 +275,18 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (import.meta.env.DEV) performance.measure('world:city', { start: c0, end: performance.now() });
     })
     .catch((err) => console.error('[world] city assets failed to load', err));
-  let D1 = Math.round(pinnedDistance(window.innerHeight) * T_MAX);
   let expectedY = Number.NaN;
+  /**
+   * PRESS START's play through the enter segment at the reference's pace (segments.ts PLAY): it began
+   * `from` ms into a play from the top, at t0 on the clock, and ends at y1. A scroll of the user's cancels it.
+   */
+  let playing: { from: number; y1: number; t0: number } | null = null;
   let scrollOverrideUntil = 0;
   let autoArmed = false;
   const trigger = ScrollTrigger.create({
     trigger: section,
     start: 'top top',
-    end: () => `+=${D1}`,
+    end: () => `+=${D}`,
     pin: true,
     pinSpacing: true,
     anticipatePin: 1,
@@ -288,12 +297,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       scrollOverrideUntil = performance.now() + SCROLL_OVERRIDE_MS;
       motion.cancel();
       autoArmed = false;
-      timeline.setScrollTarget(self.progress * T_MAX);
+      playing = null;
+      timeline.setScrollTarget(tOf(self.progress));
     },
     onRefresh: (self) => {
-      D1 = Math.round(pinnedDistance(window.innerHeight) * T_MAX);
+      ({ DE, DW, D } = scrollLengths(window.innerHeight));
+      timeline.tMin = -DE / DW;
       expectedY = Number.NaN;
-      timeline.jumpTo(self.progress * T_MAX);
+      timeline.jumpTo(tOf(self.progress));
     },
   });
   // A link to a section (/#register) was resolved by the browser before the pin added its scroll
@@ -303,7 +314,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     window.scrollTo({ top: Math.round(target.getBoundingClientRect().top + window.scrollY), behavior: 'instant' });
     ScrollTrigger.update();
   }
-  timeline.jumpTo(trigger.progress * T_MAX);
+  timeline.jumpTo(tOf(trigger.progress));
 
   const io = new IntersectionObserver((entries) => {
     input.active = entries.some((e) => e.isIntersecting);
@@ -332,7 +343,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
       const t = Number(jump);
       motion.cancel();
-      window.scrollTo({ top: Math.round(trigger.start + t * D1), behavior: 'instant' });
+      playing = null;
+      window.scrollTo({ top: Math.round(trigger.start + DE + t * DW), behavior: 'instant' });
       expectedY = window.scrollY;
       timeline.jumpTo(t);
     });
@@ -366,13 +378,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
   // ── The opening: PRESS START, the monitor's 3D, the parallax ──────────────
   const d = o.hero;
-  /** Until the zoom plays it in (Gate 3), PRESS START — or Space / → at the monitor — jumps to the world start. */
+  /** PRESS START — or Space / → at the monitor — plays the enter segment at the reference's pace, from where the page is: it scrolls with it. */
   const start = () => {
     motion.cancel();
-    window.scrollTo({ top: Math.round(trigger.start + WORLD_START * D1), behavior: 'instant' });
-    expectedY = window.scrollY;
-    timeline.jumpTo(WORLD_START);
     d?.startButton.blur();
+    const y1 = Math.round(trigger.start + DE);
+    if (window.scrollY < y1 - 1) playing = { from: playMs((window.scrollY - trigger.start) / DE), y1, t0: -1 };
   };
   d?.startButton.addEventListener('click', start);
 
@@ -383,10 +394,20 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let startUV: [number, number, number, number] = [0, 0, 1, 1];
   let slotCentre = { x: 0, y: 0 };
   let lastOut = -1;
+  let lastFade = -1;
   const layoutHero = () => {
     if (!d || !hero3d) return;
     const b = slotBox(d);
-    hero3d.layout(d.gl.clientWidth, d.gl.clientHeight, { cx: b.x + b.w / 2, cy: b.y + b.h / 2, w: b.w });
+    const g = screen.geom;
+    hero3d.layout({
+      cssW: d.gl.clientWidth,
+      cssH: d.gl.clientHeight,
+      slot: { cx: b.x + b.w / 2, cy: b.y + b.h / 2, w: b.w },
+      devW: vp.devW,
+      devH: vp.devH,
+      k: vp.k,
+      frame: { W: g.W, H: g.H, mx: g.mx, mt: g.mt },
+    });
     startUV = startRect(d);
     scanStart(d, startUV, hero3d.scanLines);
     const r = d.slot.getBoundingClientRect();
@@ -452,8 +473,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   }
 
   /** The monitor while the opening shows: the screen frame, the first frame in place of the poster, the power-on, PRESS START. */
-  const drawHero = (f: WorldFrame, now: number) => {
+  const drawHero = (f: WorldFrame, now: number, p: number) => {
     if (heroMode !== '3d' || !hero3d || !d || document.hidden) return;
+    hero3d.enter(p);
     if (screen.update(f, level, dust, now)) hero3d.frameChanged(false);
     if (shownAt < 0) {
       const t0 = performance.now();
@@ -466,7 +488,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     }
     if (hero3d.phase === 'off' && now >= shownAt + POWER_DELAY_MS) hero3d.powerOn(now);
     const phase = hero3d.render(now);
-    placeStart(d, hero3d.quad(...startUV));
+    if (p < ENTER.copyOut[1]) placeStart(d, hero3d.quad(...startUV));
     if (phase === 'on' && !startShown) {
       startShown = true;
       d.start.classList.add('is-ready');
@@ -488,31 +510,44 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const now = vclock ? vclock.now : rafNow;
     const dt = Math.min(0.05, Math.max(0, now - last) / 1000);
     last = now;
-    const pxPerWorld = D1 / X_MAX;
+    const pxPerWorld = DW / X_MAX;
     // 'instant' overrides the page's CSS scroll-behavior: smooth, which would otherwise restart
-    // a smooth animation every frame and never move.
+    // a smooth animation every frame and never move. X is world px; below 0 it is in the enter segment.
     const scrollToX = (X: number) => {
-      window.scrollTo({ top: trigger.start + X * pxPerWorld, behavior: 'instant' });
+      window.scrollTo({ top: trigger.start + DE + X * pxPerWorld, behavior: 'instant' });
       expectedY = window.scrollY;
     };
-    const tNow = timeline.t;
+    const tNow = Math.max(0, timeline.t);
 
-    // While the opening is up the keys never drive the world: Space or → at the monitor is PRESS START.
+    // PRESS START playing the enter segment: the page scrolls on, the visual follows it exactly.
+    if (playing) {
+      if (playing.t0 < 0) playing.t0 = now;
+      const pp = playP(playing.from + now - playing.t0);
+      const y = pp >= 1 ? playing.y1 : trigger.start + pp * DE;
+      window.scrollTo({ top: y, behavior: 'instant' });
+      expectedY = window.scrollY;
+      timeline.drive((y - trigger.start - DE) / pxPerWorld, 0, 'auto');
+      if (pp >= 1) playing = null;
+    }
+
+    // While the monitor shows, the keys never drive the world: Space or → at it is PRESS START.
     // (A → press is read every frame, so one from the run can never start the game later.)
-    const heroUp = !!d && timeline.tTarget < HERO_OUT[0];
+    const pT = clamp01(1 + (timeline.tTarget * DW) / DE);
+    const heroUp = !!d && pT < ENTER.handover[1];
     const rightPress = input.consumeRightPress();
-    if (heroUp && input.active && (rightPress || input.dir > 0 || input.consumeJumpPress()) && now >= scrollOverrideUntil) start();
+    if (heroUp && input.active && (rightPress || input.dir > 0 || input.consumeJumpPress()) && now >= scrollOverrideUntil && !playing) start();
     // Keys / d-pad: Sam runs with real velocity and the page follows him.
-    const held = input.active && now >= scrollOverrideUntil && !heroUp ? input.dir : 0;
+    const held = input.active && now >= scrollOverrideUntil && !heroUp && !playing ? input.dir : 0;
     if (held !== 0) lastInputAt = now;
     // While the visual is still easing after a scroll, keys move the target (the page) from where
     // the user left it and the visual catches up; otherwise they move Sam directly.
     const catchingUp = Math.abs(timeline.tTarget - timeline.t) * W > 2;
-    const base = catchingUp ? timeline.tTarget * W : timeline.X;
+    // From the tail of the enter segment the keys start the run where it begins.
+    const base = Math.max(0, catchingUp ? timeline.tTarget * W : timeline.X);
     const wall = base >= X_MAX ? 1 : base <= 0 ? -1 : 0;
     // Turning away from an end of the level: he was stopped there, so no momentum and no skid.
     if (wall !== 0 && held === -wall && motion.vx * wall > 0) motion.cancel();
-    const endY = trigger.start + X_MAX * pxPerWorld;
+    const endY = trigger.start + D;
     if (window.scrollY > endY + 1) {
       // Past the end of the pin, in the Arrival section with the world still partly in view: the keys
       // scroll the page with Sam's run physics and nothing in the world moves — never back to the wall.
@@ -529,7 +564,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         overflow = X - X_MAX;
         X = X_MAX;
       } else if (X < 0) {
-        overflow = X;
+        // the start of the run is a wall: the keys never walk back out into the monitor
         X = 0;
       }
       // Pushing into an end of the level: Sam stands still while the page keeps scrolling on —
@@ -547,7 +582,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
     // Space / tap / A: a jump on the ground; from the flight on, a hit on the glass:
     // one crack per hit, the page following, and the hit that completes the cracks starts the dissolve.
-    const hitting = tNow >= BREAK.flight[0] && tNow < BREAK.dissolve[1];
+    const hitting = tNow >= BREAK.flight[0] && tNow < BREAK.dissolve[1] && !heroUp;
     if (input.active) {
       if (input.consumeJumpPress()) {
         lastInputAt = now;
@@ -577,14 +612,16 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     prevT = tNow;
 
     timeline.step(dt);
-    const t = timeline.t;
+    // The world's own t (0 throughout the enter segment) and the enter segment's progress p.
+    const t = Math.max(0, timeline.t);
+    const p = clamp01(1 + (timeline.t * DW) / DE);
     // The flight: on the propeller from 0.84, up and across in the game frame, down again on the plaza.
     const flight = flightAt(t, vp.bw, sx);
     sam.flight = flight ? flight.lift : null;
     // While catching up the visual still follows the ease, so Sam faces the way he actually moves.
-    sam.update(dt, timeline.speed, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
+    sam.update(dt, timeline.t > 0 ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
 
-    const X = timeline.X;
+    const X = t * W;
     const camLeft = X - sx;
     coins.update(X, prevSamX, sam.lift);
     prevSamX = X;
@@ -592,19 +629,29 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     if (input.active) {
       const shown = dissolveLevel(t);
       const view = { t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, range: viewport, span: screen.rect, now, sky: skyAt(t), sam, coins, dust };
-      // The opening steps out as a pure function of the scroll position (not the eased visual, so a
-      // scrollbar jump removes it at once): six hard steps over t 0.05–0.08. Over the canvas world
-      // until then, so the world is drawn only once it has started to go.
-      const out = steps((timeline.tTarget - HERO_OUT[0]) / (HERO_OUT[1] - HERO_OUT[0]), 6);
-      if (d && out !== lastOut) {
-        lastOut = out;
-        d.stage.style.transform = out > 0 ? `translateY(${-out * 48}px)` : '';
-        d.stage.style.opacity = out > 0 ? String(1 - out) : '';
-        d.stage.style.visibility = out >= 1 ? 'hidden' : '';
-        section.classList.toggle('world--opening', out < 1);
+      // The enter segment, a pure function of p: the copy and PRESS START go first, then the whole
+      // opening hands over to the canvas world under it — only the top layer fades, over an opaque world.
+      const fade = d ? 1 - smooth(p, ENTER.handover) : 0;
+      if (d) {
+        const out = Math.round(smooth(p, ENTER.copyOut) * 100) / 100;
+        if (out !== lastOut) {
+          lastOut = out;
+          d.stage.style.setProperty('--out', String(out));
+          d.stage.classList.toggle('is-copy-gone', out >= 1);
+        }
+        const f2 = Math.round(fade * 1000) / 1000;
+        if (f2 !== lastFade) {
+          lastFade = f2;
+          d.stage.style.opacity = f2 < 1 ? String(f2) : '';
+          d.stage.style.visibility = f2 <= 0 ? 'hidden' : '';
+        }
+        section.classList.toggle('world--opening', p < ENTER.overlays);
+        if (fade > 0) drawHero({ ...view, samX: X }, now, p);
       }
-      if (d && out < 1) drawHero({ ...view, samX: X }, now);
-      if (!d || out > 0) {
+      if (!d || p >= ENTER.drawWorld) {
+        // Through the enter segment the far sky snaps to whole art px, as on the monitor's screen, so the
+        // two agree at the handover; it glides at device px once the run moves (where the switch can't be seen).
+        const glide = !d || t > 0;
         if (shown < 64) {
           // The game frame, Sam drifting to the right edge once he is on the propeller, the cracks on its glass.
           level.draw(bctx, { ...view, samX: flight && t < BREAK.dissolve[1] ? camLeft + flight.screenX : X });
@@ -617,20 +664,22 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           if (shown < 64) dissolve.apply(bctx, realBuf, rctx, shown, vp.bw, vp.bh, impactPoint(vp.bw, F));
         }
         // The far sky at device resolution (clouds glide), then the buffer over it.
-        if (shown < 64) level.drawFar(sctx, { ...view, samX: X }, vp.k);
-        else real.drawFar(sctx, { ...view, samX: X }, vp.k);
+        if (shown < 64) level.drawFar(sctx, { ...view, samX: X }, vp.k, glide);
+        else real.drawFar(sctx, { ...view, samX: X }, vp.k, glide);
         sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
       }
 
-      o.hud?.classList.toggle('is-visible', t >= 0.06 && t < BREAK.hudOut);
+      // The game's overlays come in at the end of the enter segment.
+      const inGame = !d || p >= ENTER.overlays;
+      o.hud?.classList.toggle('is-visible', inGame && t < BREAK.hudOut);
       // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.
       for (const el of o.sessions) {
         const level = el.dataset.session;
         el.classList.toggle('is-visible', level === '1' ? t >= 0.08 && t < 0.34 : level === '2' ? t >= 0.36 && t < 0.6 : level === '3' ? t >= 0.62 && t < 0.83 : false);
       }
-      o.hint?.classList.toggle('is-visible', t > 0.005 && t < 0.14);
+      o.hint?.classList.toggle('is-visible', inGame && t < 0.14);
       // The rail: each stop done, current or next by t.
-      o.rail?.classList.toggle('is-visible', t >= 0.06);
+      o.rail?.classList.toggle('is-visible', inGame);
       const current = railStops.find((s) => t >= s.from && t < s.to)?.id ?? '';
       if (current !== railCurrent) {
         railCurrent = current;
@@ -693,8 +742,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       get vp() {
         return vp;
       },
-      get D1() {
-        return D1;
+      get lengths() {
+        return { DE, DW, D };
+      },
+      get p() {
+        return clamp01(1 + (timeline.t * DW) / DE);
       },
       get breakout() {
         return { stage: crackStage(timeline.t), level: dissolveLevel(timeline.t), armed: autoArmed, flight: flightAt(timeline.t, vp.bw, sx) };
