@@ -60,6 +60,12 @@ export interface Pose {
   fov: number;
   ox: number;
   oy: number;
+  /**
+   * How far the lens's aspect has gone from the page's (0) to the native pose's buffer's (1) — they
+   * differ by a classic scrollbar. The dive blends it in step with the tube's flattening so the picture
+   * never jumps at the landing; unset, the page's aspect with a view offset and the buffer's without.
+   */
+  native?: number;
 }
 
 /** The game's screen frame as the native pose needs it: its size in texels and where the viewport frame sits in it. */
@@ -288,11 +294,17 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
     },
     applyPose(p) {
       camera.fov = p.fov;
-      camera.aspect = bufW / bufH;
       camera.position.copy(p.target).addScaledVector(dirOf(p.yaw, p.pitch), p.dist);
       camera.lookAt(p.target);
-      if (p.ox !== 0 || p.oy !== 0) camera.setViewOffset(cssW, cssH, p.ox, p.oy, cssW, cssH);
-      else camera.clearViewOffset();
+      // (three's setViewOffset sets the aspect to its full view's: the page's here)
+      const a = p.native === undefined ? null : cssW / cssH + (bufW / bufH - cssW / cssH) * p.native;
+      if (p.ox !== 0 || p.oy !== 0) {
+        if (a === null) camera.setViewOffset(cssW, cssH, p.ox, p.oy, cssW, cssH);
+        else camera.setViewOffset(a * cssH, cssH, (p.ox * a * cssH) / cssW, p.oy, a * cssH, cssH);
+      } else {
+        camera.clearViewOffset();
+        camera.aspect = a ?? bufW / bufH;
+      }
       camera.updateProjectionMatrix();
       camera.updateMatrixWorld();
     },

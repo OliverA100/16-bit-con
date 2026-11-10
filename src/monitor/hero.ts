@@ -13,10 +13,13 @@
  * The zoom (src/game/segments.ts ENTER, DIVE): the camera dives from the rest pose to the native pose
  * — where one texel of the game's frame is exactly k device px on the canvas world's grid — along the
  * reference's measured curve, turning straight-on on the way. The tube keeps its whole look —
- * curvature, bulge, scanlines growing with the screen, every effect — until its picture nearly fills
- * the view, then drops it in a cut while the bezel's last strips slide out (as in the reference, on
- * review 2026-11-09); the glass's reflection goes early. At the landing the screen shows the game's
- * pixels exactly and the page can hand over to the canvas world without a jump. No brightness flash.
+ * curvature, bulge, scanlines growing with the screen, every effect — until its picture all but fills
+ * the view (as in the reference, on review 2026-11-09); then its curvature and its vintage look flatten
+ * together over ~125 ms while the bezel's last strips slide out, and the camera's last bit of zoom plays
+ * on the flat picture (on review 2026-11-10: a ~30 ms cut read as too fast). The glass's reflection goes
+ * early. At the landing
+ * the screen shows the game's pixels exactly and the page can hand over to the canvas world without a
+ * jump. No brightness flash.
  */
 import { CanvasTexture, Color, Quaternion, Vector3, type Texture } from 'three';
 import { createBreakout } from './breakout';
@@ -88,8 +91,8 @@ export interface Hero {
   readonly phase: PowerPhase;
   /** Scanlines across the screen's height at rest (PRESS START's own lines match them). */
   readonly scanLines: number;
-  /** Where on the way in the screen's picture first nearly fills the view (p), for this layout: the tube's look is cut there. */
-  readonly fillP: number;
+  /** Where on the way in (p) the tube starts to flatten, for this layout (dev measurements). */
+  readonly flatP: number;
   /** The enter segment's progress: 0 at rest, 1 in the game (the camera lands at ENTER.camera[1]). */
   enter(p: number): void;
   /**
@@ -203,7 +206,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   /** The screen's width at rest, px of the canvas at rest. */
   let restW = 1;
   let fullRes = false;
-  let fillP: number = ENTER.cutBy;
+  /** Where the tube starts to flatten (p): ENTER.flatten.lead before its picture nearly fills the view. */
+  let flatP: number = ENTER.fillBy - ENTER.flatten.lead;
   const pose: Pose = { target: new Vector3(), dist: 1, yaw: 0, pitch: 0, fov: 30, ox: 0, oy: 0 };
   const probe: Pose = { target: new Vector3(), dist: 1, yaw: 0, pitch: 0, fov: 30, ox: 0, oy: 0 };
 
@@ -212,11 +216,15 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   const side = new Vector3();
   let brk: BreakoutState | null = null;
 
-  /** The camera at enter progress q: rest → native along the reference's dive, the distance in log space, the turn done before the cut. */
+  /** The camera's progress along the dive at enter progress q (0–1, its log distance). */
+  const diveAt = (q: number): number => DIVE(clamp01((q - ENTER.camera[0]) / (ENTER.camera[1] - ENTER.camera[0])));
+  /** How flat the tube is at enter progress q (0 its whole look, 1 flat): eased in and out over ENTER.flatten.length. */
+  const flatAt = (q: number): number => smooth(q, [flatP, flatP + ENTER.flatten.length]);
+
+  /** The camera at enter progress q: rest → native along the reference's dive, the distance in log space, turning straight-on. */
   const poseAt = (q: number, out: Pose): Pose => {
     if (!rest || !native) return out;
-    const [c0, c1] = ENTER.camera;
-    const e = DIVE(clamp01((q - c0) / (c1 - c0)));
+    const e = diveAt(q);
     const tn = smooth(q, ENTER.turn);
     out.target.copy(rest.target).lerp(native.target, e);
     out.dist = Math.exp(lerp(Math.log(rest.dist), Math.log(native.dist), e));
@@ -225,6 +233,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
     out.fov = rest.fov;
     out.ox = e >= 1 ? 0 : lerp(rest.ox, 0, e);
     out.oy = e >= 1 ? 0 : lerp(rest.oy, 0, e);
+    // the lens's aspect reaches the buffer's with the tube's flattening, so the landing never jumps
+    out.native = flatAt(q);
     return out;
   };
 
@@ -234,7 +244,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
    * parallax has settled long before). The bezel's last strips slide out after it, as in the reference.
    */
   const fillAt = (): number => {
-    if (!lay || !rest || !native) return ENTER.cutBy;
+    if (!lay || !rest || !native) return ENTER.fillBy;
     const turned = parts.pivot.quaternion.clone();
     parts.pivot.quaternion.identity();
     parts.pivot.updateMatrixWorld(true);
@@ -243,10 +253,11 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
     const iy = H * ENTER.fillInset;
     const view: Pt[] = [[ix, iy], [W - ix, iy], [W - ix, H - iy], [ix, H - iy]];
     const at = (uu: number, vv: number) => m.toCss(m.screenPoint(uu, vv, p0));
-    let found: number = ENTER.cutBy;
-    for (let i = 0; i * 0.0025 < ENTER.cutBy; i++) {
+    let found: number = ENTER.fillBy;
+    for (let i = 0; i * 0.0025 < ENTER.fillBy; i++) {
       const q = i * 0.0025;
-      m.applyPose(poseAt(q, probe));
+      poseAt(q, probe).native = 0; // the outline at the page's own aspect, whatever the flattening
+      m.applyPose(probe);
       const outline = [at(0, 0), at(1, 0), at(1, 1), at(0, 1)];
       if (view.every(([x, y]) => inside(outline, x, y))) {
         found = q;
@@ -275,8 +286,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
     get scanLines() {
       return u.uScanLines.value;
     },
-    get fillP() {
-      return fillP;
+    get flatP() {
+      return flatP;
     },
     layout(l) {
       lay = l;
@@ -285,7 +296,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       setRes(fullRes);
       rest = m.restPose(l.slot);
       native = m.nativePose(l.frame, l.k, l.devW, l.devH, rest.fov);
-      fillP = fillAt();
+      flatP = fillAt() - ENTER.flatten.lead;
       // The tube's effects are sized in px of the canvas at rest (the rest buffer is capped at 2×).
       m.applyPose(rest);
       right.setFromMatrixColumn(m.camera.matrixWorld, 0).normalize();
@@ -379,9 +390,10 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       hoverB += (hoverTarget - hoverB) * (1 - Math.exp(-dt / HOVER.tau));
       const hb = phase === 'on' ? hoverB : 1;
 
-      // ── The tube: its whole look held on the way in, cut as its picture fills the view ──
-      const cutEnd = Math.min(fillP, ENTER.cutBy);
-      const fx = 1 - smooth(p, [cutEnd - ENTER.cut, cutEnd]);
+      // ── The tube: its whole look held on the way in until its picture nearly fills the view; then its
+      //    curvature and its vintage look flatten together (one factor for every effect) while the bezel's
+      //    last strips slide out, the camera's last bit of zoom on the flat picture ──
+      const fx = 1 - flatAt(p);
       // the bloom and the grain keep their size on the page as the screen grows; the convergence error grows, capped
       const size = m.screenSize();
       tuneOnScreen(crt, size.w * prRest, size.h * prRest, restW);
