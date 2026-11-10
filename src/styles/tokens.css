@@ -31,12 +31,6 @@
   --color-grey-700: #3C3B38;
   --color-outline-black: #151514;
 
-  /* Ground: the flat fill under ground-daisy-row-strip, sampled from the strip's own darkest
-     dirt row. An asset colour (not a brand token) so the static hero and the canvas share it. */
-  --color-field-dirt: #773D34;
-  /* The deeper fill under it, sampled from tile-grass-dirt's dark dirt specks (rows 6–7). */
-  --color-field-dirt-deep: #4A2620;
-
   /* Blues — sky and sky illustrations only */
   --color-blue-100: #CAE6FF;
   --color-blue-300: #8DCAFF;
@@ -48,7 +42,7 @@
   --surface: var(--color-daisy-white);
   --surface-raised: var(--color-cloud-white);
   --surface-dark: var(--color-green-900);
-  --surface-card: var(--color-cloud-white); /* window, folder and document bodies (the guidelines' white) */
+  --surface-card: var(--color-cloud-white); /* window bodies and UI buttons (the guidelines' white) */
   /* Green 900 is the ink: all body text, all frame lines, all icons default to it. */
   --text: var(--color-green-900);
   --text-muted: var(--color-green-900);
@@ -56,7 +50,6 @@
   --text-on-dark: var(--color-daisy-white);
   --text-on-dark-accent: var(--color-green-100);
   --accent: var(--color-yellow-400);
-  --accent-strong: var(--color-yellow-500);
   --outline: var(--color-green-900);
   --focus-ring: var(--color-yellow-400);
   --sky: var(--color-sky-blue);
@@ -66,20 +59,16 @@
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
-  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  --space-16: 64px;
   --space-24: 96px;
-  --space-32: 128px;
 
   /* Frame lines at vega.io's scale: 1 px Green 900, no radius, hard offset shadow. */
   --border: 1px solid var(--outline);
   --shadow-hard: 4px 4px 0 var(--outline);
   --shadow-hard-sm: 2px 2px 0 var(--outline);
-  --shadow-hard-lg: 8px 8px 0 var(--outline);
   --window-bar-h: 33px;               /* title bar incl. its 1 px rule (vega.io) */
   --window-bar-pad: 6px 8px;
   --window-pad: 20px;                 /* body padding, as vega.io's cards */
@@ -116,9 +105,7 @@
      Set by the inline script in Base.astro; 2 is the no-JS fallback. */
   --px: 2;
 
-  /* Motion: smooth easing for UI, steps() where things should feel 16-bit */
-  --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dur-fast: 120ms;
+  /* Motion: one base duration, and steps() where things should feel 16-bit */
   --dur-base: 200ms;
   --steps-16bit: steps(4, end);
 

@@ -1,7 +1,7 @@
 /**
  * The monitor posters, public/monitor/monitor-{off,on}.webp: renders of src/monitor at rest (the
  * screen off, and on with the game's screen frame at t = 0), shown until the 3D takes over and,
- * screen on, wherever there is no 3D. Measured when they were rendered (/dev/monitor?poster=…, at
+ * screen on, wherever there is no 3D. Measured when they were rendered (at
  * 1440 × 900, device pixel ratio 2), as fractions of the slot — the monitor's silhouette at rest,
  * which the 3D is framed on too.
  */

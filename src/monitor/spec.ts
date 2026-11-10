@@ -58,11 +58,6 @@ export interface View {
 
 /** The rest pose: a 3/4 view from the front right, 20° yaw, 6° above. */
 export const REST: View = { yaw: 20, pitch: 6, fit: 'casing' };
-export const VIEWS: Record<string, View> = {
-  front34: REST,
-  side: { yaw: 78, pitch: 6, fit: 'casing' },
-  closeup: { yaw: 13, pitch: 4, fit: 'screen' },
-};
 export const FOV = 30;
 
 /**

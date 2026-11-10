@@ -61,23 +61,6 @@ export function remap(image: HTMLImageElement | HTMLCanvasElement, map: ColorMap
   return canvas;
 }
 
-/** Count opaque pixels whose colour is in `hexes`. Used by the dev page to prove a remap left nothing behind. */
-export function countColors(image: HTMLImageElement | HTMLCanvasElement, hexes: string[]): number {
-  const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return -1;
-  ctx.drawImage(image, 0, 0);
-  const wanted = new Set(hexes.map((h) => pack(...hexToRgb(h))));
-  const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  let n = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i + 3] !== 0 && wanted.has(pack(d[i]!, d[i + 1]!, d[i + 2]!))) n++;
-  }
-  return n;
-}
-
 /** Read a colour token from tokens.css so the canvas never carries raw hex. */
 export function readToken(name: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();

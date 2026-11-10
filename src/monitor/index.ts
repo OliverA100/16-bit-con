@@ -36,8 +36,6 @@ import { buildMonitor, measure, type MonitorParts } from './build';
 import { createCrtMaterial, coverRect } from './crt';
 import { CENTRE, DIMS, FOV, OPENING_Y, REST, restWidth, scaleAt, type Slot, type View } from './spec';
 
-export { FOV, REST, restWidth, VIEWS, type Slot, type View } from './spec';
-
 const DEG = Math.PI / 180;
 
 const color = (token: string) => new Color().setStyle(readToken(token));
@@ -113,7 +111,7 @@ export interface Monitor {
 }
 
 /** The setup, one step per `yield` (a yielded promise is awaited first); returns the monitor. */
-function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, precompile = false): Generator<Promise<unknown> | void, Monitor> {
+function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Generator<Promise<unknown> | void, Monitor> {
   const renderer = new WebGLRenderer({ canvas, context, antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.toneMapping = ACESFilmicToneMapping;
@@ -127,22 +125,20 @@ function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, pre
   const scene = new Scene();
   const pmrem = new PMREMGenerator(renderer);
   const room = new RoomEnvironment();
-  if (precompile) {
-    // The room's programs, compiled in parallel (KHR_parallel_shader_compile) exactly as PMREM will
-    // use them, into a half-float cube target: then fromScene only compiles its own three passes.
-    const target = new WebGLCubeRenderTarget(256, { type: HalfFloatType });
-    const cube = new CubeCamera(0.1, 100, target);
-    renderer.setRenderTarget(target, 0);
-    const compiled = renderer.compileAsync(room, cube.children[0] as PerspectiveCamera);
-    renderer.setRenderTarget(null);
-    yield compiled.finally(() => target.dispose());
-  }
+  // The room's programs, compiled in parallel (KHR_parallel_shader_compile) exactly as PMREM will
+  // use them, into a half-float cube target: then fromScene only compiles its own three passes.
+  const roomTarget = new WebGLCubeRenderTarget(256, { type: HalfFloatType });
+  const cube = new CubeCamera(0.1, 100, roomTarget);
+  renderer.setRenderTarget(roomTarget, 0);
+  const compiled = renderer.compileAsync(room, cube.children[0] as PerspectiveCamera);
+  renderer.setRenderTarget(null);
+  yield compiled.finally(() => roomTarget.dispose());
   const env = pmrem.fromScene(room, 0.04).texture;
   pmrem.dispose();
   room.dispose();
   // A dim room for the plastic, so the clearcoat carries highlights rather than a white sheen and the
   // key light shapes the casing (front lit, the side falling into orange). Exposure, room and key were
-  // swept against reference 01's front/side colours.
+  // swept against a reference image's front and side colours.
   scene.environment = env;
   scene.environmentIntensity = 0.22;
   yield;
@@ -176,7 +172,7 @@ function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, pre
   parts.materials.glass.envMap = env;
   parts.materials.glass.envMapIntensity = 2.2;
   parts.materials.glass.roughness = 0.22;
-  // turned so the room's bright panel lands as a soft sheet in the glass's upper left, as in reference 01
+  // turned so the room's bright panel lands as a soft sheet in the glass's upper left, as in the reference image
   parts.materials.glass.envMapRotation.set(0.45, 5.2, 0);
   yield;
 
@@ -390,18 +386,9 @@ function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, pre
   return monitor;
 }
 
-/** Build the monitor in one go (the review page). */
-export function createMonitor(canvas: HTMLCanvasElement): Monitor {
-  const it = steps(canvas);
-  for (;;) {
-    const r = it.next();
-    if (r.done) return r.value;
-  }
-}
-
 /** Build the monitor one step per task, awaiting `pause` between steps (the page, with the context it made). */
 export async function createMonitorAsync(canvas: HTMLCanvasElement, context: WebGL2RenderingContext, pause: () => Promise<void>): Promise<Monitor> {
-  const it = steps(canvas, context, true);
+  const it = steps(canvas, context);
   for (let i = 0; ; i++) {
     const t0 = performance.now();
     const r = it.next();

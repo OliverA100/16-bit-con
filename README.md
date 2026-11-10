@@ -45,11 +45,10 @@ npm run check     # type-check
 | Path | What |
 |---|---|
 | `src/pages/index.astro` | The page: the world, the registration form and the schedule |
-| `src/components/` | Window, Button, Folder, Document, Nav, SessionCard, RegisterForm, Wordmark, World |
+| `src/components/` | Window, Button, Nav, SessionCard, SceneStill, RegisterForm, Wordmark, World |
 | `src/game/` | The canvas world: timeline, stages, Sam, input, night palettes and their worker, the plaza and the landing |
 | `src/monitor/` | The three.js monitor: model, CRT shader, poster and breakout |
 | `src/data/` | Layer recipes, the sprite manifest, sessions, the progress rail and Agent Sam's lines |
-| `src/pages/dev/` | Review pages for sprites, wordmark, monitor, UI and buttons, not linked from the page |
 | `public/sprites/` | Vega's art, untouched; `SOURCES.md` lists where each file comes from and the new art drawn for this page |
 
 ## Performance and accessibility

@@ -1,7 +1,7 @@
 /**
  * The monitor's screen: the game drawn at one art px per texel into a frame that is the
  * viewport frame plus margins. The margins give it the opening's aspect, and keep the opening's
- * rounded corners outside the viewport when the zoom (Gate 3) ends with the viewport frame filling
+ * rounded corners outside the viewport when the zoom ends with the viewport frame filling
  * the screen at k device px per texel. The world composes itself on the viewport (bw, F, sx) as
  * always, so the centre of this frame is the 2D canvas's frame exactly; the margins show what lies
  * past its edges, and the ground's fill carries on below the band.

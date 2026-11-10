@@ -1,5 +1,5 @@
 /**
- * World geometry shared by the static stills (Phase 2) and the canvas engine (Phase 3).
+ * World geometry shared by the static stills (SceneStill) and the canvas engine.
  * Everything is in art pixels relative to the ground line F (Sam's feet).
  *
  * Anchors:

@@ -7,14 +7,12 @@ import Nav from '../components/Nav.astro';
 interface Props {
   title?: string;
   description?: string;
-  noindex?: boolean;
 }
 
 const {
   title = '16-Bit Con — October 3–5, 2026, Javits Center, New York',
   description =
     'The retro gaming convention for people who never stopped playing. October 3–5, 2026 at the Javits Center, New York. Find Vega at Booth 630.',
-  noindex = false,
 } = Astro.props;
 ---
 
@@ -25,7 +23,6 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/Signifier-Variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />

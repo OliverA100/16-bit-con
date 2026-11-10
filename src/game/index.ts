@@ -660,7 +660,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // ── Loop ────────────────────────────────────────────────────────────────
   let last = performance.now();
   let prevSamX = timeline.X;
-  let prevT = timeline.t;
   let lastInputAt = performance.now();
   let lastClock = '';
 
@@ -675,7 +674,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       window.scrollTo({ top: trigger.start + DE + X * pxPerWorld, behavior: 'instant' });
       expectedY = window.scrollY;
     };
-    const tNow = Math.max(0, timeline.t);
 
     // PRESS START playing the enter segment: the page scrolls on, the visual follows it exactly.
     if (playing) {
@@ -810,7 +808,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     wasHitZone = hitZone;
     if (!hitZone) autoArmed = false;
     if (autoArmed && hitZone && input.active && now >= scrollOverrideUntil && now - lastInputAt >= AUTO_IDLE_MS && now - lastHitAt >= AUTO_HIT_MS) hit(true);
-    prevT = tNow;
 
     timeline.step(dt);
     // The world's own t (0 through the enter segment, 1 through the breakout), the enter segment's
