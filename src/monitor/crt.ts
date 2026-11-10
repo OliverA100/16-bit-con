@@ -18,6 +18,7 @@
  *  - uNoise   fine grain, 24 times a second
  *  - uGrade   phosphor colour: a little desaturated and warm, the blacks lifted off pure black
  *  - uBright  brightness (the scanlines and the mask take light away; this gives some back)
+ *  - uStatic  a broken tube (the breakout): static where the picture was, under the same scanlines
  * Power-on: a bright line grows from the centre to the full width (uLine, uLineW), then the raster
  * opens vertically from it (uOn, uOpen); the off tube is a dark grey under the glass.
  */
@@ -57,6 +58,7 @@ export interface CrtUniforms {
   uNoise: { value: number };
   uGrade: { value: number };
   uBright: { value: number };
+  uStatic: { value: number };
   uOn: { value: number };
   uOpen: { value: number };
   uLine: { value: number };
@@ -98,6 +100,7 @@ uniform float uHum;
 uniform float uNoise;
 uniform float uGrade;
 uniform float uBright;
+uniform float uStatic;
 uniform float uOn;
 uniform float uOpen;
 uniform float uLine;
@@ -172,6 +175,11 @@ void main() {
   col += col * uBar * hum;
   col *= uBright;
   col *= 1.0 + uNoise * (hash(floor(vUv * uRes) + floor(uTime * 24.0)) - 0.5);
+  // A broken tube: static where the picture was, in 2 px cells 30 times a second, under the scanlines.
+  if (uStatic > 0.0) {
+    float n = hash(floor(vUv * uRes * 0.5) + vec2(floor(uTime * 30.0) * 7.0, 0.0));
+    col = mix(col, vec3(0.06 + 0.8 * n * n) * (1.0 - uScan * gap * gap), uStatic);
+  }
   // The black level: phosphor glass is never quite black.
   col += uGrade * 0.006 * (1.0 - col);
 
@@ -211,6 +219,7 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
     uNoise: { value: CRT_REST.noise },
     uGrade: { value: CRT_REST.grade },
     uBright: { value: CRT_REST.bright },
+    uStatic: { value: 0 },
     uOn: { value: 1 },
     uOpen: { value: 1 },
     uLine: { value: 0 },
@@ -223,6 +232,7 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
   const m = new ShaderMaterial({ uniforms: uniforms as unknown as ShaderMaterial['uniforms'], vertexShader: vertex, fragmentShader: fragment, toneMapped: false });
   return m as CrtMaterial;
 }
+
 
 /** One scanline every this many device px of the screen at rest (the reference shows about 4). */
 export const SCAN_PX = 4;

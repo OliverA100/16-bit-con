@@ -24,14 +24,12 @@ import { Timeline } from './timeline';
 import { Input } from './input';
 import { Motion } from './motion';
 import { Dust } from './dust';
-import { Sam, SAM_CELL } from './sam';
+import { FOOT_SINK, Sam, SAM_CELL } from './sam';
 import { Coins, LEVEL1_COINS, TOTAL_COINS } from './coins';
 import { loadCity, loadLevel1 } from './assets';
 import { Level1 } from './world';
-import { Arrival } from './arrival';
-import { AUTO_IDLE_MS, AUTO_SPEED, BREAK, CRACK_STAGES, Dissolve, crackStage, dissolveLevel, drawCracks, flightAt, impactPoint, mashTarget, promptOn } from './breakout';
 import { skyAt } from './stages';
-import { GROUND_BAND } from '../data/layers';
+import { GROUND_BAND, PLAZA_TIME } from '../data/layers';
 import { levelLabel, railStops, samLines, type SamLine } from '../data/guide';
 import { sprites } from '../data/sprites.manifest';
 import { loadImage } from './sprites';
@@ -39,12 +37,13 @@ import { remap, SAM_BRAND_MAP } from './palette';
 import { ScreenFrame } from './screen-frame';
 import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
-import type { Hero } from '../monitor/hero';
-import { ENTER, clamp01, playMs, playP, scrollLengths, smooth } from './segments';
+import type { BreakoutState, Hero } from '../monitor/hero';
+import { AUTO_HIT_MS, AUTO_IDLE_MS, BREAKOUT, BREAK_PLAY_MS, CRACK_STAGES, ENTER, clamp01, crackStage, hitTarget, playMs, playP, scrollLengths, smooth } from './segments';
+import { drawCell, idleOnPerch, queryPerch } from './landing';
 import { GL_ATTRIBUTES } from '../monitor/spec';
 
 const W = 6000;
-/** The whole run: the field, the city, the night, the breakout and the arrival at Booth 630 (world x 0–6000). */
+/** The whole run: the field, the city, the night and the dawn at the Javits plaza, the game's last level (world x 0–6000). */
 const T_MAX = 1;
 const X_MAX = T_MAX * W;
 /** A scroll we did not cause suspends keys for this long. */
@@ -170,13 +169,23 @@ function pauseTask(): Promise<void> {
 }
 
 function clockFor(t: number): string {
-  // 07:00 during the title; 10:00 at t 0.08 → 14:00 at 0.36 → 18:00 at 0.62 → 22:00 at 0.84,
-  // stepped to 10 minutes; the HUD is gone with the game frame after that.
+  // 07:00 during the title; 10:00 at t 0.08 → 14:00 at 0.36 → 18:00 at 0.62 → 22:00 at 0.84.
+  // Then the night fast-forwards with the dawn sky: 05:00 under its Blue 900, 06:00
+  // as it turns Yellow 600 (sunrise), 07:30 in the Blue 100 morning, 09:00 at the plaza's end — or,
+  // at a night plaza, on to midnight. Stepped to 10 minutes.
   const stops: [number, number][] = [
     [0.08, 10 * 60],
     [0.36, 14 * 60],
     [0.62, 18 * 60],
     [0.84, 22 * 60],
+    ...(PLAZA_TIME === 'dawn'
+      ? ([
+          [0.86, 29 * 60],
+          [0.88, 30 * 60],
+          [0.92, 31 * 60 + 30],
+          [1, 33 * 60],
+        ] as [number, number][])
+      : ([[1, 24 * 60]] as [number, number][])),
   ];
   let minutes = 7 * 60;
   if (t >= 0.08) {
@@ -191,7 +200,7 @@ function clockFor(t: number): string {
     }
   }
   minutes = Math.floor(minutes / 10) * 10;
-  const h = Math.floor(minutes / 60);
+  const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = ((h + 11) % 12) + 1;
@@ -202,6 +211,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   if (!shouldRunWorld()) return;
   const o = query(section);
   gsap.registerPlugin(ScrollTrigger);
+  // ScrollTrigger never re-measures on a resize by itself: the resize handler below decides, so a
+  // height-only resize on a touch screen (a keyboard takes ~40 % of the height, beyond what
+  // ignoreMobileResize lets pass) never moves the page.
+  ScrollTrigger.config({ ignoreMobileResize: true, autoRefreshEvents: 'visibilitychange,DOMContentLoaded,load' });
 
   // The opening is a whole page while the world loads (the monitor is its loading state), so no
   // loading window covers it — and the world's ~1 MB of art waits until the wordmark (the LCP
@@ -213,11 +226,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const bootAt = performance.now();
 
   // ── Viewport, buffers, geometry ─────────────────────────────────────────
-  // Two offscreen frames: the game frame, and the real frame the dissolve reveals behind it.
+  // The game frame, drawn offscreen at art pixels and scaled onto the canvas over the far sky.
   const buffer = document.createElement('canvas');
   const bctx = buffer.getContext('2d')!;
-  const realBuf = document.createElement('canvas');
-  const rctx = realBuf.getContext('2d')!;
   const sctx = o.canvas.getContext('2d')!;
   // The layout width (without a classic scrollbar), so the canvas world's buffer maps 1:1 onto device
   // pixels under its CSS box — and onto the 3D's buffer at the handover.
@@ -234,12 +245,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     F = vp.bh - GROUND_BAND;
     sx = Math.round(0.3 * vp.bw);
     viewport = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
-    buffer.width = realBuf.width = vp.bw;
-    buffer.height = realBuf.height = vp.bh;
+    buffer.width = vp.bw;
+    buffer.height = vp.bh;
     o.canvas.width = vp.devW;
     o.canvas.height = vp.devH;
     bctx.imageSmoothingEnabled = false;
-    rctx.imageSmoothingEnabled = false;
     sctx.imageSmoothingEnabled = false;
     screen.fit(vp.bw, vp.bh);
   };
@@ -250,11 +260,24 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   fit();
 
   // ── Timeline, pin, inputs ───────────────────────────────────────────────
-  // The pin: the enter segment (D_E) and the run (D_W). The timeline's t runs below 0 through the
-  // enter segment, from −D_E / D_W at the top of the page.
-  let { DE, DW, D } = scrollLengths(window.innerHeight);
-  const timeline = new Timeline(W, T_MAX, -DE / DW);
+  // The pin: the enter segment (D_E), the run (D_W) and, where the monitor's 3D can run, the breakout
+  // (D_B). The timeline's t runs below 0 through the enter segment, from −D_E / D_W at the top of the
+  // page, and above 1 through the breakout, to 1 + D_B / D_W.
+  // Dev only: ?hero=poster holds the poster (the swap check), ?hero=static is the no-3D opening.
+  const devHero = import.meta.env.DEV ? new URLSearchParams(location.search).get('hero') : null;
+  let wantBreakout = !!o.hero && 'WebGL2RenderingContext' in window && devHero !== 'static' && devHero !== 'poster';
+  let { DE, DW, DB, D } = scrollLengths(window.innerHeight, wantBreakout);
+  const timeline = new Timeline(W, T_MAX + DB / DW, -DE / DW);
   const tOf = (progress: number) => (progress * D - DE) / DW;
+  // The landing section rises into the pin through the breakout's landing (--rise: exactly its
+  // stretch of scroll), and Sam stands on it at the game's own scale (--sam-px, CSS px per art px).
+  const root = document.documentElement;
+  const setLandingVars = () => {
+    root.style.setProperty('--rise', `${wantBreakout ? Math.round((1 - BREAKOUT.land[0]) * DB) : 0}px`);
+    root.style.setProperty('--sam-px', `${vp.k / (window.devicePixelRatio || 1)}px`);
+    root.classList.toggle('has-breakout', wantBreakout);
+  };
+  setLandingVars();
   const motion = new Motion();
   const dust = new Dust();
   const input = new Input(o.canvas);
@@ -262,27 +285,36 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const sam = new Sam(assets.sam);
   const coins = new Coins(LEVEL1_COINS);
   const level = new Level1(assets);
-  const real = new Arrival(assets);
-  const dissolve = new Dissolve();
-  dissolve.warm(vp.bw, vp.bh, impactPoint(vp.bw, F));
-  // The city set (and the arrival's art) loads right behind the field; city-far first enters at world x 300.
+  // The city set (and the plaza's art) loads right behind the field; city-far first enters at world x 300.
   loadCity()
     .then((c) => {
       const c0 = performance.now();
       level.city = c;
-      real.warm(c);
+      level.plaza.warm(c);
       level.prepareNight();
       if (import.meta.env.DEV) performance.measure('world:city', { start: c0, end: performance.now() });
     })
     .catch((err) => console.error('[world] city assets failed to load', err));
+  // A dev-only virtual clock (?clock=virtual): time stands still until __world.clock.now moves, so the
+  // power-on, the zoom and the breakout can be captured at exact steps. Everything that keeps time — the
+  // loop, and the scroll lock a user's scroll starts — reads it.
+  const vclock = import.meta.env.DEV && new URLSearchParams(location.search).get('clock') === 'virtual' ? { now: performance.now() } : null;
+  const clockNow = () => (vclock ? vclock.now : performance.now());
   let expectedY = Number.NaN;
   /**
    * PRESS START's play through the enter segment at the reference's pace (segments.ts PLAY): it began
    * `from` ms into a play from the top, at t0 on the clock, and ends at y1. A scroll of the user's cancels it.
    */
   let playing: { from: number; y1: number; t0: number } | null = null;
+  /** The breakout's own plays, q from q0 to q1 in ms: the pull-back (→ or Space at the plaza), and the rest after the sixth hit. */
+  let breakPlay: { q0: number; q1: number; ms: number; t0: number } | null = null;
   let scrollOverrideUntil = 0;
+  /** The auto-hits: armed on reaching the cracks, they start after a second without input. */
   let autoArmed = false;
+  let lastHitAt = 0;
+  let wasHitZone = false;
+  /** A tap or click on the monitor's screen during the cracks (its DOM hit target). */
+  let pendingHit = false;
   const trigger = ScrollTrigger.create({
     trigger: section,
     start: 'top top',
@@ -294,15 +326,18 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     onUpdate: (self) => {
       // Our own scrollTo (keys, d-pad, a hit, the auto-break) echoes back here; anything else is the user, and the user wins.
       if (Math.abs(window.scrollY - expectedY) <= ECHO_PX) return;
-      scrollOverrideUntil = performance.now() + SCROLL_OVERRIDE_MS;
+      scrollOverrideUntil = clockNow() + SCROLL_OVERRIDE_MS;
       motion.cancel();
       autoArmed = false;
       playing = null;
+      breakPlay = null;
       timeline.setScrollTarget(tOf(self.progress));
     },
     onRefresh: (self) => {
-      ({ DE, DW, D } = scrollLengths(window.innerHeight));
+      ({ DE, DW, DB, D } = scrollLengths(window.innerHeight, wantBreakout));
       timeline.tMin = -DE / DW;
+      timeline.tMax = T_MAX + DB / DW;
+      setLandingVars();
       expectedY = Number.NaN;
       timeline.jumpTo(tOf(self.progress));
     },
@@ -321,12 +356,19 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   });
   io.observe(section);
 
+  let lastViewW = viewW();
   window.addEventListener(
     'resize',
     () => {
+      const w = viewW();
+      // A height-only resize on a touch screen (the keyboard opening on the Register form, the address
+      // bar) keeps the pin, its lengths and the landing's place: re-measuring them would move the page
+      // under the user's thumb. The canvas still fits the new height.
+      const touch = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+      const heightOnly = w === lastViewW && touch;
+      lastViewW = w;
       fit();
-      dissolve.warm(vp.bw, vp.bh, impactPoint(vp.bw, F));
-      ScrollTrigger.refresh();
+      if (!heightOnly) ScrollTrigger.refresh();
       hero3d?.frameChanged(true);
       layoutHero();
     },
@@ -395,6 +437,20 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let slotCentre = { x: 0, y: 0 };
   let lastOut = -1;
   let lastFade = -1;
+  /** Sam where the run ends, on the monitor's screen: his cell's centre (screen UV) and size (screen heights) — where the cracks start. */
+  let samOnScreen: { centre: [number, number]; size: number } | null = null;
+  /** The landing: how far the monitor glides up the page, and how much smaller it ends, to sit between the nav and the rising section. */
+  let glideTo = { up: 0, scale: 1 };
+  /** The monitor's screen as a tap target through the cracks (the 3D canvas itself takes no pointer events). */
+  const hitEl = d ? d.stage.querySelector<HTMLElement>('[data-hit]') : null;
+  let hitBox = '';
+  if (hitEl) {
+    hitEl.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      hitEl.setPointerCapture(e.pointerId);
+      pendingHit = true;
+    });
+  }
   const layoutHero = () => {
     if (!d || !hero3d) return;
     const b = slotBox(d);
@@ -412,6 +468,21 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     scanStart(d, startUV, hero3d.scanLines);
     const r = d.slot.getBoundingClientRect();
     slotCentre = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    // The breakout: Sam where the run ends — at the camera's left margin, on the ground — on the screen frame.
+    const left = sx + g.mx;
+    const top = F - SAM_CELL + FOOT_SINK + g.mt;
+    const h = hero3d;
+    const centre = h.screenUV(left + SAM_CELL / 2, top + SAM_CELL / 2);
+    samOnScreen = { centre, size: Math.abs(h.screenUV(left, top)[1] - h.screenUV(left, top + SAM_CELL)[1]) };
+    // The crack pattern starts from him: laid out (and uploaded) in idle time, never on a scroll frame.
+    const w = window as IdleWindow;
+    (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200)))(() => hero3d?.prepareBreakout(centre));
+    // The glide: between the nav and where the landing section's top ends (it rises by --rise), the
+    // monitor centred, no taller than 85 % of that room.
+    const navH = parseFloat(getComputedStyle(root).getPropertyValue('--nav-h')) || 64;
+    const sectionTop = d.gl.clientHeight - Math.round((1 - BREAKOUT.land[0]) * DB);
+    const room = Math.max(1, sectionTop - navH);
+    glideTo = { up: b.y + b.h / 2 - (navH + room / 2), scale: Math.min(1, (0.85 * room) / b.h) };
   };
   /** No 3D after all (no WebGL 2, an error, too slow): the powered-on poster, PRESS START on it. */
   const toStatic = (why: unknown) => {
@@ -421,10 +492,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     hero3d?.dispose();
     hero3d = null;
     staticHero(d);
+    // No 3D, no breakout: the run ends at the plaza and the pin releases into the Register section.
+    if (wantBreakout) {
+      wantBreakout = false;
+      setLandingVars();
+      ScrollTrigger.refresh();
+    }
   };
   if (d) {
-    // Dev only: ?hero=poster holds the poster (the swap check), ?hero=static is the no-3D opening.
-    const devHero = import.meta.env.DEV ? new URLSearchParams(location.search).get('hero') : null;
     if (devHero === 'static' || !('WebGL2RenderingContext' in window)) toStatic(null);
     else if (devHero !== 'poster')
       whenIdleAfterLoad(() => {
@@ -472,10 +547,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     b.addEventListener('blur', () => hero3d?.hover(false));
   }
 
-  /** The monitor while the opening shows: the screen frame, the first frame in place of the poster, the power-on, PRESS START. */
-  const drawHero = (f: WorldFrame, now: number, p: number) => {
+  /**
+   * The monitor while it shows — the opening, or the breakout (`b`): the screen frame, the first frame in
+   * place of the poster, the power-on, PRESS START (the opening only).
+   */
+  const drawHero = (f: WorldFrame, now: number, p: number, b: BreakoutState | null) => {
     if (heroMode !== '3d' || !hero3d || !d || document.hidden) return;
     hero3d.enter(p);
+    hero3d.breakout(b);
     if (screen.update(f, level, dust, now)) hero3d.frameChanged(false);
     if (shownAt < 0) {
       const t0 = performance.now();
@@ -488,16 +567,95 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     }
     if (hero3d.phase === 'off' && now >= shownAt + POWER_DELAY_MS) hero3d.powerOn(now);
     const phase = hero3d.render(now);
-    if (p < ENTER.copyOut[1]) placeStart(d, hero3d.quad(...startUV));
+    if (!b && p < ENTER.copyOut[1]) placeStart(d, hero3d.quad(...startUV));
     if (phase === 'on' && !startShown) {
       startShown = true;
       d.start.classList.add('is-ready');
     }
   };
 
-  // A dev-only virtual clock (?clock=virtual): time stands still until __world.clock.now moves, so
-  // the power-on can be captured at exact 20 ms steps.
-  const vclock = import.meta.env.DEV && new URLSearchParams(location.search).get('clock') === 'virtual' ? { now: performance.now() } : null;
+  /** The breakout for the monitor at q: the cracks, the shatter, Sam's billboard (his frame drawn into it), the landing's glide. */
+  let samBillboard = '';
+  const breakState = (q: number, now: number): BreakoutState => {
+    const shatter = q > BREAKOUT.shatter[0] ? clamp01((q - BREAKOUT.shatter[0]) / (BREAKOUT.shatter[1] - BREAKOUT.shatter[0])) : 0;
+    const leap = clamp01((q - BREAKOUT.leap[0]) / (BREAKOUT.leap[1] - BREAKOUT.leap[0]));
+    const g = smooth(q, BREAKOUT.land);
+    let samB: BreakoutState['sam'] = null;
+    if (shatter > 0 && samOnScreen && hero3d) {
+      // idling while the glass flies, then the jump as he leaps; the page takes him at twice the game's scale
+      const idle = assets.sam.idle;
+      const f = Math.floor(now / 125) % idle.frames;
+      const key = leap > 0 ? 'jump' : `idle${f}`;
+      if (key !== samBillboard) {
+        samBillboard = key;
+        drawCell(hero3d.samCanvas, leap > 0 ? assets.sam.jump : idle, leap > 0 ? 0 : f);
+        hero3d.samDrawn();
+      }
+      samB = { centre: samOnScreen.centre, size: samOnScreen.size, leap, scale: 2 * vp.k, hidden: q >= BREAKOUT.leap[1] };
+    }
+    return { stage: crackStage(q), shatter, sam: samB, glide: { up: g * glideTo.up, scale: 1 + g * (glideTo.scale - 1) } };
+  };
+
+  // ── Sam on the page (src/game/landing.ts): perched on the Register window; with the breakout, away in
+  //    the game until he leaps out, then in flight from the monitor — shrinking smoothly from twice the
+  //    game's scale (where the page takes him from the billboard, exactly) to its own — landing on the
+  //    window's title bar as the pin releases, at whole device px per art px again. In flight his box stays
+  //    on the perch and a transform carries him, so the page never lays anything out again: no layout shift.
+  const perch = queryPerch();
+  let perchBox = '';
+  let perchFrame = '';
+  if (perch) idleOnPerch(perch, assets.sam.idle, () => perch.root.classList.contains('is-landed'));
+  const updatePerch = (q: number) => {
+    if (!perch) return;
+    // past the pin he is on the window, whatever the eased picture still shows: a jump down the page
+    // (a link, the Register button) never sees him fly in over the form
+    const pastPin = window.scrollY >= trigger.start + D - 1;
+    const landed = !wantBreakout || pastPin || q >= 1 - 1e-4;
+    const flying = wantBreakout && !landed && q >= BREAKOUT.leap[1];
+    if (perch.root.classList.contains('is-landed') !== landed) {
+      perch.root.classList.toggle('is-landed', landed);
+      perchFrame = '';
+      if (landed) perch.root.dispatchEvent(new Event('landed'));
+    }
+    const c = perch.canvas;
+    if (c.classList.contains('is-flying') !== flying) c.classList.toggle('is-flying', flying);
+    if (!flying) {
+      if (perchBox) {
+        perchBox = '';
+        c.style.transform = '';
+      }
+      return;
+    }
+    const sprite = hero3d?.samSprite();
+    if (!sprite || !d) return;
+    if (perchFrame !== 'jump') {
+      perchFrame = 'jump';
+      drawCell(c, assets.sam.jump, 0);
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const e = smooth(q, BREAKOUT.land);
+    const big = 2 * vp.k;
+    const scale = big + (vp.k - big) * e;
+    const size = (SAM_CELL * scale) / dpr;
+    // from where the billboard left him (its centre at the end of the leap) …
+    const gl = d.gl.getBoundingClientRect();
+    const hx = gl.left + sprite.x;
+    const hy = gl.top + sprite.y;
+    // … over an arc to his cell on the title bar, where the CSS places him (and his box always is)
+    const pr = perch.root.getBoundingClientRect();
+    const land = (SAM_CELL * vp.k) / dpr;
+    const x0 = pr.left;
+    const y0 = pr.bottom + (FOOT_SINK * vp.k) / dpr - land;
+    const arc = Math.min(window.innerHeight * 0.18, 160) * 4 * e * (1 - e);
+    const x = Math.round((hx + (x0 + land / 2 - hx) * e - size / 2) * dpr) / dpr;
+    const y = Math.round((hy + (y0 + land / 2 - hy) * e - arc - size / 2) * dpr) / dpr;
+    const key = `${x},${y},${size}`;
+    if (key !== perchBox) {
+      perchBox = key;
+      c.style.transform = `translate(${x - x0}px, ${y - y0}px) scale(${scale / vp.k})`;
+    }
+  };
+
 
   // ── Loop ────────────────────────────────────────────────────────────────
   let last = performance.now();
@@ -530,14 +688,61 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (pp >= 1) playing = null;
     }
 
+    // ── The breakout, after the run (src/game/segments.ts BREAKOUT): q from the page, its plays, the hits ──
+    const qOf = (tt: number) => (DB > 0 ? clamp01(((tt - T_MAX) * DW) / DB) : 0);
+    const yOfQ = (qq: number) => trigger.start + DE + DW + qq * DB;
+    const xOfQ = (qq: number) => (T_MAX + (qq * DB) / DW) * W;
+    if (breakPlay) {
+      if (breakPlay.t0 < 0) breakPlay.t0 = now;
+      const k = Math.min(1, (now - breakPlay.t0) / Math.max(1, breakPlay.ms));
+      const qq = breakPlay.q0 + (breakPlay.q1 - breakPlay.q0) * k;
+      window.scrollTo({ top: yOfQ(qq), behavior: 'instant' });
+      expectedY = window.scrollY;
+      timeline.drive(xOfQ(qq), 0, 'auto');
+      if (k >= 1) breakPlay = null;
+    }
+    const qT = qOf(timeline.tTarget);
+    const inBreak = qT > 0 || breakPlay !== null;
+    /** The plaza's end: the run is over, and → or Space pulls the camera back out of the game. */
+    const atEnd = DB > 0 && timeline.tTarget >= T_MAX - 1e-6;
+    /** The glass is there to hit: the monitor at rest, fewer than six cracks, nothing playing. */
+    const hitZone = DB > 0 && !breakPlay && qT >= BREAKOUT.cracks[0] - 1e-3 && crackStage(qT) < CRACK_STAGES;
+    /** Out to the monitor, or back into the game: the enter segment's pace, backwards. */
+    const pullTo = (to: number) => {
+      if (Math.abs(to - qT) < 1e-4) return;
+      breakPlay = { q0: qT, q1: to, ms: (playMs(1) * Math.abs(to - qT)) / BREAKOUT.pullBack[1], t0: -1 };
+      motion.cancel();
+    };
+    /** One hit on the glass: one crack further, Sam hopping on the screen; the sixth breaks it and the rest plays itself. */
+    const hit = (auto: boolean) => {
+      const next = hitTarget(qT);
+      sam.jumpPress(now);
+      sam.jumpRelease();
+      lastHitAt = now;
+      if (!auto) lastInputAt = now;
+      if (next === null) {
+        breakPlay = { q0: qT, q1: 1, ms: (BREAK_PLAY_MS * (1 - qT)) / (1 - BREAKOUT.shatter[0]), t0: -1 };
+        autoArmed = false;
+        return;
+      }
+      window.scrollTo({ top: yOfQ(next), behavior: 'instant' });
+      expectedY = window.scrollY;
+      timeline.driveTarget(xOfQ(next), auto ? 'auto' : 'mash');
+    };
+
     // While the monitor shows, the keys never drive the world: Space or → at it is PRESS START.
     // (A → press is read every frame, so one from the run can never start the game later.)
     const pT = clamp01(1 + (timeline.tTarget * DW) / DE);
     const heroUp = !!d && pT < ENTER.handover[1];
     const rightPress = input.consumeRightPress();
     if (heroUp && input.active && (rightPress || input.dir > 0 || input.consumeJumpPress()) && now >= scrollOverrideUntil && !playing) start();
+    // At the plaza's end and through the pull-back: → pulls the camera back to the monitor, ← dives back into the game.
+    if (input.active && DB > 0 && !breakPlay && !heroUp && now >= scrollOverrideUntil && qT < BREAKOUT.cracks[0]) {
+      if ((atEnd || qT > 0) && (rightPress || (qT > 0 && input.dir > 0))) pullTo(BREAKOUT.cracks[0]);
+      else if (qT > 0 && input.dir < 0) pullTo(0);
+    }
     // Keys / d-pad: Sam runs with real velocity and the page follows him.
-    const held = input.active && now >= scrollOverrideUntil && !heroUp && !playing ? input.dir : 0;
+    const held = input.active && now >= scrollOverrideUntil && !heroUp && !playing && !inBreak && !breakPlay ? input.dir : 0;
     if (held !== 0) lastInputAt = now;
     // While the visual is still easing after a scroll, keys move the target (the page) from where
     // the user left it and the visual catches up; otherwise they move Sam directly.
@@ -574,52 +779,49 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (catchingUp) timeline.driveTarget(X, source);
       else timeline.drive(X, blocked ? 0 : motion.vx, source);
       if (motion.puff) dust.spawn(X + SAM_CELL / 2, Math.sign(motion.vx), now);
-      if (overflow !== 0) {
+      if (overflow !== 0 && DB > 0) {
+        // pushing on past the plaza's end: the camera pulls back out of the game
+        scrollToX(X_MAX);
+        pullTo(BREAKOUT.cracks[0]);
+      } else if (overflow !== 0) {
         window.scrollBy({ top: overflow * pxPerWorld, behavior: 'instant' });
         expectedY = window.scrollY;
       } else scrollToX(X);
     }
 
-    // Space / tap / A: a jump on the ground; from the flight on, a hit on the glass:
-    // one crack per hit, the page following, and the hit that completes the cracks starts the dissolve.
-    const hitting = tNow >= BREAK.flight[0] && tNow < BREAK.dissolve[1] && !heroUp;
+    // Space / tap / A: a jump, all the way to the plaza; there, out to the monitor; at the monitor, a
+    // hit on the glass (as is a tap or click on its screen).
     if (input.active) {
-      if (input.consumeJumpPress()) {
+      if (input.consumeJumpPress() || pendingHit) {
         lastInputAt = now;
-        if (hitting) {
-          const next = mashTarget(timeline.tTarget);
-          timeline.driveTarget(next * W, 'mash');
-          scrollToX(next * W);
-        } else if (tNow < BREAK.flight[0] && !heroUp) sam.jumpPress(now);
+        if (hitZone) hit(false);
+        else if (DB > 0 && !breakPlay && (atEnd || (qT > 0 && qT < BREAKOUT.cracks[0]))) pullTo(BREAKOUT.cracks[0]);
+        else if (!heroUp && !inBreak) sam.jumpPress(now);
       }
-      if (!input.jumpHeld) sam.jumpRelease();
+      if (!input.jumpHeld && !inBreak) sam.jumpRelease();
     }
-
-    // The auto-break: armed on entering the cracks from below, its idle second counted
-    // from then or from the last input; the page then completes the breakout at run speed. A native
-    // scroll disarms it (onUpdate).
-    const cracking = tNow >= BREAK.cracks[0] && tNow < BREAK.dissolve[1];
-    if (cracking && prevT < BREAK.cracks[0]) {
+    pendingHit = false;
+    // The auto-hits: armed on reaching the glass; after a second with no input the page
+    // hits it by itself, a crack every AUTO_HIT_MS. A scroll of the user's disarms them (onUpdate).
+    if (hitZone && !wasHitZone) {
       autoArmed = true;
       lastInputAt = now;
     }
-    if (!cracking) autoArmed = false;
-    if (autoArmed && held === 0 && !input.jumpHeld && now - lastInputAt >= AUTO_IDLE_MS && now >= scrollOverrideUntil && timeline.tTarget < BREAK.dissolve[1]) {
-      const next = Math.min(BREAK.dissolve[1], timeline.tTarget + (AUTO_SPEED * dt) / W);
-      timeline.driveTarget(next * W, 'auto');
-      scrollToX(next * W);
-    }
+    wasHitZone = hitZone;
+    if (!hitZone) autoArmed = false;
+    if (autoArmed && hitZone && input.active && now >= scrollOverrideUntil && now - lastInputAt >= AUTO_IDLE_MS && now - lastHitAt >= AUTO_HIT_MS) hit(true);
     prevT = tNow;
 
     timeline.step(dt);
-    // The world's own t (0 throughout the enter segment) and the enter segment's progress p.
-    const t = Math.max(0, timeline.t);
+    // The world's own t (0 through the enter segment, 1 through the breakout), the enter segment's
+    // progress p and the breakout's q; through the breakout the monitor shows the enter segment backwards.
+    const t = Math.min(T_MAX, Math.max(0, timeline.t));
     const p = clamp01(1 + (timeline.t * DW) / DE);
-    // The flight: on the propeller from 0.84, up and across in the game frame, down again on the plaza.
-    const flight = flightAt(t, vp.bw, sx);
-    sam.flight = flight ? flight.lift : null;
+    const q = qOf(timeline.t);
+    const inBreakout = q > 0;
+    const heroP = inBreakout ? 1 - clamp01(q / BREAKOUT.pullBack[1]) : p;
     // While catching up the visual still follows the ease, so Sam faces the way he actually moves.
-    sam.update(dt, timeline.t > 0 ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
+    sam.update(dt, timeline.t > 0 && !inBreak && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
 
     const X = t * W;
     const camLeft = X - sx;
@@ -627,13 +829,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     prevSamX = X;
 
     if (input.active) {
-      const shown = dissolveLevel(t);
       const view = { t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, range: viewport, span: screen.rect, now, sky: skyAt(t), sam, coins, dust };
       // The enter segment, a pure function of p: the copy and PRESS START go first, then the whole
       // opening hands over to the canvas world under it — only the top layer fades, over an opaque world.
-      const fade = d ? 1 - smooth(p, ENTER.handover) : 0;
+      const fade = d ? 1 - smooth(heroP, ENTER.handover) : 0;
       if (d) {
-        const out = Math.round(smooth(p, ENTER.copyOut) * 100) / 100;
+        // the opening's copy and PRESS START never come back: the breakout's monitor stands alone
+        const out = inBreakout ? 1 : Math.round(smooth(p, ENTER.copyOut) * 100) / 100;
         if (out !== lastOut) {
           lastOut = out;
           d.stage.style.setProperty('--out', String(out));
@@ -645,33 +847,44 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           d.stage.style.opacity = f2 < 1 ? String(f2) : '';
           d.stage.style.visibility = f2 <= 0 ? 'hidden' : '';
         }
-        section.classList.toggle('world--opening', p < ENTER.overlays);
-        if (fade > 0) drawHero({ ...view, samX: X }, now, p);
+        section.classList.toggle('world--opening', heroP < ENTER.overlays);
+        if (fade > 0) {
+          const b = inBreakout ? breakState(q, now) : null;
+          drawHero({ ...view, samX: X, hideSam: !!b?.sam }, now, heroP, b);
+          // the monitor's screen takes taps through the cracks; BREAK OUT · n/6 labels it
+          const prompting = !!b && q >= BREAKOUT.cracks[0] - 0.005 && b.stage < CRACK_STAGES && !breakPlay;
+          o.prompt?.classList.toggle('is-visible', prompting);
+          const count = `BREAK OUT · ${b ? b.stage : 0}/${CRACK_STAGES}`;
+          if (o.promptTitle && o.promptTitle.textContent !== count) o.promptTitle.textContent = count;
+          if (hitEl) {
+            hitEl.classList.toggle('is-active', prompting);
+            if (prompting && hero3d) {
+              const qd = hero3d.quad(0, 0, 1, 1);
+              const xs = qd.map((c) => c[0]);
+              const ys = qd.map((c) => c[1]);
+              const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map(Math.round);
+              const key = box.join(',');
+              if (key !== hitBox) {
+                hitBox = key;
+                Object.assign(hitEl.style, { left: `${box[0]}px`, top: `${box[1]}px`, width: `${box[2]! - box[0]!}px`, height: `${box[3]! - box[1]!}px` });
+              }
+            }
+          }
+        } else o.prompt?.classList.remove('is-visible');
       }
-      if (!d || p >= ENTER.drawWorld) {
-        // Through the enter segment the far sky snaps to whole art px, as on the monitor's screen, so the
-        // two agree at the handover; it glides at device px once the run moves (where the switch can't be seen).
-        const glide = !d || t > 0;
-        if (shown < 64) {
-          // The game frame, Sam drifting to the right edge once he is on the propeller, the cracks on its glass.
-          level.draw(bctx, { ...view, samX: flight && t < BREAK.dissolve[1] ? camLeft + flight.screenX : X });
-          const stage = crackStage(t);
-          if (stage > 0 && level.city) drawCracks(bctx, level.city.cracks, stage, vp.bw, F);
-        }
-        if (shown > 0) {
-          // The real frame, Sam back at the left margin: drawn straight once the dissolve is through.
-          real.draw(shown >= 64 ? bctx : rctx, { ...view, samX: X }, shown < 64);
-          if (shown < 64) dissolve.apply(bctx, realBuf, rctx, shown, vp.bw, vp.bh, impactPoint(vp.bw, F));
-        }
-        // The far sky at device resolution (clouds glide), then the buffer over it.
-        if (shown < 64) level.drawFar(sctx, { ...view, samX: X }, vp.k, glide);
-        else real.drawFar(sctx, { ...view, samX: X }, vp.k, glide);
+      if (!d || heroP >= ENTER.drawWorld) {
+        // Through the enter segment (and the breakout) the far sky snaps to whole art px, as on the monitor's
+        // screen, so the two agree at the handover; it glides at device px while the run moves (where the switch can't be seen).
+        const glide = !d || (t > 0 && !inBreakout);
+        // The game frame, then the far sky at device resolution (clouds glide) and the buffer over it.
+        level.draw(bctx, { ...view, samX: X });
+        level.drawFar(sctx, { ...view, samX: X }, vp.k, glide);
         sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
       }
 
       // The game's overlays come in at the end of the enter segment.
-      const inGame = !d || p >= ENTER.overlays;
-      o.hud?.classList.toggle('is-visible', inGame && t < BREAK.hudOut);
+      const inGame = (!d || p >= ENTER.overlays) && (!inBreakout || heroP >= ENTER.overlays);
+      o.hud?.classList.toggle('is-visible', inGame);
       // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.
       for (const el of o.sessions) {
         const level = el.dataset.session;
@@ -697,7 +910,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         if (o.hudLevel.textContent !== lvl) o.hudLevel.textContent = lvl;
       }
       // Agent Sam: the line for this stretch types out once it starts; screen readers get it whole.
-      const line = samLines.find((l) => t >= l.from && t < l.to) ?? null;
+      const line = inGame ? (samLines.find((l) => t >= l.from && t < l.to) ?? null) : null;
       if (line !== samLine) {
         samLine = line;
         samSince = now;
@@ -713,16 +926,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         }
       }
 
-      // The breakout's DOM: the MASH prompt, a function of t.
-      o.prompt?.classList.toggle('is-visible', promptOn(t));
-      const count = `BREAK OUT · ${crackStage(t)}/${CRACK_STAGES}`;
-      if (o.promptTitle && o.promptTitle.textContent !== count) o.promptTitle.textContent = count;
       const clock = clockFor(t);
       if (clock !== lastClock && o.hudClock) {
         o.hudClock.textContent = clock;
         lastClock = clock;
       }
     }
+    // Sam on the page, wherever the page is (below the pin the world no longer draws).
+    updatePerch(q);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
@@ -743,13 +954,16 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         return vp;
       },
       get lengths() {
-        return { DE, DW, D };
+        return { DE, DW, DB, D };
       },
       get p() {
         return clamp01(1 + (timeline.t * DW) / DE);
       },
+      get q() {
+        return DB > 0 ? clamp01(((timeline.t - T_MAX) * DW) / DB) : 0;
+      },
       get breakout() {
-        return { stage: crackStage(timeline.t), level: dissolveLevel(timeline.t), armed: autoArmed, flight: flightAt(timeline.t, vp.bw, sx) };
+        return { want: wantBreakout, play: breakPlay, armed: autoArmed, stage: crackStage(DB > 0 ? clamp01(((timeline.t - T_MAX) * DW) / DB) : 0), perch: perch?.root.className ?? null, samOnScreen, glideTo };
       },
       get hero() {
         return { mode: heroMode, phase: hero3d?.phase ?? null, shownAt, startShown, startUV, screen: screen.geom, version: screen.version, hero3d };
@@ -761,7 +975,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         return { overrideUntil: scrollOverrideUntil, expectedY, lastInputAt, active: input.active, dir: input.dir };
       },
       level,
-      real,
     };
   }
 }

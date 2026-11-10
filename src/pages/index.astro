@@ -12,7 +12,24 @@ import { sprites } from '../data/sprites.manifest';
 <Base>
   <World />
 
-  <!-- Arrival: the world's pin releases into this section — Sam has reached Booth 630, so the booth and the registration come first. -->
+  <!--
+    The landing: Sam breaks out of the monitor and lands here, on the Register
+    window's title bar. With the breakout this section rises under the pinned monitor through the
+    breakout's last stretch (--rise, set by the world); without it, it simply follows the world.
+  -->
+  <section class="section container landing" aria-labelledby="landing-title">
+    <h2 class="sr-only" id="landing-title">Register for 16-Bit Con</h2>
+    <div class="landing__window">
+      <div class="landing__perch" data-landing>
+        <canvas class="landing__sam pixel" width="60" height="60" aria-hidden="true" data-landing-sam></canvas>
+        <Window title="Agent Sam" class="landing__bubble" data-landing-bubble>
+          <p class="mono landing__line">Made it. Find me at Booth 630.</p>
+        </Window>
+      </div>
+      <RegisterForm />
+    </div>
+  </section>
+
   <section class="section container" id="booth" aria-labelledby="booth-title">
     <SectionMarker sprite="handMegaphone" />
     <h2 id="booth-title">Find us at Booth 630</h2>
@@ -24,7 +41,6 @@ import { sprites } from '../data/sprites.manifest';
         <p class="eyebrow">Javits Center · Hall 3B · Booth 630</p>
         <p class="mono cta__url"><a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a></p>
       </Window>
-      <RegisterForm />
       <Window title="Player 1 bonus" id="bonus" class="bonus" hidden>
         <p class="bonus__gg">12/12 coins. GG.</p>
         <p class="bonus__copy">Say <span class="mono">16BIT-GG</span> at Booth 630 for the Player 1 bonus.</p>
@@ -75,6 +91,62 @@ import { sprites } from '../data/sprites.manifest';
     padding: 0;
     list-style: none;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  }
+
+  /* ── The landing: the Register window with Sam on its title bar (--sam-px: CSS px per art px, whole
+        device px; set by the world, else the page's own k at 2×) and Agent Sam beside him. ── */
+  .landing {
+    position: relative;
+    z-index: 2;
+    margin-top: calc(-1 * var(--rise, 0px));
+    padding-top: calc(var(--space-12) + 64 * var(--sam-px, 1.5px));
+  }
+
+  .landing__window {
+    position: relative;
+    width: min(100%, 36rem);
+  }
+
+  .landing__perch {
+    position: absolute;
+    bottom: 100%;
+    left: var(--space-6);
+    z-index: 1;
+    width: calc(60 * var(--sam-px, 1.5px));
+    height: 0;
+  }
+
+  /* his soles on the bar's top edge: the cell's last 5 rows are below his feet (FOOT_SINK) */
+  .landing__sam {
+    position: absolute;
+    bottom: calc(-5 * var(--sam-px, 1.5px));
+    left: 0;
+    width: calc(60 * var(--sam-px, 1.5px));
+    height: calc(60 * var(--sam-px, 1.5px));
+    image-rendering: pixelated;
+  }
+
+  .landing__bubble {
+    position: absolute;
+    bottom: calc(24 * var(--sam-px, 1.5px));
+    left: calc(60 * var(--sam-px, 1.5px) + var(--space-2));
+    width: min(15rem, calc(100vw - 2 * var(--gutter) - 60 * var(--sam-px, 1.5px) - var(--space-8)));
+    box-shadow: var(--shadow-hard-sm);
+  }
+
+  .landing__line {
+    font-size: var(--text-sm);
+  }
+
+  /* With the breakout, Sam is in the game until he lands: the perch waits for him. In flight his box
+     stays here and the world carries him by a transform from it (translate and scale). */
+  :global(:root.has-breakout) .landing__perch:not(.is-landed) :is(.landing__sam, .landing__bubble) {
+    visibility: hidden;
+  }
+
+  :global(:root.has-breakout) .landing__perch .landing__sam.is-flying {
+    transform-origin: 0 0;
+    visibility: visible;
   }
 
   .cta {

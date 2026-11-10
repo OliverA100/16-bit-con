@@ -37,6 +37,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   <div class="hero__stage" data-stage>
     <canvas class="hero__gl" aria-hidden="true" data-gl></canvas>
+    <div class="hero__hit" aria-hidden="true" data-hit></div>
     <div class="hero__copy">
       <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
       <Wordmark as="h1" size="hero" id="hero-title" />
@@ -153,27 +154,36 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 <script>
   import { bootWorld, shouldRunWorld } from '../game/index';
   import { queryHero, staticHero } from '../game/hero-dom';
+  import { perchStill, queryPerch } from '../game/landing';
 
   const section = document.querySelector<HTMLElement>('[data-world]');
   const toRegister = () => document.getElementById('register')?.scrollIntoView({ block: 'start' });
+  // The static page: Sam is already on the Register window.
+  const perch = () => {
+    const p = queryPerch();
+    if (p) void perchStill(p).catch(() => {});
+  };
 
   if (section && shouldRunWorld()) {
     bootWorld(section).catch((err) => {
       console.error('[world] boot failed, the static opening stays', err);
+      document.documentElement.classList.remove('has-breakout');
       const d = queryHero(section);
       if (d && !section.classList.contains('world--live')) {
         staticHero(d);
         d.startButton.addEventListener('click', toRegister);
       }
+      perch();
     });
   } else if (section) {
     // Reduced motion, save-data or a small device: the static page, the monitor powered on, and
-    // PRESS START goes straight to the Register section.
+    // PRESS START goes straight to the Register section, where Sam already stands.
     const d = queryHero(section);
     if (d) {
       staticHero(d);
       d.startButton.addEventListener('click', toRegister);
     }
+    perch();
   }
 </script>
 
@@ -268,6 +278,24 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .hero__gl.is-on {
     opacity: 1;
+  }
+
+  /* The monitor's screen as a tap target through the breakout's cracks (the 3D takes no pointer events):
+     a hit, never the start of a scroll, a zoom or a long-press menu. */
+  .hero__hit {
+    position: absolute;
+    z-index: 3;
+    display: none;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .hero__hit.is-active {
+    display: block;
   }
 
   /* At full resolution the 3D's buffer is the canvas world's, pixel for pixel: scaled like it (with a

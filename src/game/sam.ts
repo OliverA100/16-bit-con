@@ -12,21 +12,14 @@ export interface SamSheets {
   run: Strip;
   jump: Strip;
   idle: Strip;
-  propeller: Strip;
 }
 
 export async function loadSamSheets(): Promise<SamSheets> {
-  const [run, jump, idle, propeller] = await Promise.all([
-    loadImage(sprites.samRun.file),
-    loadImage(sprites.samJump.file),
-    loadImage(sprites.samIdle.file),
-    loadImage(sprites.samPropeller.file),
-  ]);
+  const [run, jump, idle] = await Promise.all([loadImage(sprites.samRun.file), loadImage(sprites.samJump.file), loadImage(sprites.samIdle.file)]);
   return {
     run: makeStrip(remap(run, SAM_BRAND_MAP)),
     jump: makeStrip(remap(jump, SAM_BRAND_MAP)),
     idle: makeStrip(remap(idle, SAM_BRAND_MAP)),
-    propeller: makeStrip(propeller),
   };
 }
 
@@ -40,8 +33,6 @@ export const SAM_HITBOX = { left: 14, right: 46, top: 15 };
  * than on its far edge. The same sink in both grounds, so the feet never change height.
  */
 export const FOOT_SINK = 5;
-/** The propeller sheet carries Sam 3 rows higher in its cell than the run sheet; it is drawn lower by this much so the switch does not hop. */
-const PROPELLER_DROP = 3;
 
 /** World px of travel per run frame: one 4-frame cycle every 48 px, ~13 fps at full speed. */
 const STRIDE = 12;
@@ -57,16 +48,14 @@ const JUMP_HOLD_MAX_MS = 450;
 /** A tap still rises this long before the cut applies, so the smallest hop clears ~16 px. */
 const JUMP_MIN_MS = 80;
 
-export type SamMode = 'idle' | 'run' | 'skid' | 'jump' | 'fly';
+export type SamMode = 'idle' | 'run' | 'skid' | 'jump';
 
 export class Sam {
   facing: 1 | -1 = 1;
   mode: SamMode = 'idle';
   frame = 0;
-  /** Whole pixels above the ground line while jumping or flying. */
+  /** Whole pixels above the ground line while jumping. */
   lift = 0;
-  /** Set each frame by the breakout: whole px above the ground while on the propeller, null on the ground. */
-  flight: number | null = null;
   private y = 0;
   private vy = 0;
   private inAir = false;
@@ -79,11 +68,11 @@ export class Sam {
   constructor(private readonly sheets: SamSheets) {}
 
   get airborne(): boolean {
-    return this.inAir || this.flight !== null;
+    return this.inAir;
   }
 
   jumpPress(now: number): void {
-    if (this.inAir || this.flight !== null) return;
+    if (this.inAir) return;
     this.inAir = true;
     this.holding = true;
     this.released = false;
@@ -107,18 +96,7 @@ export class Sam {
     if (held !== 0) this.facing = held > 0 ? 1 : -1;
     else if (Math.abs(speed) > 4) this.facing = speed > 0 ? 1 : -1;
 
-    if (this.flight !== null) {
-      // On the propeller: no jump, the blades spin on the wall clock, a 1 px hover bob off the ground.
-      this.inAir = false;
-      this.holding = false;
-      this.y = this.vy = 0;
-      this.lift = this.flight + (this.flight > 0 ? Math.round(Math.sin(now / 400)) : 0);
-      this.mode = 'fly';
-      this.frame = Math.floor(now / 83) % this.sheets.propeller.frames;
-      return;
-    }
-
-    if (!this.inAir) this.lift = 0; // back on the ground, from a jump or from the propeller
+    if (!this.inAir) this.lift = 0; // back on the ground
     if (this.inAir) {
       const flight = now - this.jumpAt;
       if (this.released && flight >= JUMP_MIN_MS && this.vy > JUMP_CUT) this.vy = JUMP_CUT;
@@ -155,10 +133,6 @@ export class Sam {
 
   /** Draw with the cell's left edge at sx and feet on the ground line F. */
   draw(ctx: CanvasRenderingContext2D, sx: number, F: number): void {
-    if (this.mode === 'fly') {
-      this.sheets.propeller.draw(ctx, this.frame, sx, F - SAM_CELL - this.lift + FOOT_SINK + PROPELLER_DROP, this.facing < 0);
-      return;
-    }
     const sheet = this.mode === 'jump' ? this.sheets.jump : this.mode === 'idle' ? this.sheets.idle : this.sheets.run;
     sheet.draw(ctx, this.frame, sx, F - SAM_CELL - this.lift + FOOT_SINK, this.facing < 0);
   }

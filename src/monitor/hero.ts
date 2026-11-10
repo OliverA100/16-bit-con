@@ -19,6 +19,7 @@
  * pixels exactly and the page can hand over to the canvas world without a jump. No brightness flash.
  */
 import { CanvasTexture, Color, Quaternion, Vector3, type Texture } from 'three';
+import { createBreakout } from './breakout';
 import { readToken } from '../game/palette';
 import type { Quad } from '../game/quad';
 import { DIVE, ENTER, smooth } from '../game/segments';
@@ -57,6 +58,22 @@ export interface HeroLayout {
   frame: FrameGeom;
 }
 
+/** The breakout, frame by frame (src/game/segments.ts BREAKOUT). */
+export interface BreakoutState {
+  /** Crack stage on the glass, 0–6. */
+  stage: number;
+  /** The glass's flight once it breaks, 0–1 (0: whole). */
+  shatter: number;
+  /**
+   * Sam as a billboard: his cell's centre in screen UV (v up), its size in screen heights, how far he has
+   * leapt (0–1), and the scale (device px per art px) the leap brings him to — where the page takes him
+   * over, so from then he is hidden here (his place is still worked out, for samSprite).
+   */
+  sam: { centre: [number, number]; size: number; leap: number; scale: number; hidden: boolean } | null;
+  /** The landing: how far the monitor has glided up the page (CSS px) and how much smaller it has become (1: as at rest). */
+  glide: { up: number; scale: number };
+}
+
 export interface Hero {
   monitor: Monitor;
   layout(l: HeroLayout): void;
@@ -75,6 +92,19 @@ export interface Hero {
   readonly fillP: number;
   /** The enter segment's progress: 0 at rest, 1 in the game (the camera lands at ENTER.camera[1]). */
   enter(p: number): void;
+  /**
+   * The breakout (src/monitor/breakout.ts), applied at the next render; null outside it. Lay its crack
+   * pattern out first (prepareBreakout), in idle time: it rasterises the cracks and uploads them.
+   */
+  breakout(b: BreakoutState | null): void;
+  prepareBreakout(impact: [number, number]): void;
+  /** Sam's 60 × 60 canvas for the billboard: draw his frame into it, then call samDrawn(). */
+  readonly samCanvas: HTMLCanvasElement;
+  samDrawn(): void;
+  /** Where Sam's billboard is on the page (its centre, CSS px of the canvas) and its scale (device px per art px), while it shows. */
+  samSprite(): { x: number; y: number; scale: number } | null;
+  /** A point of the game's screen frame (its canvas px, y down) as screen UV (v up). */
+  screenUV(fx: number, fy: number): [number, number];
   /** Advance to `now` (ms, the page's clock) and draw. */
   render(now: number): PowerPhase;
   /** CSS px corners (top left, top right, bottom right, bottom left) of a rectangle on the screen; u, v across the opening, 0–1. */
@@ -127,9 +157,21 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   const h0 = Math.max(1, canvas.clientHeight);
   m.setBuffer(w0, h0, Math.round(w0 * Math.min(2, devicePixelRatio || 1)), Math.round(h0 * Math.min(2, devicePixelRatio || 1)));
   m.applyPose(m.restPose({ cx: w0 / 2, cy: h0 / 2, w: 300 }));
+  // The breakout's meshes (hidden), then the monitor's programs; then, a task later, the breakout's own —
+  // laid out once (any impact point) and shown for their compile, so every program it needs exists before
+  // the first scroll and no one task builds them all.
+  const bo = createBreakout(parts, crt);
   const compiling = renderer.compileAsync(m.scene, m.camera);
   mark('compile-start', t0);
   await compiling;
+  await pause();
+  t0 = performance.now();
+  bo.layout([0.3, 0.15]);
+  bo.showAll(true);
+  const compilingBreakout = renderer.compileAsync(m.scene, m.camera);
+  mark('compile-breakout', t0);
+  await compilingBreakout;
+  bo.showAll(false);
   await pause();
   t0 = performance.now();
   const shadowMap = (parts.shadow.material as { map?: Texture | null }).map ?? null;
@@ -166,6 +208,9 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   const probe: Pose = { target: new Vector3(), dist: 1, yaw: 0, pitch: 0, fov: 30, ox: 0, oy: 0 };
 
   const p0 = new Vector3();
+  const p1 = new Vector3();
+  const side = new Vector3();
+  let brk: BreakoutState | null = null;
 
   /** The camera at enter progress q: rest → native along the reference's dive, the distance in log space, the turn done before the cut. */
   const poseAt = (q: number, out: Pose): Pose => {
@@ -291,7 +336,13 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       // ── The camera: rest → native ──
       if (rest && native) {
         if (p >= ENTER.fullRes !== fullRes) setRes(p >= ENTER.fullRes);
-        m.applyPose(poseAt(p, pose));
+        const at = poseAt(p, pose);
+        // the breakout's landing: the monitor glides up the page (the view moves down over it) and draws back a little
+        if (brk) {
+          at.oy += brk.glide.up;
+          at.dist /= brk.glide.scale;
+        }
+        m.applyPose(at);
       }
 
       // ── Power: the line grows from the centre, brightens, then the picture opens from it ──
@@ -361,8 +412,42 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       glass.specularIntensity = gx;
       parts.glass.visible = gx > 0.001;
 
+      // ── The breakout: the cracks, the shatter with static behind it, Sam's billboard ──
+      bo.set(brk ? brk.stage : 0, brk ? brk.shatter : 0, m.camera);
+      const sb = brk?.sam ?? null;
+      bo.sam(sb ? sb.centre : null, sb ? sb.size : 0, sb ? sb.leap : 0, m.camera, sb ? sb.scale : 1, sb ? sb.hidden : true, (v) => m.toCss(v), window.devicePixelRatio || 1);
+
       m.render();
       return phase;
+    },
+    breakout(b) {
+      brk = b;
+    },
+    prepareBreakout(impact) {
+      bo.layout(impact);
+      // uploaded here, in this idle task, so no scroll frame ever does it
+      for (const t of bo.textures()) renderer.initTexture(t);
+    },
+    get samCanvas() {
+      return bo.samCanvas;
+    },
+    samDrawn() {
+      bo.samDrawn();
+    },
+    screenUV(fx, fy) {
+      const f = u.uFrame.value;
+      const uf = fx / frame.width;
+      const vf = 1 - fy / frame.height;
+      return [(uf - f.x) / (f.z - f.x), (vf - f.y) / (f.w - f.y)];
+    },
+    samSprite() {
+      const w = bo.samWorld;
+      if (!w) return null;
+      side.setFromMatrixColumn(m.camera.matrixWorld, 0).normalize();
+      const a = m.toCss(p0.copy(w.centre).addScaledVector(side, -w.size / 2));
+      const b = m.toCss(p1.copy(w.centre).addScaledVector(side, w.size / 2));
+      const c = m.toCss(p0.copy(w.centre));
+      return { x: c[0], y: c[1], scale: (Math.hypot(b[0] - a[0], b[1] - a[1]) * (window.devicePixelRatio || 1)) / 60 };
     },
     quad(u0, v0, u1, v1) {
       const c = (uu: number, vv: number): [number, number] => m.toCss(m.screenPoint(uu, vv, p0));
@@ -370,6 +455,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
     },
     dispose() {
       texture.dispose();
+      bo.dispose();
       m.dispose();
     },
   };

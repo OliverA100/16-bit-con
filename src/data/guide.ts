@@ -20,8 +20,7 @@ export const railStops: RailStop[] = [
   { id: 'keynote', label: '10:00 Keynote', jump: 0.08, from: 0, to: 0.34, icon: 'sun' },
   { id: 'panel', label: '2:00 Panel', jump: 0.36, from: 0.34, to: 0.62, icon: 'city' },
   { id: 'party', label: '6:00 Party', jump: 0.62, from: 0.62, to: 0.84, icon: 'moon' },
-  { id: 'breakout', label: 'Break out', jump: 0.86, from: 0.84, to: 0.94, icon: 'crt' },
-  { id: 'booth', label: 'Booth 630', jump: 1, from: 0.94, to: 1.01, icon: 'booth' },
+  { id: 'booth', label: 'Booth 630', jump: 1, from: 0.84, to: 1.01, icon: 'booth' },
   { id: 'register', label: 'Register', jump: 'register', from: 2, to: 2, icon: 'ticket' },
 ];
 
@@ -30,8 +29,7 @@ export function levelLabel(t: number): string {
   if (t < 0.34) return 'LVL 1';
   if (t < 0.62) return 'LVL 2';
   if (t < 0.84) return 'LVL 3';
-  if (t < 0.94) return 'BREAK';
-  return 'IRL';
+  return 'LVL 4';
 }
 
 export interface SamLine {
@@ -45,6 +43,5 @@ export const samLines: SamLine[] = [
   { from: 0.29, to: 0.34, text: 'Leaving the field. New York, act normal.' },
   { from: 0.53, to: 0.58, text: 'Glass box down the avenue? That’s Javits. Booth 630 is inside.' },
   { from: 0.66, to: 0.72, text: 'Sun’s down, lights on. After party’s at 6. Follow the neon.' },
-  { from: 0.86, to: 0.91, text: 'This screen is too small for me. Hit it. Hard.' },
-  { from: 0.955, to: 1.01, text: 'IRL at last. Booth 630, Oct 3–5. I’m the one in goggles.' },
+  { from: 0.97, to: 1.01, text: 'Wait. This is just the game. The real one’s out there.' },
 ];

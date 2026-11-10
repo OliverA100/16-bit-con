@@ -38,11 +38,10 @@ import {
   type Material,
 } from 'three';
 
-import { CENTRE, DIMS, OPENING_Y, SLOT_Y } from './spec';
+import { CENTRE, DIMS, OPENING_Y, SLOT_Y, scaleAt } from './spec';
 
 export { CENTRE, CHIN, DIMS, OPENING_Y, SCREEN_ASPECT, SLOT_Y } from './spec';
 
-const scaleAt = (z: number) => 1 - DIMS.TAPER * Math.min(1, Math.max(0, -z / DIMS.DEPTH));
 
 interface OutlinePt {
   x: number;
@@ -417,6 +416,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material): M
   const glassGeo = new PlaneGeometry(O.w + 0.004, O.h + 0.004, 40, 32);
   {
     const p = glassGeo.getAttribute('position');
+    const uv = glassGeo.getAttribute('uv');
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i);
       const y = p.getY(i);
@@ -425,6 +425,8 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material): M
       const z = -DIMS.recess + DIMS.glassGap + DIMS.bulge * (1 - cx * cx) * (1 - cy * cy);
       const s = scaleAt(z);
       p.setXYZ(i, x * s, (y + OPENING_Y) * s, z);
+      // the screen's own UVs (0–1 across the opening), so the breakout's crack mask lines up with the picture
+      uv.setXY(i, (x + O.w / 2) / O.w, (y + O.h / 2) / O.h);
     }
     glassGeo.computeVertexNormals();
   }

@@ -31,6 +31,9 @@ export const DIMS = {
   feet: { r: 0.034, h: 0.022, x: 0.38, z: [0.12, 0.93] },
 } as const;
 
+/** The casing tapers toward the back: x and y scale about the bottom centre by this at depth z (z ≤ 0). */
+export const scaleAt = (z: number) => 1 - DIMS.TAPER * Math.min(1, Math.max(0, -z / DIMS.DEPTH));
+
 export const OPENING_Y = DIMS.H - DIMS.opening.top - DIMS.opening.h / 2; // 0.625
 export const CHIN = DIMS.H - DIMS.opening.top - DIMS.opening.h; // 0.34
 export const SLOT_Y = CHIN * DIMS.slot.at;

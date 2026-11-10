@@ -71,8 +71,7 @@ export interface CityAssets {
   molePizza: Strip;
   dogBark: Strip;
   vegaSignHorizontal: Drawable;
-  /** The breakout and the arrival, all NEW art: the crack stages, the real Javits and its end annex, the cypress row, the sign post, the plaza → daisy-bed seam details. */
-  cracks: Strip;
+  /** The plaza, all NEW art: the real Javits and its end annex, the cypress row, the sign post, the plaza → daisy-bed seam details. */
   facade: Drawable;
   facadeBay: Drawable;
   cypress: Drawable;
@@ -192,14 +191,13 @@ export async function loadCity(): Promise<CityAssets> {
     sprites.molePizza,
     sprites.dogBark,
     sprites.vegaSignHorizontal,
-    sprites.crtCracks,
     sprites.javitsFacade,
     sprites.cypress,
     sprites.signPost,
     sprites.seamStreetField,
     sprites.letters,
   ];
-  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits, chess, sofa, pizza, dogBark, vegaSignH, cracks, facade, cypress, signPost, seamBack, letters] =
+  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits, chess, sofa, pizza, dogBark, vegaSignH, facade, cypress, signPost, seamBack, letters] =
     await loadAll(files);
   const strip = (img: HTMLImageElement | undefined, fw = 60, fh = 60) => makeStrip(img!, fw, fh);
   return {
@@ -226,7 +224,6 @@ export async function loadCity(): Promise<CityAssets> {
     molePizza: strip(pizza),
     dogBark: strip(dogBark),
     vegaSignHorizontal: withDaisy(vegaSignH!, await loadImage(sprites.daisyIcon.file), 'left'),
-    cracks: makeStrip(cracks!, sprites.crtCracks.fw, sprites.crtCracks.fh),
     facade: facade!,
     facadeBay: cropImage(facade!, 0, 0, FACADE_BAY, facade!.height),
     cypress: cypress!,

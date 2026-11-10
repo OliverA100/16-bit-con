@@ -7,12 +7,60 @@
  */
 import { pinnedDistance } from './timeline';
 
-/** The scroll lengths, px: the enter segment (one viewport), the run (14 viewports, 9 000–15 000 px). */
-export function scrollLengths(viewportH: number): { DE: number; DW: number; D: number } {
+/**
+ * The scroll lengths, px: the enter segment (one viewport), the run (14 viewports, 9 000–15 000 px)
+ * and, where the monitor's 3D runs, the breakout (3.2 viewports; none without it — the run then ends
+ * at the plaza and the pin releases into the Register section).
+ */
+export function scrollLengths(viewportH: number, breakout = true): { DE: number; DW: number; DB: number; D: number } {
   const DE = Math.round(viewportH);
   const DW = pinnedDistance(viewportH);
-  return { DE, DW, D: DE + DW };
+  const DB = breakout ? Math.round(3.2 * viewportH) : 0;
+  return { DE, DW, DB, D: DE + DW + DB };
 }
+
+/**
+ * The breakout's schedule, in its progress q (0–1 over D_B, after the run). Like the
+ * enter segment, every visual is a pure function of q, so scrolling back up plays it all backwards.
+ */
+export const BREAKOUT = {
+  /** The camera pulls back out of the game to the monitor at rest: the enter segment's p from 1 to 0, the plaza on the screen. */
+  pullBack: [0, 0.31],
+  /** Six cracks on the real glass from where Sam stands on the screen, one per hit. */
+  cracks: [0.31, 0.56],
+  /**
+   * Sam jumps through the glass: it shatters round him — every piece at once, each its own way and speed:
+   * small ones round his spot fly at the viewer, past the camera; the rest fall to the floor round the
+   * monitor, where the big ones break again — and the tube behind it shows static. The glass runs its own
+   * clock over this stretch.
+   */
+  shatter: [0.56, 0.76],
+  /** …and from the same moment he leaps on toward the viewer, where the page takes him over at a whole-number scale. */
+  leap: [0.56, 0.81],
+  /** The Register section rises under the monitor, which glides to the top third; Sam lands on the Register window. */
+  land: [0.81, 1],
+} as const;
+export const CRACK_STAGES = 6;
+const CRACK_STEP = (BREAKOUT.cracks[1] - BREAKOUT.cracks[0]) / CRACK_STAGES;
+
+/** The crack stage at q: 0 before the cracks, 1–6 through them (a stage shows as soon as q passes the hit before it). */
+export function crackStage(q: number): number {
+  if (q <= BREAKOUT.cracks[0]) return 0;
+  return Math.min(CRACK_STAGES, Math.ceil((q - BREAKOUT.cracks[0]) / CRACK_STEP - 1e-6));
+}
+
+/** Where a hit takes q from `q`: to the middle of the next stage — and the sixth hit, the one that breaks the glass, all the way (null: play on to the end). */
+export function hitTarget(q: number): number | null {
+  const next = crackStage(q) + 1;
+  if (next >= CRACK_STAGES) return null;
+  return BREAKOUT.cracks[0] + (next - 0.5) * CRACK_STEP;
+}
+
+/** After the sixth hit the breakout plays itself to the end, q per ms: shatter, leap and landing in about 2.4 s. */
+export const BREAK_PLAY_MS = 2400;
+/** Idle this long with the glass cracking and the page hits it by itself, one crack every AUTO_HIT_MS. */
+export const AUTO_IDLE_MS = 1000;
+export const AUTO_HIT_MS = 380;
 
 /** The enter segment's schedule, in p. */
 export const ENTER = {

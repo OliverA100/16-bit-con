@@ -16,6 +16,9 @@ import { makeStrip, type Strip } from './sprites';
 import { CLOUD_ROLES, RANGE_ROLES, Tinted } from './tint';
 import { board, letter } from './lettering';
 import { readToken } from './palette';
+import { Plaza, PLAZA, type PlazaLook } from './plaza';
+import { horizonAt } from './stages';
+import { PLAZA_TIME } from '../data/layers';
 
 /** A rectangle in viewport art px. */
 export interface Rect {
@@ -50,6 +53,8 @@ export interface Frame {
   samX: number;
   coins: Coins;
   dust: Dust;
+  /** Sam has left the picture (the breakout: from the shatter on he is the monitor's own billboard). */
+  hideSam?: boolean;
 }
 
 const mod = (v: number, m: number) => ((v % m) + m) % m;
@@ -71,7 +76,8 @@ export const SEQ = {
   seam: 2000, // X0: the surface changes (grass → pavement); the edge at X0 + 28, the fill at X0 + 56
   subway: 2136, // the entrance stands on the pavement 80 px after the fill seam, like any prop
   nearBegin: 2150, // building fronts
-  fenceEnd: 6400, // the street carries on under the breakout; the game frame is gone before its end could show
+  fenceEnd: 5520, // the street's railing stops before the plaza's first planter
+  cityClear: 5900, // the city's last block has cleared the left of the screen by here: the plaza
 } as const;
 
 /** Parallax factor and where each layer's bottom sits (art px relative to the ground line F). */
@@ -94,7 +100,7 @@ export const STACK = {
    * a park with a view down the avenue. The mid and tower openings and the Javits silhouette are
    * aligned to it, so that is where the destination is first seen.
    */
-  cityNear: { p: 0.75, bottom: 2, leadColumn: 1063, gapFrom: 328, gapTo: 592 },
+  cityNear: { p: 0.75, bottom: 2, leadColumn: 1063, gapFrom: 328, gapTo: 592, period: 1152, ends: [114, 330, 537, 678, 1097] },
   /** Javits at the towers' depth, its base on the far city's line: hidden behind the arriving fronts until the opening shows it between the flanking towers. */
   javits: { p: 0.35 },
   near: { hedgeBottom: 20, bottom: 2, treeBottom: 3 },
@@ -135,9 +141,9 @@ const FIELD_TREES = [600, 900, 1250, 1600, 1900];
 /** Mid-layer trees in that layer's own space (u). */
 const MID_TREES = [260, 1000, 1760];
 const TINY_DAISIES = [560, 760, 1100, 1420, 1700];
-/** The street, world x, through Level 3 and on under the breakout. */
-const STREET_TREES = [2330, 2630, 2930, 3230, 3530, 3830, 4130, 4430, 4730, 5030, 5330, 5630];
-const PLANTS = [2400, 2950, 3380, 3900, 4500, 5200, 5500];
+/** The street, world x, through Level 3 and into the dawn; the plaza has its own trees and planters (src/game/plaza.ts). */
+const STREET_TREES = [2330, 2630, 2930, 3230, 3530, 3830, 4130, 4430, 4730, 5030, 5330];
+const PLANTS = [2400, 2950, 3380, 3900, 4500, 5200];
 const ARCADES = [2620, 3420];
 /** Level 2's life (one office-chair gag, then street chess) and Level 3's crowd toward the after party at Booth 630. */
 const NPCS = { molePhone: 2380, moleCoffee: 2680, molesChess: 3340, molesSofa: 4300, molePizza: 4450, dogBark: 4600, molePhone2: 4780 } as const;
@@ -175,6 +181,15 @@ const NIGHT = { span: 0.06, far: 0.64, towers: 0.665, mid: 0.69, near: 0.715, st
 /** Window lighting: [from, to] in t, and the share of a layer's windows that end up lit — a night city is not fully lit, and the shuffled order leaves the dark ones scattered. */
 const LIGHTS = { far: [0.7, 0.76, 0.7], towers: [0.72, 0.78, 0.55], mid: [0.74, 0.8, 0.5], near: [0.76, 0.82, 0.45] } as const;
 const NEON_AT = 0.76;
+/**
+ * Dawn at the plaza: each layer steps back to its day palette over `span`, far
+ * first and near last — the far skyline, Javits, the towers, the mid and near fronts, then the street
+ * and the plaza's props; before that the windows go dark one by one (LIGHTS_OUT) and the neon goes
+ * back to day. None of it at a night plaza (PLAZA_TIME).
+ */
+const DAWN = PLAZA_TIME === 'dawn' ? { span: 0.04, far: 0.845, javits: 0.85, towers: 0.855, mid: 0.865, near: 0.875, street: 0.885 } : null;
+const LIGHTS_OUT = { far: [0.845, 0.875], towers: [0.85, 0.88], mid: [0.855, 0.885], near: [0.86, 0.89] } as const;
+const NEON_OFF = PLAZA_TIME === 'dawn' ? 0.88 : Infinity;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 interface NightSet {
@@ -295,6 +310,22 @@ function alignOpening(
   }
   return best;
 }
+/**
+ * The near fronts' end, in their layer's space: the last of their blocks' clean ends (STACK.cityNear.ends,
+ * tile columns: a block's side wall in perspective, or its plain side) at or before `limit`.
+ */
+function cityEndU(phase: number, limit: number): number {
+  const { period, ends } = STACK.cityNear;
+  const n = Math.floor((limit - phase) / period);
+  let best = -Infinity;
+  for (const k of [n, n - 1]) {
+    for (const col of ends) {
+      const u = phase + k * period + col;
+      if (u <= limit && u > best) best = u;
+    }
+  }
+  return best;
+}
 const nearestEdge = (col: number) => Math.min(...MID_EDGES.map((e) => Math.abs(e - col)));
 const insideClear = (col: number) => Math.min(...TOWER_CLEAR.map(([a, b]) => (col >= a && col <= b ? 0 : Math.min(Math.abs(col - a), Math.abs(col - b)))));
 
@@ -357,12 +388,15 @@ export function drawTiled(
 export class Level1 {
   /** Set once the city assets arrive; until then the city simply has not come into view. */
   city: CityAssets | null = null;
+  /** The Javits plaza at the end of the run, the game's last level (src/game/plaza.ts). */
+  readonly plaza: Plaza;
   private night: NightSet | null = null;
   private signs: Signs | null = null;
   /** The clouds and the far range, recoloured gradually with the sky. */
   private readonly tints: Map<Drawable, Tinted>;
 
   constructor(private readonly a: Level1Assets) {
+    this.plaza = new Plaza(a);
     this.tints = new Map([...a.small, ...a.medium, ...a.cumulus, a.cloudBank].map((img) => [img, new Tinted(img, CLOUD_ROLES)]));
     this.tints.set(a.silhouette, new Tinted(a.silhouette, RANGE_ROLES));
   }
@@ -387,6 +421,8 @@ export class Level1 {
     for (const st of n.strips.values()) st.prepare();
     n.lights.mid.prepare();
     n.lights.near.prepare();
+    // the plaza, which the night reaches last
+    this.plaza.prepareNight(T, n.tree, n.plant);
   }
 
   /**
@@ -410,6 +446,12 @@ export class Level1 {
     sctx.imageSmoothingEnabled = false;
     sctx.fillStyle = f.sky;
     sctx.fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+    // At dawn the horizon glows ahead of the sky, behind the plaza's rooflines (the city's fronts hide it before).
+    const horizon = horizonAt(t);
+    if (horizon) {
+      sctx.fillStyle = horizon;
+      sctx.fillRect(r.x0, F - PLAZA.horizon, r.x1 - r.x0, r.y1 - F + PLAZA.horizon);
+    }
     sctx.beginPath();
     sctx.rect(r.x0, r.y0, r.x1 - r.x0, F - r.y0);
     sctx.clip();
@@ -466,9 +508,17 @@ export class Level1 {
     const a = this.a;
     const c = this.city;
     const nt = this.night;
-    const stepOf = (start: number) => Math.min(NIGHT_STEPS, Math.max(0, Math.floor(((t - start) / NIGHT.span) * NIGHT_STEPS)));
-    const streetStep = stepOf(NIGHT.street);
-    const lit = (l: Lights, range: readonly [number, number, number]) => l.at(clamp01((t - range[0]) / (range[1] - range[0])), range[2]);
+    // A layer's palette step: into the night from its NIGHT start, back to day from its DAWN start.
+    const toNight = (start: number) => Math.min(NIGHT_STEPS, Math.max(0, Math.floor(((t - start) / NIGHT.span) * NIGHT_STEPS)));
+    const toDay = (start: number | undefined) => (DAWN && start !== undefined ? Math.min(NIGHT_STEPS, Math.max(0, NIGHT_STEPS - Math.floor(((t - start) / DAWN.span) * NIGHT_STEPS))) : NIGHT_STEPS);
+    const stepOf = (night: number, dawn?: number) => Math.min(toNight(night), toDay(dawn));
+    const streetStep = stepOf(NIGHT.street, DAWN?.street);
+    // Windows light one by one through the night and, at dawn, go dark one by one.
+    const lightsOn = (on: readonly number[], out: readonly [number, number]) =>
+      clamp01((t - on[0]!) / (on[1]! - on[0]!)) * (DAWN ? 1 - clamp01((t - out[0]) / (out[1] - out[0])) : 1);
+    const lit = (l: Lights, on: readonly [number, number, number], out: readonly [number, number]) => l.at(lightsOn(on, out), on[2]);
+    // The plaza's steps: Javits darkens with the towers and comes back to day first of the near layers; its props with the street.
+    const plazaLook: PlazaLook = { facade: stepOf(NIGHT.towers, DAWN?.javits), street: streetStep };
     /** Layer-space u of the right edge of the screen when Sam is at world x — where a layer begins or ends. */
     const edgeAt = (p: number, x: number) => p * (x - sx) + bw;
     // Those starts and ends are cut to fall just past the viewport's right edge. The monitor's wider
@@ -502,27 +552,49 @@ export class Level1 {
     const nearBegin = edgeAt(STACK.cityNear.p, SEQ.nearBegin);
     const Xgap = sx + (nearBegin + (STACK.cityNear.gapFrom + STACK.cityNear.gapTo) / 2 - bw / 2) / STACK.cityNear.p;
     const centreAt = (p: number) => p * (Xgap - sx) + bw / 2;
+    // ── Where the city ends: the side wall of a block in the near fronts — the last
+    //    of their clean ends to have cleared the left of the screen by SEQ.cityClear, solved per device.
+    //    The near fronts are a wall to the top of every viewport, so that wall is a curtain: everything
+    //    between it and the far skyline is cut at it — the city to its left, the plaza to its right.
+    const nearPhase = nearBegin - STACK.cityNear.leadColumn;
+    const nearEnd = cityEndU(nearPhase, STACK.cityNear.p * (SEQ.cityClear - sx));
+    const endShown = end(nearEnd, STACK.cityNear.p);
+    const cityEndX = endShown === Infinity ? Infinity : Math.round(nearEnd - STACK.cityNear.p * camLeft);
+    const cityOnly = (draw: () => void) => {
+      if (cityEndX >= r.x1) return draw();
+      if (cityEndX <= r.x0) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(r.x0, r.y0, cityEndX - r.x0, r.y1 - r.y0);
+      ctx.clip();
+      draw();
+      ctx.restore();
+    };
     if (c) {
       const farBegin = edgeAt(STACK.cityFar.p, SEQ.farBegin);
-      const farImg = nt ? nt.far.at(stepOf(NIGHT.far)) : c.far;
+      const farImg = nt ? nt.far.at(stepOf(NIGHT.far, DAWN?.far)) : c.far;
       const farOpts = { mirror: true, from: begin(farBegin, STACK.cityFar.p), phase: farBegin };
       const farY = F + STACK.cityFar.bottom - c.far.height;
       drawTiled(ctx, farImg, STACK.cityFar.p * camLeft, farY, r, farOpts);
-      const farLit = nt && lit(nt.lights.far, LIGHTS.far);
+      const farLit = nt && lit(nt.lights.far, LIGHTS.far, LIGHTS_OUT.far);
       if (farLit) drawTiled(ctx, farLit, STACK.cityFar.p * camLeft, farY, r, farOpts);
-      place(nt ? nt.javits.at(stepOf(NIGHT.towers)) : c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
-      const towersBegin = edgeAt(STACK.towers.p, SEQ.towersBegin);
-      const tw = alignOpening(STACK.towers.period, towersBegin, centreAt(STACK.towers.p), TOWER_GAPS, insideClear);
-      const towersY = F + STACK.towers.bottom - c.towers.height;
-      const towersImg = nt ? nt.towers.at(stepOf(NIGHT.towers)) : c.towers;
-      const towersLit = nt && lit(nt.lights.towers, LIGHTS.towers);
-      for (const img of towersLit ? [towersImg, towersLit] : [towersImg]) {
-        const tb = begin(towersBegin, STACK.towers.p);
-        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: tb, to: tw.gapL, phase: tw.phase });
-        drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: Math.max(tb, tw.gapR), phase: tw.phase });
-      }
+      cityOnly(() => {
+        place(nt ? nt.javits.at(stepOf(NIGHT.towers, DAWN?.towers)) : c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
+        const towersBegin = edgeAt(STACK.towers.p, SEQ.towersBegin);
+        const tw = alignOpening(STACK.towers.period, towersBegin, centreAt(STACK.towers.p), TOWER_GAPS, insideClear);
+        const towersY = F + STACK.towers.bottom - c.towers.height;
+        const towersImg = nt ? nt.towers.at(stepOf(NIGHT.towers, DAWN?.towers)) : c.towers;
+        const towersLit = nt && lit(nt.lights.towers, LIGHTS.towers, LIGHTS_OUT.towers);
+        for (const img of towersLit ? [towersImg, towersLit] : [towersImg]) {
+          const tb = begin(towersBegin, STACK.towers.p);
+          drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: tb, to: tw.gapL, phase: tw.phase });
+          drawTiled(ctx, img, STACK.towers.p * camLeft, towersY, r, { from: Math.max(tb, tw.gapR), phase: tw.phase });
+        }
+      });
     }
     drawTiled(ctx, a.plain, STACK.plain.p * camLeft, F + STACK.plain.top, r);
+    // The plaza: Javits beyond the city's last block, the far skyline behind its low wings.
+    if (c) this.plaza.drawFacade(ctx, f, cityEndX, plazaLook);
 
     // ── Mid layer: bushes and trees at 0.45, ending as the mid buildings arrive ──
     const midHedgeEnd = edgeAt(STACK.midHedge.p, SEQ.midHedgeEnd);
@@ -531,28 +603,30 @@ export class Level1 {
     for (const u of MID_TREES) if (u + a.treeField.width <= midHedgeEnd) place(a.treeField, STACK.midHedge.p, u, F + STACK.midHedge.treeBottom);
 
     if (c) {
-      const midBegin = edgeAt(STACK.cityMid.p, SEQ.cityMidBegin);
-      const md = alignOpening(STACK.cityMid.period, midBegin, centreAt(STACK.cityMid.p), MID_GAPS, nearestEdge);
-      const midY = F + STACK.cityMid.bottom - c.mid.height;
-      const midImg = nt ? nt.mid.at(stepOf(NIGHT.mid)) : c.mid;
-      const midLit = nt && lit(nt.lights.mid, LIGHTS.mid);
-      for (const img of midLit ? [midImg, midLit] : [midImg]) {
-        const mb = begin(midBegin, STACK.cityMid.p);
-        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: mb, to: md.gapL, phase: md.phase });
-        drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: Math.max(mb, md.gapR), phase: md.phase });
-      }
-      const nearPhase = nearBegin - STACK.cityNear.leadColumn;
+      cityOnly(() => {
+        const midBegin = edgeAt(STACK.cityMid.p, SEQ.cityMidBegin);
+        const md = alignOpening(STACK.cityMid.period, midBegin, centreAt(STACK.cityMid.p), MID_GAPS, nearestEdge);
+        const midY = F + STACK.cityMid.bottom - c.mid.height;
+        const midImg = nt ? nt.mid.at(stepOf(NIGHT.mid, DAWN?.mid)) : c.mid;
+        const midLit = nt && lit(nt.lights.mid, LIGHTS.mid, LIGHTS_OUT.mid);
+        for (const img of midLit ? [midImg, midLit] : [midImg]) {
+          const mb = begin(midBegin, STACK.cityMid.p);
+          drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: mb, to: md.gapL, phase: md.phase });
+          drawTiled(ctx, img, STACK.cityMid.p * camLeft, midY, r, { from: Math.max(mb, md.gapR), phase: md.phase });
+        }
+      });
       const nearY = F + STACK.cityNear.bottom - c.near.height;
-      const nearImg = nt ? nt.near.at(stepOf(NIGHT.near)) : c.near;
-      const nearLit = nt && lit(nt.lights.near, LIGHTS.near);
+      const nearImg = nt ? nt.near.at(stepOf(NIGHT.near, DAWN?.near)) : c.near;
+      const nearLit = nt && lit(nt.lights.near, LIGHTS.near, LIGHTS_OUT.near);
       for (const img of nearLit ? [nearImg, nearLit] : [nearImg]) {
         const nb = begin(nearBegin, STACK.cityNear.p);
         drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
-        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb === Infinity ? Infinity : nearBegin + STACK.cityNear.gapTo, phase: nearPhase });
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb === Infinity ? Infinity : nearBegin + STACK.cityNear.gapTo, to: endShown, phase: nearPhase });
       }
       place(nt ? nt.poster.at(streetStep) : c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
       const signs = this.signs ?? (this.signs = buildSigns(c));
-      place(t >= NEON_AT ? signs.billboard.neon : signs.billboard.day, STACK.cityNear.p, nearBegin + BILLBOARD.u, F + BILLBOARD.bottom);
+      const neon = t >= NEON_AT && t < NEON_OFF;
+      place(neon ? signs.billboard.neon : signs.billboard.day, STACK.cityNear.p, nearBegin + BILLBOARD.u, F + BILLBOARD.bottom);
     }
     ctx.restore();
 
@@ -571,19 +645,24 @@ export class Level1 {
       ctx.fillRect(r.x0, F + g.edgeTop, edgeX - r.x0, g.fillTop - g.edgeTop);
     }
     // The fill band, and below the viewport (the monitor's screen frame only) the same fill carrying on down.
+    // The street's bands run on as the plaza's paving and stop at its three seams, where the daisy bed takes over.
+    const plazaSurface = PLAZA.seam;
+    const plazaEdge = PLAZA.seam + g.seamStep;
+    const plazaFill = PLAZA.seam + 2 * g.seamStep;
     const road = c ? (nt ? nt.road.at(streetStep) : c.road) : null;
     for (let y = F + g.fillTop; y < Math.max(bh, r.y1); y += a.dirtFill.height) {
       drawTiled(ctx, a.dirtFill, camLeft, y, r, { to: seamFill, phase: g.daisyPhase });
-      if (road) drawTiled(ctx, road, camLeft, y, r, { from: seamFill });
+      if (road) drawTiled(ctx, road, camLeft, y, r, { from: seamFill, to: plazaFill });
     }
     drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, r, { to: seamEdge, phase: g.daisyPhase });
     drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, r, { to: SEQ.seam, phase: g.daisyPhase });
     if (c) {
       const sw = nt ? nt.sidewalk.at(streetStep) : c.sidewalk;
-      drawTiled(ctx, sw, camLeft, F, r, { from: SEQ.seam });
-      drawTiled(ctx, nt ? nt.kerb.at(streetStep) : c.kerb, camLeft, F + g.edgeTop, r, { from: seamEdge });
+      drawTiled(ctx, sw, camLeft, F, r, { from: SEQ.seam, to: plazaSurface });
+      drawTiled(ctx, nt ? nt.kerb.at(streetStep) : c.kerb, camLeft, F + g.edgeTop, r, { from: seamEdge, to: plazaEdge });
       // The seam details: tufts on the first slabs, a lighter kerb end-stone, dirt pixels on kerb and road.
       place(nt ? nt.seam.at(streetStep) : c.seam, 1, SEQ.seam + g.seamTileLeft, F + g.seamTileTop + c.seam.height);
+      this.plaza.drawGround(ctx, f, plazaLook);
     }
 
     for (const x of TINY_DAISIES) place(a.daisyTiny, 1, x, F);
@@ -599,7 +678,7 @@ export class Level1 {
       for (const x of PLANTS) place(plant, 1, x, base);
       const arcade = nt ? nt.arcade.at(streetStep) : c.arcade;
       for (const x of [...ARCADES, PARTY.x, PARTY.x + PARTY.arcadeGap]) place(arcade, 1, x, base);
-      const party = this.signs ? (t >= NEON_AT ? this.signs.party.neon : this.signs.party.day) : null;
+      const party = this.signs ? (t >= NEON_AT && t < NEON_OFF ? this.signs.party.neon : this.signs.party.day) : null;
       if (party) place(party, 1, PARTY.x + (PARTY.arcadeGap + c.arcade.width) / 2 - party.width / 2, base - c.arcade.height - 6);
       // Characters live on their own clocks, independent of Sam: idle loops, and the dog patrolling.
       const npc = (st: Strip) => (nt ? stripOver(nt.strips.get(st)!.at(streetStep), st) : st);
@@ -617,10 +696,11 @@ export class Level1 {
       const goingLeft = leg < span;
       const dogX = goingLeft ? DOG.to - leg : DOG.from + (leg - span);
       npc(c.dog).draw(ctx, Math.floor(travelled / DOG.stride), dogX - camLeft, feet, goingLeft);
+      this.plaza.drawProps(ctx, f, plazaLook);
     }
 
     f.coins.draw(ctx, a.coin, camLeft, F, r, now);
-    f.sam.draw(ctx, f.samX - camLeft, F);
+    if (!f.hideSam) f.sam.draw(ctx, f.samX - camLeft, F);
     f.dust.draw(ctx, camLeft, F + FOOT_SINK, now);
   }
 }

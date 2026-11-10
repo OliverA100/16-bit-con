@@ -34,7 +34,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { readToken } from '../game/palette';
 import { buildMonitor, measure, type MonitorParts } from './build';
 import { createCrtMaterial, coverRect } from './crt';
-import { CENTRE, DIMS, FOV, OPENING_Y, REST, restWidth, type Slot, type View } from './spec';
+import { CENTRE, DIMS, FOV, OPENING_Y, REST, restWidth, scaleAt, type Slot, type View } from './spec';
 
 export { FOV, REST, restWidth, VIEWS, type Slot, type View } from './spec';
 
@@ -201,7 +201,6 @@ function* steps(canvas: HTMLCanvasElement, context?: WebGL2RenderingContext, pre
     [1, 0],
     [0, 0],
   ] as const;
-  const scaleAt = (z: number) => 1 - DIMS.TAPER * Math.min(1, Math.max(0, -z / DIMS.DEPTH));
 
   const tmp = new Vector3();
   const project = (pts: Vector3[], space: 'body' | 'world') => {

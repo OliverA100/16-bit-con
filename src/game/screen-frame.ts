@@ -103,6 +103,7 @@ export class ScreenFrame {
       s.facing,
       s.lift,
       g.samX,
+      g.hideSam ? 1 : 0,
       f.coins.showing(g.camLeft, g.range) ? Coins.frameAt(now, 3) : 0,
       dust.alive(now) ? now : 0,
       // the street's characters run their own loops; past the field the frame follows the clock
