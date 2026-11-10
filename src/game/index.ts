@@ -47,7 +47,7 @@ import { ScreenFrame } from './screen-frame';
 import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
 import type { BreakoutState, Hero } from '../monitor/hero';
-import { AUTO_HIT_MS, AUTO_IDLE_MS, BREAKOUT, BREAK_PLAY_MS, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, hitTarget, playMs, playP, scrollLengths, smooth } from './segments';
+import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, hitTarget, playMs, playP, scrollLengths, smooth } from './segments';
 import { drawCell, idleOnPerch, queryPerch } from './landing';
 import { createRegisterDialog, focusRegister } from './register-dialog';
 import { GL_ATTRIBUTES } from '../monitor/spec';
@@ -66,6 +66,27 @@ const ECHO_PX = 1.5;
  * once, letting the page show through the whole monitor — a flash (the dark screen 89 → 131 of 255).
  */
 const POWER_DELAY_MS = 200;
+/**
+ * The finale's pace, ms per stretch of the breakout: a beat from the sixth hit to the burst; Sam's jump
+ * up out of the screen to its top (the leap, src/monitor/breakout.ts); his fall from there onto the
+ * Register window (the landing: the pin lets go with the hero as it is on load, and the page follows him
+ * down until the Register window is centred). One jump, airborne ~1.3 s. The glass keeps its own clock
+ * (GLASS_MS) and is never sped up.
+ */
+const FINALE_MS = { toBurst: 300, leap: 650, land: 650 } as const;
+/** After the landing has settled, the hero's copy waits, then fades back in over this long, ms. */
+const COPY_BACK_MS = { wait: 200, fade: 600 } as const;
+/** The glass's flight, ms: the shatter's own clock (src/monitor/breakout.ts FALL.time), whatever Sam's pace. */
+const GLASS_MS = 1100;
+/**
+ * The breakout can't be skipped, however the page is scrolled: past the plaza's end the scroll drives it
+ * no faster than this — the pull-back at the dive's own pace (segments.ts PLAY), and a crack at most every
+ * CRACK_MIN_MS (mashing speed) — and the page holds at the monitor until Sam
+ * has landed. Scroll beyond that is absorbed.
+ */
+const CRACK_MIN_MS = 150;
+/** One crack's stretch of the breakout's progress q. */
+const CRACK_STEP = (BREAKOUT.cracks[1] - BREAKOUT.cracks[0]) / CRACK_STAGES;
 /** A 3D that is not on screen this long after it was asked for gives way to the static opening. */
 const HERO_TIMEOUT_MS = 10000;
 
@@ -304,7 +325,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   };
   /** 'default': a normal page, no pin. 'play': after PRESS START, the pin and the game. 'done': Sam has landed, the pin is gone for good. */
   let mode: 'default' | 'play' | 'done' = 'default';
-  /** The Register dialog is open over the game: no input, no plays, no auto-hit. */
+  /** The Register dialog is open over the game: no input, no plays. */
   let paused = false;
   let pausedAt = 0;
   /** The pin, only while playing. */
@@ -320,12 +341,33 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let saved: { t: number; q: number } | null = null;
   /** The enter progress the monitor shows (the last frame's), where an exit's zoom starts. */
   let lastHeroP = 0;
+  /**
+   * The breakout's finale — the glass bursting, Sam's leap, the landing on the Register window — is an
+   * event, not a camera move: once it starts (the sixth hit, or a scroll past the last crack) it plays to
+   * the end at its own pace, the page held still under it (:root.is-finale), and the scroll never scrubs it.
+   */
+  let finale = false;
+  /** How far Sam's fall onto the Register window has gone in time (0–1), through the finale's landing. */
+  let landT = 0;
+  /**
+   * The landing: the page following Sam down from the hero to the Register window — scroll eased from 0
+   * to y1 from t0 — while he drops from the top of his jump to (x, y) on screen, where his cell on the
+   * Register window's title bar comes to rest under him.
+   */
+  let landing: { t0: number; y1: number; x: number; y: number } | null = null;
+  /** "Register now" during the finale: the form gets focus once Sam is on it. */
+  let focusAfterLanding = false;
+  /** When everything settled after the landing: the hero's copy fades back in from then (COPY_BACK_MS). */
+  let settledAt: number | null = null;
+  /** When the glass burst (the finale's clock time), so it falls at its own pace; null before it bursts. */
+  let glassT0: number | null = null;
+  /** The breakout progress the page may reach so far (the speed limit grows it); the page holds there. */
+  let allowQ = 0;
+  /** A wheel push at the hold (absorbed), when: it keeps the breakout moving at its capped pace. */
+  let gatePushAt = -Infinity;
   const pinTop = () => trigger?.start ?? 0;
-  // The landing section rises into the pin through the breakout's landing (--rise: exactly its
-  // stretch of scroll; from PRESS START on, and kept after the landing, where it is what the page
-  // shows), and Sam stands on it at the game's own scale (--sam-px, CSS px per art px).
+  // Sam stands on the Register window at the game's own scale (--sam-px, CSS px per art px).
   const setLandingVars = () => {
-    root.style.setProperty('--rise', `${wantBreakout && mode !== 'default' ? Math.round((1 - BREAKOUT.land[0]) * DB) : 0}px`);
     root.style.setProperty('--sam-px', `${vp.k / (window.devicePixelRatio || 1)}px`);
   };
   setLandingVars();
@@ -358,12 +400,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
    */
   let playing: { from: number; y1: number; t0: number } | null = null;
   /** The breakout's own plays, q from q0 to q1 in ms: the pull-back (→ or Space at the plaza), and the rest after the sixth hit. */
-  let breakPlay: { q0: number; q1: number; ms: number; t0: number } | null = null;
+  let breakPlay: { q0: number; q1: number; ms: number; t0: number; keys?: [number, number][]; floorY?: number } | null = null;
   let scrollOverrideUntil = 0;
-  /** The auto-hits: armed on reaching the cracks, they start after a second without input. */
-  let autoArmed = false;
-  let lastHitAt = 0;
-  let wasHitZone = false;
   /** A tap or click on the monitor's screen during the cracks (its DOM hit target). */
   let pendingHit = false;
   /** The pin, created by PRESS START (never on load), so the page is only as long as its content until then. */
@@ -378,10 +416,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       invalidateOnRefresh: true,
       onUpdate: (self) => {
         // Our own scrollTo (keys, d-pad, a hit, the auto-break) echoes back here; anything else is the user, and the user wins.
-        if (paused || exiting || Math.abs(window.scrollY - expectedY) <= ECHO_PX) return;
+        if (paused || exiting || finale || Math.abs(window.scrollY - expectedY) <= ECHO_PX) return;
         scrollOverrideUntil = clockNow() + SCROLL_OVERRIDE_MS;
         motion.cancel();
-        autoArmed = false;
         playing = null;
         breakPlay = null;
         timeline.setScrollTarget(tOf(self.progress));
@@ -427,7 +464,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // ── Progress rail: a click jumps the world to a level with no smear ──
   for (const btn of o.railStops) {
     btn.addEventListener('click', () => {
-      if (mode !== 'play' || paused || zoom) return;
+      if (mode !== 'play' || paused || zoom || finale) return;
       const t = Number(btn.dataset.jump);
       motion.cancel();
       playing = null;
@@ -488,36 +525,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let lastFade = -1;
   /** Sam where the run ends, on the monitor's screen: his cell's centre (screen UV) and size (screen heights) — where the cracks start. */
   let samOnScreen: { centre: [number, number]; size: number } | null = null;
-  /** The landing: how far the monitor glides up (and sideways) and how much smaller it ends, into the masthead's slot. */
-  let glideTo = { up: 0, left: 0, scale: 1 };
-  /** The masthead the landing ends in (World.astro): the copy moves into it, the monitor glides into its slot. */
-  const mast = d?.stage.querySelector<HTMLElement>('[data-mast]') ?? null;
-  const mastCopy = mast?.querySelector<HTMLElement>('[data-mast-copy]') ?? null;
-  const mastSlot = mast?.querySelector<HTMLElement>('[data-mast-slot]') ?? null;
-  const heroCopy = d?.stage.querySelector<HTMLElement>('.hero__copy') ?? null;
-  const heroTagline = d?.stage.querySelector<HTMLElement>('.hero__tagline') ?? null;
-  let inMast = false;
-  // While the copy is in the masthead, empty boxes of its height hold its place round the monitor's slot,
-  // so the slot (the 3D's rest pose) never moves: no layout shift.
-  const placeholder = () => Object.assign(document.createElement('div'), { ariaHidden: 'true' });
-  const holdCopy = placeholder();
-  const holdTagline = placeholder();
-  /** The eyebrow, the h1 and the tagline: in the masthead from the landing on, else home round the monitor. The same nodes, never copies. */
-  const toMast = (on: boolean) => {
-    if (on === inMast || !d || !mastCopy || !heroCopy || !heroTagline) return;
-    inMast = on;
-    if (on) {
-      holdCopy.style.height = `${heroCopy.offsetHeight}px`;
-      holdTagline.style.height = `${heroTagline.offsetHeight}px`;
-      heroCopy.replaceWith(holdCopy);
-      heroTagline.replaceWith(holdTagline);
-      mastCopy.append(heroCopy, heroTagline);
-    } else {
-      holdCopy.replaceWith(heroCopy);
-      holdTagline.replaceWith(heroTagline);
-    }
-  };
-  let glideLeft = '';
   /** The monitor's screen as a tap target through the cracks (the 3D canvas itself takes no pointer events). */
   const hitEl = d ? d.stage.querySelector<HTMLElement>('[data-hit]') : null;
   let hitBox = '';
@@ -554,49 +561,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // The crack pattern starts from him: laid out (and uploaded) in idle time, never on a scroll frame.
     const w = window as IdleWindow;
     (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200)))(() => hero3d?.prepareBreakout(centre));
-    layoutMast(b);
-  };
-  /**
-   * The masthead's room, at the end of the landing: from the load's distance under the nav (CSS) down to
-   * where the risen landing section starts, or Agent Sam's bubble on the Register window if that is higher.
-   * The monitor glides to the centre of its slot there, at 95 % of the slot's height.
-   */
-  const layoutMast = (b: { x: number; y: number; w: number; h: number }) => {
-    if (!d || !mast || !mastSlot) return;
-    const css = getComputedStyle(root);
-    const px = (name: string) => parseFloat(css.getPropertyValue(name)) || 0;
-    const top = px('--nav-h') + px('--space-6');
-    const sectionTop = d.gl.clientHeight - Math.round((1 - BREAKOUT.land[0]) * DB);
-    let bottom = sectionTop;
-    const win = document.querySelector('.landing__window');
-    const bubble = perch?.bubble;
-    if (win && bubble) {
-      // the window's top at the landing: the section's top plus the perch room it has in the game (index.astro)
-      const windowTop = sectionTop + px('--space-12') + 64 * (vp.k / (window.devicePixelRatio || 1));
-      bottom = Math.min(bottom, windowTop + (bubble.getBoundingClientRect().top - win.getBoundingClientRect().top) - px('--space-4'));
-    }
-    d.stage.style.setProperty('--mast-h', `${Math.max(1, Math.round(bottom - top))}px`);
-    // The slot as it is with the copy in the masthead (on phones the copy takes rows above and below it).
-    // Until the landing the copy is home, so hidden stand-ins without ids are measured in its place: the
-    // real h1 (the page's LCP element) is never moved for a measurement.
-    let ghosts: HTMLElement[] = [];
-    if (!inMast && mastCopy && heroCopy && heroTagline) {
-      ghosts = [heroCopy, heroTagline].map((el) => el.cloneNode(true) as HTMLElement);
-      for (const g of ghosts) {
-        g.removeAttribute('id');
-        g.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
-        g.setAttribute('aria-hidden', 'true');
-        g.style.visibility = 'hidden';
-      }
-      mastCopy.append(...ghosts);
-    }
-    const s = mastSlot.getBoundingClientRect();
-    for (const g of ghosts) g.remove();
-    const st = d.stage.getBoundingClientRect();
-    const tx = s.left - st.left + s.width / 2;
-    const ty = s.top - st.top + s.height / 2;
-    glideTo = { up: b.y + b.h / 2 - ty, left: tx - (b.x + b.w / 2), scale: Math.min(1, (0.95 * s.height) / b.h) };
-    glideLeft = '';
   };
   /** No 3D after all (no WebGL 2, an error, too slow): the powered-on poster, PRESS START on it. */
   const toStatic = (why: unknown) => {
@@ -691,9 +655,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   /** The breakout for the monitor at q: the cracks, the shatter, Sam's billboard (his frame drawn into it), the landing's glide. */
   let samBillboard = '';
   const breakState = (q: number, now: number): BreakoutState => {
-    const shatter = q > BREAKOUT.shatter[0] ? clamp01((q - BREAKOUT.shatter[0]) / (BREAKOUT.shatter[1] - BREAKOUT.shatter[0])) : 0;
+    // the glass on its own clock from the burst (Sam may leave before it settles); from q where there is no burst clock
+    if (q > BREAKOUT.shatter[0] && glassT0 === null && finale) glassT0 = now;
+    const shatter =
+      glassT0 !== null
+        ? clamp01((now - glassT0) / GLASS_MS)
+        : q > BREAKOUT.shatter[0]
+          ? clamp01((q - BREAKOUT.shatter[0]) / (BREAKOUT.shatter[1] - BREAKOUT.shatter[0]))
+          : 0;
     const leap = clamp01((q - BREAKOUT.leap[0]) / (BREAKOUT.leap[1] - BREAKOUT.leap[0]));
-    const g = smooth(q, BREAKOUT.land);
     let samB: BreakoutState['sam'] = null;
     if (shatter > 0 && samOnScreen && hero3d) {
       // idling while the glass flies, then the jump as he leaps; the page takes him at twice the game's scale
@@ -707,7 +677,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
       samB = { centre: samOnScreen.centre, size: samOnScreen.size, leap, scale: 2 * vp.k, hidden: q >= BREAKOUT.leap[1] };
     }
-    return { stage: crackStage(q), shatter, sam: samB, glide: { up: g * glideTo.up, scale: 1 + g * (glideTo.scale - 1) } };
+    // the monitor stays where it is on load: no glide (the page follows Sam down to the Register window instead)
+    return { stage: crackStage(q), shatter, sam: samB, glide: { up: 0, scale: 1 } };
   };
 
   // ── Sam on the page (src/game/landing.ts): perched on the Register window only once he has escaped
@@ -718,12 +689,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   //    on the perch and a transform carries him, so the page never lays anything out again: no layout shift.
   const perch = queryPerch();
   let perchBox = '';
+  /** Where the page took Sam over, on screen: the top of his jump out of the monitor. */
+  let flightFrom: { x: number; y: number } | null = null;
   let perchFrame = '';
   if (perch) idleOnPerch(perch, assets.sam.idle, () => perch.root.classList.contains('is-landed'));
   const updatePerch = (q: number) => {
     if (!perch) return;
-    const landed = mode === 'done';
-    const flying = mode === 'play' && wantBreakout && q >= BREAKOUT.leap[1];
+    const landed = mode === 'done' && !landing;
+    const flying = !!landing;
     if (perch.root.classList.contains('is-landed') !== landed) {
       perch.root.classList.toggle('is-landed', landed);
       perchFrame = '';
@@ -732,35 +705,34 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const c = perch.canvas;
     if (c.classList.contains('is-flying') !== flying) c.classList.toggle('is-flying', flying);
     if (!flying) {
+      flightFrom = null;
       if (perchBox) {
         perchBox = '';
         c.style.transform = '';
       }
       return;
     }
-    const sprite = hero3d?.samSprite();
-    if (!sprite || !d) return;
+    if (!landing || !flightFrom) return;
     if (perchFrame !== 'jump') {
       perchFrame = 'jump';
       drawCell(c, assets.sam.jump, 0);
     }
     const dpr = window.devicePixelRatio || 1;
-    const e = smooth(q, BREAKOUT.land);
+    // The second half of one jump: from its top he drops onto his cell on the title bar (where the CSS
+    // places him, and his box always is) as the page brings it up under him — across at an even pace, down
+    // under gravity (from rest at the top, faster as he falls), shrinking from twice the game's scale to
+    // its own. By the landing's own time.
+    const u = landT;
     const big = 2 * vp.k;
-    const scale = big + (vp.k - big) * e;
+    const scale = big + (vp.k - big) * u;
     const size = (SAM_CELL * scale) / dpr;
-    // from where the billboard left him (its centre at the end of the leap) …
-    const gl = d.gl.getBoundingClientRect();
-    const hx = gl.left + sprite.x;
-    const hy = gl.top + sprite.y;
-    // … over an arc to his cell on the title bar, where the CSS places him (and his box always is)
     const pr = perch.root.getBoundingClientRect();
     const land = (SAM_CELL * vp.k) / dpr;
     const x0 = pr.left;
     const y0 = pr.bottom + (FOOT_SINK * vp.k) / dpr - land;
-    const arc = Math.min(window.innerHeight * 0.18, 160) * 4 * e * (1 - e);
-    const x = Math.round((hx + (x0 + land / 2 - hx) * e - size / 2) * dpr) / dpr;
-    const y = Math.round((hy + (y0 + land / 2 - hy) * e - arc - size / 2) * dpr) / dpr;
+    const { x: hx, y: hy } = flightFrom;
+    const x = Math.round((hx + (landing.x - hx) * u - size / 2) * dpr) / dpr;
+    const y = Math.round((hy + (landing.y - hy) * u * u - size / 2) * dpr) / dpr;
     const key = `${x},${y},${size}`;
     if (key !== perchBox) {
       perchBox = key;
@@ -783,11 +755,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   /** The opening as it is at rest (p 0), at once: a hidden PRESS START could not take focus. */
   const resetStage = () => {
     entryShift = 0;
-    toMast(false);
     if (!d) return;
     d.stage.style.translate = '';
-    d.gl.style.translate = '';
-    glideLeft = '';
     d.stage.style.setProperty('--out', '0');
     d.stage.classList.remove('is-copy-gone');
     d.stage.style.opacity = '';
@@ -805,8 +774,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     motion.cancel();
     playing = null;
     breakPlay = null;
-    autoArmed = false;
-    wasHitZone = false;
     pendingHit = false;
   };
 
@@ -818,10 +785,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const enterPlay = () => {
     if (mode !== 'default' || trigger) return;
     const y0 = Math.max(0, Math.round(window.scrollY));
+    endFinale();
     mode = 'play';
     root.classList.add('is-playing');
     syncLengths();
     const resume = saved ? tlOf(saved) : null;
+    allowQ = saved?.q ?? 0;
+    lastCrackSeen = crackStage(allowQ);
+    glassT0 = null;
+    gatePushAt = -Infinity;
     saved = null;
     timeline.jumpTo(resume ?? timeline.tMin);
     motion.cancel();
@@ -844,6 +816,89 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (p1 > 0) zoom = { p0: 0, p1, t0: -1, done: () => {} };
     }
     announce('Game started. Scroll or use the arrow keys to play. Press Escape to exit.');
+  };
+
+  /**
+   * The page holds still through the finale: wheel, touch drags and scroll keys do nothing. Listeners, not
+   * CSS: an `overflow: hidden` hold on the root makes the browser count Sam's landing as a layout shift.
+   * They exist only while the finale plays, so scrolling anywhere else never waits on them.
+   */
+  const SCROLL_KEYS = ['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' '];
+  const holdScroll = (e: Event) => e.preventDefault();
+  const holdKeys = (e: KeyboardEvent) => {
+    if (SCROLL_KEYS.includes(e.key)) e.preventDefault();
+  };
+  const holdPage = (on: boolean) => {
+    const add = on ? window.addEventListener.bind(window) : window.removeEventListener.bind(window);
+    add('wheel', holdScroll, { passive: false } as AddEventListenerOptions);
+    add('touchmove', holdScroll, { passive: false } as AddEventListenerOptions);
+    add('keydown', holdKeys as EventListener);
+  };
+  /**
+   * The hold at the breakout: a wheel that would carry the page past what the breakout has played so far
+   * (allowQ) is absorbed, and counts as a push that keeps it going at its capped pace (the frame grows
+   * allowQ). Attached only while the page is near the breakout, so the run's scrolling never waits on it.
+   */
+  const gateY = () => pinTop() + DE + DW + allowQ * DB;
+  const gateWheel = (e: WheelEvent) => {
+    if (!trigger || e.deltaY <= 0) return;
+    const y = gateY();
+    if (window.scrollY + e.deltaY <= y + 1) return;
+    e.preventDefault();
+    gatePushAt = clockNow();
+    if (window.scrollY < y - 0.5) {
+      window.scrollTo({ top: y, behavior: 'instant' });
+      expectedY = window.scrollY;
+    }
+  };
+  let gateWheelOn = false;
+  const setGateWheel = (on: boolean) => {
+    if (on === gateWheelOn) return;
+    gateWheelOn = on;
+    if (on) window.addEventListener('wheel', gateWheel, { passive: false });
+    else window.removeEventListener('wheel', gateWheel);
+  };
+  /** The crack stage last seen, so a crack the scroll makes gets Sam's hop, as a hit does. */
+  let lastCrackSeen = 0;
+  /** The picture's breakout progress last frame: the picture, too, goes through the breakout no faster than the cap. */
+  let lastPicQ = 0;
+  /** The breakout's speed limit at progress q, per ms: the pull-back at the dive's pace, then a crack per CRACK_MIN_MS. */
+  const breakoutRate = (q: number) => (q < BREAKOUT.cracks[0] ? BREAKOUT.pullBack[1] / playMs(1) : CRACK_STEP / CRACK_MIN_MS);
+  /** The finale from breakout progress `from` to the landing, at its own pace (FINALE_MS; the glass on GLASS_MS). */
+  const startFinale = (from: number) => {
+    if (finale) return;
+    finale = true;
+    root.classList.add('is-finale');
+    holdPage(true);
+    input.enabled = false;
+    input.reset();
+    motion.cancel();
+    playing = null;
+    pendingHit = false;
+    // Keyframes (ms, q) from `from` to the landing, each stretch lasting its FINALE_MS (a share of it
+    // when `from` is inside it): from the sixth hit's crack to the burst, the leap, the landing.
+    const sixthHit = BREAKOUT.cracks[0] + (CRACK_STAGES - 1.5) * CRACK_STEP;
+    const stretches: [number, number, number][] = [
+      [sixthHit, BREAKOUT.shatter[0], FINALE_MS.toBurst],
+      [BREAKOUT.shatter[0], BREAKOUT.land[0], FINALE_MS.leap],
+    ];
+    const keys: [number, number][] = [[0, from]];
+    let prev = 0;
+    for (const [a, b, ms] of stretches) {
+      if (b <= from) continue;
+      // the beat before the burst is always whole, however far into the sixth crack the finale starts
+      prev += a === sixthHit ? ms : (ms * (b - Math.max(from, a))) / (b - a);
+      keys.push([prev, b]);
+    }
+    // (the page never goes back up: the picture may trail where the page was let go, behind the pinned monitor)
+    breakPlay = { q0: from, q1: Math.max(from, BREAKOUT.land[0]), ms: prev, t0: -1, keys, floorY: window.scrollY };
+    // the picture is where the finale starts from this very frame (a fast scroll may have left it behind)
+    timeline.jumpTo(T_MAX + (from * DB) / DW);
+  };
+  const endFinale = () => {
+    if (finale) holdPage(false);
+    finale = false;
+    root.classList.remove('is-finale');
   };
 
   /** The pin's last step, at once: Sam lands on the Register window and the game closes. */
@@ -917,6 +972,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
    */
   const finish = () => {
     if (mode !== 'play' || !trigger) return;
+    // the page's hold through the finale goes first, so the swap below is the only change this frame
+    endFinale();
+    setGateWheel(false);
     const ref = perch?.root ?? document.getElementById('register');
     const before = ref?.getBoundingClientRect().top ?? 0;
     // The page keeps its height through the swap: otherwise layout clamps the scroll to the shorter
@@ -936,6 +994,68 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     announce('Sam made it. Register below.');
   };
 
+  /**
+   * The top of Sam's jump out of the monitor: the pin lets go — the hero exactly as on load, the glass
+   * broken, the page at its top so nothing on screen moves — and the page follows him down as he falls,
+   * until the Register window is centred and he is on it (the frame's landing step). The page stays held
+   * (the finale's listeners) until he has landed.
+   */
+  const releaseToLanding = (now: number) => {
+    if (mode !== 'play' || !trigger) return;
+    trigger.kill(true);
+    trigger = null;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    expectedY = Number.NaN;
+    mode = 'done';
+    root.classList.add('is-done');
+    root.classList.remove('is-playing');
+    input.enabled = false;
+    input.reset();
+    motion.cancel();
+    playing = null;
+    pendingHit = false;
+    setGateWheel(false);
+    timeline.jumpTo(timeline.tMax);
+    // Where he is (the top of his jump, on screen) and where his cell on the title bar is on the page. The
+    // page scrolls until the view ends halfway down the form's email field: Sam on the title bar, the form's
+    // first fields under him, the broken monitor still above (on review 2026-11-10); he falls onto it as it
+    // arrives, never back up the screen.
+    const dpr = window.devicePixelRatio || 1;
+    const sprite = hero3d?.samSprite();
+    const g0 = d?.gl.getBoundingClientRect();
+    const from = sprite && g0 ? { x: g0.left + sprite.x, y: g0.top + sprite.y } : { x: window.innerWidth / 2, y: window.innerHeight / 3 };
+    flightFrom = from;
+    const pr = perch?.root.getBoundingClientRect();
+    const cell = (SAM_CELL * vp.k) / dpr;
+    const cellX = pr ? pr.left + cell / 2 : from.x;
+    const cellY = pr ? pr.bottom + (FOOT_SINK * vp.k) / dpr - cell / 2 : from.y;
+    const maxY = document.documentElement.scrollHeight - window.innerHeight;
+    const email = document.getElementById('reg-email')?.getBoundingClientRect();
+    const win = document.getElementById('register')?.getBoundingClientRect();
+    // (once the player has registered the field is hidden: the same depth into the window)
+    const endAt = email && email.height > 0 ? email.top + email.height / 2 : win ? win.top + 260 : window.innerHeight;
+    const want = endAt - window.innerHeight;
+    // (never so far that his cell would come to rest above him: he only ever falls)
+    const y1 = Math.max(0, Math.min(maxY, cellY - from.y, want));
+    landing = { t0: now, y1, x: cellX, y: cellY - y1 };
+    landT = 0;
+  };
+  /** The landing's step: the page eases down to the Register window as Sam falls onto it; then he is on it. */
+  const stepLanding = (now: number) => {
+    if (!landing) return;
+    landT = clamp01((now - landing.t0) / FINALE_MS.land);
+    window.scrollTo({ top: landing.y1 * smooth(landT, [0, 1]), behavior: 'instant' });
+    if (landT < 1) return;
+    landing = null;
+    settledAt = now;
+    endFinale();
+    announce('Sam made it. Register below.');
+    if (focusAfterLanding) {
+      focusAfterLanding = false;
+      focusRegister();
+    }
+  };
+
   // ── Register over the game: the dialog pauses it, and the plays pick up where they were ──
   const regDialog = createRegisterDialog({
     onOpen: () => {
@@ -949,7 +1069,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       const away = clockNow() - pausedAt;
       if (playing && playing.t0 >= 0) playing.t0 += away;
       if (breakPlay && breakPlay.t0 >= 0) breakPlay.t0 += away;
-      lastInputAt = lastHitAt = clockNow();
+      lastInputAt = clockNow();
       paused = false;
       input.enabled = mode === 'play';
     },
@@ -963,9 +1083,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const openRegister = (from: HTMLElement | null): boolean => {
     if (mode !== 'play') return false;
     if (paused || exiting) return true;
-    if (wantBreakout && qAt(timeline.tTarget) >= BREAKOUT.leap[0]) {
-      landNow();
-      focusRegister();
+    if (finale) {
+      // the finale is already carrying the page down to the form: it gets focus once Sam is on it
+      focusAfterLanding = true;
       return true;
     }
     if (!regDialog) return false;
@@ -1028,12 +1148,29 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const xOfQ = (qq: number) => (T_MAX + (qq * DB) / DW) * W;
     if (breakPlay && live) {
       if (breakPlay.t0 < 0) breakPlay.t0 = now;
-      const k = Math.min(1, (now - breakPlay.t0) / Math.max(1, breakPlay.ms));
-      const qq = breakPlay.q0 + (breakPlay.q1 - breakPlay.q0) * k;
-      window.scrollTo({ top: yOfQ(qq), behavior: 'instant' });
+      const el = now - breakPlay.t0;
+      const k = Math.min(1, el / Math.max(1, breakPlay.ms));
+      let qq = breakPlay.q0 + (breakPlay.q1 - breakPlay.q0) * k;
+      const keys = breakPlay.keys;
+      if (keys) {
+        // the finale: q along its keyframes, each stretch at its own pace
+        const i = keys.findIndex(([ms]) => ms >= el);
+        if (i <= 0) qq = i === 0 ? keys[0]![1] : breakPlay.q1;
+        else {
+          const [m0, a] = keys[i - 1]!;
+          const [m1, b] = keys[i]!;
+          qq = a + (b - a) * clamp01((el - m0) / Math.max(1, m1 - m0));
+        }
+      }
+      window.scrollTo({ top: Math.max(yOfQ(qq), breakPlay.floorY ?? -Infinity), behavior: 'instant' });
       expectedY = window.scrollY;
       timeline.drive(xOfQ(qq), 0, 'auto');
-      if (k >= 1) breakPlay = null;
+      allowQ = Math.max(allowQ, Math.min(qq, BREAKOUT.shatter[0]));
+      if (k >= 1) {
+        breakPlay = null;
+        // the top of Sam's jump: the page lets the monitor go and follows him down to the Register window
+        if (finale) releaseToLanding(now);
+      }
     }
     const qT = qOf(timeline.tTarget);
     const inBreak = qT > 0 || breakPlay !== null;
@@ -1048,20 +1185,20 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       motion.cancel();
     };
     /** One hit on the glass: one crack further, Sam hopping on the screen; the sixth breaks it and the rest plays itself. */
-    const hit = (auto: boolean) => {
+    const hit = () => {
       const next = hitTarget(qT);
       sam.jumpPress(now);
       sam.jumpRelease();
-      lastHitAt = now;
-      if (!auto) lastInputAt = now;
+      lastInputAt = now;
       if (next === null) {
-        breakPlay = { q0: qT, q1: 1, ms: (BREAK_PLAY_MS * (1 - qT)) / (1 - BREAKOUT.shatter[0]), t0: -1 };
-        autoArmed = false;
+        startFinale(qT);
         return;
       }
+      allowQ = Math.max(allowQ, next);
+      lastCrackSeen = crackStage(next);
       window.scrollTo({ top: yOfQ(next), behavior: 'instant' });
       expectedY = window.scrollY;
-      timeline.driveTarget(xOfQ(next), auto ? 'auto' : 'mash');
+      timeline.driveTarget(xOfQ(next), 'mash');
     };
 
     // While the monitor shows, the keys never drive the world: Space or → at it is PRESS START.
@@ -1130,24 +1267,83 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     if (input.active && live) {
       if (input.consumeJumpPress() || pendingHit) {
         lastInputAt = now;
-        if (hitZone) hit(false);
+        if (hitZone) hit();
         else if (DB > 0 && !breakPlay && (atEnd || (qT > 0 && qT < BREAKOUT.cracks[0]))) pullTo(BREAKOUT.cracks[0]);
         else if (!heroUp && !inBreak) sam.jumpPress(now);
       }
       if (!input.jumpHeld && !inBreak) sam.jumpRelease();
     }
     pendingHit = false;
-    // The auto-hits: armed on reaching the glass; after a second with no input the page
-    // hits it by itself, a crack every AUTO_HIT_MS. A scroll of the user's disarms them (onUpdate).
-    if (hitZone && !wasHitZone) {
-      autoArmed = true;
-      lastInputAt = now;
+    // The glass cracks only when the player hits it or scrolls: it never cracks by itself.
+
+    // ── The breakout can't be skipped: past the plaza's end the page goes no further than the breakout has
+    //    played (allowQ), which a push down grows at the capped pace — the pull-back at the dive's, then a
+    //    crack every CRACK_MIN_MS at most; scroll beyond it is absorbed. The sixth crack starts the finale.
+    // (A scrollbar drag or End straight past the whole pin is a deliberate skip: the end check lands Sam.)
+    const gateOn =
+      mode === 'play' && wantBreakout && !finale && !exiting && !paused && !zoom && !!trigger && window.scrollY < trigger.end - 1;
+    setGateWheel(gateOn && window.scrollY > gateY() - 2.5 * window.innerHeight);
+    if (gateOn) {
+      const qPage = qOf((window.scrollY - pinTop() - DE) / DW);
+      const pushed = now - gatePushAt < 120;
+      if ((qPage > allowQ + 1e-6 || pushed) && allowQ < BREAKOUT.shatter[0]) {
+        const rate = breakoutRate(allowQ);
+        const cap = pushed ? BREAKOUT.shatter[0] : Math.min(qPage, BREAKOUT.shatter[0]);
+        allowQ = Math.min(cap, allowQ + rate * dt * 1000);
+        lastInputAt = now;
+      }
+      if (qPage > allowQ + 1e-6 || pushed) {
+        const y = gateY();
+        if (Math.abs(window.scrollY - y) > 0.5) {
+          window.scrollTo({ top: y, behavior: 'instant' });
+          expectedY = window.scrollY;
+        }
+        timeline.setScrollTarget(T_MAX + (allowQ * DB) / DW);
+      }
     }
-    wasHitZone = hitZone;
-    if (!hitZone) autoArmed = false;
-    if (live && autoArmed && hitZone && input.active && now >= scrollOverrideUntil && now - lastInputAt >= AUTO_IDLE_MS && now - lastHitAt >= AUTO_HIT_MS) hit(true);
 
     timeline.step(dt);
+    // The picture eases behind the page; through the breakout it may not catch up faster than the cap, so the
+    // cracks one sees are never closer than CRACK_MIN_MS (the finale has its own pace).
+    {
+      const qv = qOf(timeline.t);
+      if (gateOn && qv > lastPicQ) {
+        const maxQ = lastPicQ + breakoutRate(lastPicQ) * dt * 1000;
+        if (qv > maxQ) timeline.t = T_MAX + (maxQ * DB) / DW;
+      }
+      lastPicQ = qOf(timeline.t);
+      if (gateOn) {
+        // a crack the scroll made, as it shows: Sam hops on the screen, as on a hit
+        const stage = crackStage(lastPicQ);
+        if (stage > lastCrackSeen && stage < CRACK_STAGES) {
+          sam.jumpPress(now);
+          sam.jumpRelease();
+        }
+        lastCrackSeen = Math.max(lastCrackSeen, stage);
+        // the sixth crack, as it shows: the finale, from there
+        if (stage >= CRACK_STAGES) startFinale(Math.min(lastPicQ, BREAKOUT.shatter[0]));
+      }
+    }
+    // A fast scroll runs ahead of the picture (it eases ~0.3 s behind the page), so the page decides, not the
+    // picture. Past the end of the pin — a fling into the Register section or beyond — the game is over
+    // where the user is: Sam lands at once and the pin goes, the page never pulled back up to play anything.
+    if (mode === 'play' && !finale && !exiting && !paused && !zoom && trigger && window.scrollY >= trigger.end - 1) {
+      stopPlays();
+      timeline.jumpTo(timeline.tMax);
+      finish();
+    }
+    // A scroll past the last crack is the sixth hit: the finale takes over from where the picture is. A
+    // scroll that has already carried the page into the landing (the Register section rising into view)
+    // starts it from where the page is, so the form and the world never disagree.
+    if (mode === 'play' && wantBreakout && !finale && !exiting && !paused && !zoom) {
+      // read from the page itself: ScrollTrigger's own update (the timeline's target) can land a frame later
+      const qPage = qOf((window.scrollY - pinTop() - DE) / DW);
+      if (qPage >= BREAKOUT.land[0]) startFinale(qPage);
+      else {
+        const qPic = qOf(timeline.t);
+        if (qPic >= BREAKOUT.shatter[0] && qPic < 1) startFinale(qPic);
+      }
+    }
     // The world's own t (0 through the enter segment, 1 through the breakout), the enter segment's
     // progress p and the breakout's q; through the breakout the monitor shows the enter segment backwards.
     const t = Math.min(T_MAX, Math.max(0, timeline.t));
@@ -1166,8 +1362,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       zoomEnded = heroP === zoom.p1;
     } else if (mode === 'default') heroP = 0;
     lastHeroP = heroP;
-    /** From the landing on, the copy is in the masthead and fades in there as the monitor glides into its slot. */
-    const mastOn = wantBreakout && (mode === 'done' || (mode === 'play' && !exiting && q >= BREAKOUT.land[0]));
     // While catching up the visual still follows the ease, so Sam faces the way he actually moves.
     sam.update(dt, timeline.t > 0 && !inBreak && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
 
@@ -1182,12 +1376,21 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       // opening hands over to the canvas world under it — only the top layer fades, over an opaque world.
       const fade = d ? 1 - smooth(heroP, ENTER.handover) : 0;
       if (d) {
-        // The copy goes with the dive and comes back with a zoom out; through the breakout it stays away
-        // until the landing, where it fades into the masthead. PRESS START: never after the landing, nor
-        // through the breakout in the game; on the page it shows over the monitor wherever the game was left.
-        toMast(mastOn);
+        // The copy goes with the dive and comes back with a zoom out; through the breakout it stays away,
+        // clear of Sam's jump and fall, and fades back in its own place round the monitor (the hero as on
+        // load) only once everything has settled after the landing (on review 2026-11-10 it came in with the
+        // burst, then during the fall: in the way both times). PRESS START: never after the breakout, nor
+        // through it in the game; on the page it shows over the monitor wherever the game was left.
         const rawOut =
-          mode === 'done' ? 0 : mastOn ? 1 - smooth(q, BREAKOUT.land) : inBreakout && mode === 'play' && !exiting ? 1 : smooth(heroP, ENTER.copyOut);
+          mode === 'done'
+            ? landing
+              ? 1
+              : settledAt !== null
+                ? 1 - smooth(now - settledAt, [COPY_BACK_MS.wait, COPY_BACK_MS.wait + COPY_BACK_MS.fade])
+                : 0
+            : inBreakout && mode === 'play' && !exiting
+              ? 1
+              : smooth(heroP, ENTER.copyOut);
         const out = Math.round(rawOut * 100) / 100;
         const startGone = mode === 'done' || (mode === 'play' && !exiting && (out >= 1 || inBreakout));
         if (out !== lastOut || d.stage.classList.contains('is-copy-gone') !== startGone) {
@@ -1195,13 +1398,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           d.stage.style.setProperty('--out', String(out));
           d.stage.classList.toggle('is-copy-gone', startGone);
         }
-        // the monitor's sideways glide into its masthead slot (the 3D does the rest of the glide)
-        const gx = mastOn || mode === 'done' ? Math.round(smooth(q, BREAKOUT.land) * glideTo.left) : 0;
-        const gl = gx ? `${gx}px 0` : '';
-        if (gl !== glideLeft) {
-          glideLeft = gl;
-          d.gl.style.translate = gl;
-        }
+        // after the breakout the copy only fades (World.astro): the dive's slide is the opening's alone
+        if (d.stage.classList.contains('is-settled') !== (mode === 'done')) d.stage.classList.toggle('is-settled', mode === 'done');
         // Faded out, the stage stays in the accessibility tree (the h1 is in it): only clicks pass through.
         const f2 = Math.round(fade * 1000) / 1000;
         if (f2 !== lastFade) {
@@ -1309,18 +1507,17 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       d.stage.style.translate = shift > 0.01 ? `0 ${(-shift).toFixed(2)}px` : '';
       if (shift <= 0.01) entryShift = 0;
     }
-    // The end of the game: the page at the pin's end and the world there too (or off screen, where it
-    // can snap). Sam is on the Register window; the game closes itself.
-    if (live && trigger && window.scrollY >= trigger.end - 1) {
-      if (!input.active) timeline.jumpTo(timeline.tMax);
-      if (timeline.t >= timeline.tMax - 1e-4) finish();
-    }
+    // The end of the finale: the page at the pin's end and the world there too. Sam is on the Register
+    // window; the game closes itself.
+    // (The finale lands only when it has played out: its page eases in, so it is at the end a little early.)
+    if (live && trigger && !breakPlay && window.scrollY >= trigger.end - 1 && timeline.t >= timeline.tMax - 1e-4) finish();
     // A zoom has reached its end: the game goes on (resume), or the page takes over (exit).
     if (zoomEnded && zoom) {
       const then = zoom.done;
       zoom = null;
       then();
     }
+    stepLanding(now);
     // Sam on the page, wherever the page is (below the pin the world no longer draws).
     updatePerch(q);
     requestAnimationFrame(frame);
@@ -1345,6 +1542,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       get saved() {
         return saved;
       },
+      get finale() {
+        return finale;
+      },
+      get gate() {
+        return { allowQ, wheel: gateWheelOn, glassT0 };
+      },
       get zoom() {
         return zoom ? { ...zoom, p: lastHeroP } : null;
       },
@@ -1365,7 +1568,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         return DB > 0 ? clamp01(((timeline.t - T_MAX) * DW) / DB) : 0;
       },
       get breakout() {
-        return { want: wantBreakout, play: breakPlay, armed: autoArmed, stage: crackStage(DB > 0 ? clamp01(((timeline.t - T_MAX) * DW) / DB) : 0), perch: perch?.root.className ?? null, samOnScreen, glideTo };
+        return { want: wantBreakout, play: breakPlay, stage: crackStage(DB > 0 ? clamp01(((timeline.t - T_MAX) * DW) / DB) : 0), perch: perch?.root.className ?? null, samOnScreen };
       },
       get hero() {
         return { mode: heroMode, phase: hero3d?.phase ?? null, shownAt, startShown, startUV, screen: screen.geom, version: screen.version, hero3d };

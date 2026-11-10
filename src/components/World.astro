@@ -56,13 +56,8 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       <noscript><img class="hero__poster" src="/monitor/monitor-on.webp" width={POSTER.w} height={POSTER.h} style={posterStyle} alt={monitorLabel} /></noscript>
     </div>
     <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
-    <!-- After the breakout: the eyebrow, the h1 and the tagline move in here (the same nodes) and the broken monitor glides into the slot. -->
-    <div class="hero__mast" data-mast>
-      <div class="hero__mast-copy" data-mast-copy></div>
-      <div class="hero__mast-slot" style={`--slot-aspect: ${1 / POSTER.slotAspect};`} aria-hidden="true" data-mast-slot></div>
-    </div>
     <Window size="compact" title="Player 1" class="hero__start" data-start>
-      <Button class="hero__start-btn" data-start-button>Press start</Button>
+      <Button class="hero__start-btn" data-start-button>Start</Button>
     </Window>
   </div>
   <script is:inline>
@@ -324,8 +319,8 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     image-rendering: pixelated;
   }
 
-  /* PRESS START: laid on the screen by a matrix3d from the camera (src/game/quad.ts) and hidden
-     until the screen has powered on. Designed 8rem wide; the transform scales it with the monitor. */
+  /* START: laid on the screen by a matrix3d from the camera (src/game/quad.ts) and hidden until the
+     screen has powered on. Designed 8rem wide; the transform scales it with the monitor. */
   .hero__start {
     position: absolute;
     top: 0;
@@ -375,93 +370,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     inset: calc(-1 * var(--window-bar-h) - var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
   }
 
-  /* ── The masthead the landing ends in (src/game/index.ts layoutMast): under the nav at the load's
-        distance, as tall as the room above Sam on the Register window (--mast-h). Desktop: the copy on
-        the left, the broken monitor's slot on the right; phones: the load's stack in miniature. ── */
-  .hero__mast {
-    position: absolute;
-    top: calc(var(--nav-h) + var(--space-6));
-    left: 50%;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    column-gap: var(--space-8);
-    width: min(100% - 2 * var(--gutter), 44rem);
-    height: var(--mast-h, 0px);
-    translate: -50% 0;
-    text-align: left;
-    pointer-events: none;
-  }
-
-  .hero__mast-copy {
-    display: grid;
-    gap: var(--space-2);
-    justify-items: start;
-  }
-
-  .hero__mast-slot {
-    height: var(--mast-h, 0px);
-    aspect-ratio: var(--slot-aspect);
-  }
-
-  .hero__mast :is(.hero__copy, .hero__tagline) {
-    pointer-events: auto;
-  }
-
-  .hero__mast .hero__copy {
-    justify-items: start;
-    gap: var(--space-2);
-  }
-
-  .hero__mast .hero__copy :global(.wm--hero) {
-    font-size: clamp(2rem, min(7vw, 9vh), 4.5rem);
-  }
-
-  .hero__mast .hero__tagline {
-    max-width: 22rem;
-    font-size: var(--text-base);
-  }
-
-  @media (max-width: 40rem) {
-    .hero__mast {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto minmax(0, 1fr) auto;
-      grid-template-areas: 'copy' 'slot' 'tag';
-      justify-items: center;
-      align-items: stretch;
-      row-gap: var(--space-2);
-      width: calc(100% - 2 * var(--gutter));
-      text-align: center;
-    }
-
-    .hero__mast-copy {
-      display: contents;
-    }
-
-    .hero__mast .hero__copy {
-      grid-area: copy;
-      justify-items: center;
-      gap: var(--space-1);
-    }
-
-    .hero__mast-slot {
-      grid-area: slot;
-      height: 100%;
-      min-height: 0;
-    }
-
-    .hero__mast .hero__tagline {
-      grid-area: tag;
-      max-width: 18rem;
-      font-size: var(--text-sm);
-    }
-
-    .hero__mast .hero__copy :global(.wm--hero) {
-      font-size: clamp(1.75rem, 8.5vw, 2.25rem);
-    }
-  }
-
   /* ── Live world: the canvas world under the opening, which lies over it and steps out as the run starts ── */
   .world__canvas {
     position: absolute;
@@ -495,6 +403,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .world--live .hero__tagline {
     opacity: calc(1 - var(--out, 0));
     translate: 0 calc(var(--out, 0) * -24px);
+  }
+
+  /* After the breakout the copy simply fades back in where it is: no slide. */
+  .world--live .hero__stage.is-settled :is(.hero__copy, .hero__tagline) {
+    translate: none;
   }
 
   .world--live .hero__start {

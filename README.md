@@ -6,24 +6,24 @@ A landing page for 16-Bit Con, a fictional retro tech convention (Oct 3–5, 202
 
 ## The idea: Sam escapes to the con
 
-By default the page reads like a normal landing page: the hero, the registration form, the schedule and the footer, scrolling as usual. The hero is a late-80s monitor with a pixel-art game live on its screen, built from Vega's own backgrounds. The game is opt-in and starts only from PRESS START.
+By default the page reads like a normal landing page: the hero, the registration form, the schedule and the footer, scrolling as usual. The hero is a late-80s monitor with a pixel-art game live on its screen, built from Vega's own backgrounds. The game is opt-in and starts only from START.
 
-1. **The opening.** A yellow all-in-one monitor, built in code with three.js, powers on with the game live on its screen. PRESS START sits on the screen, and the monitor turns toward the mouse.
-2. **The dive.** PRESS START pins the page and zooms the camera into the screen until one game pixel covers a whole number of device pixels, so the 3D hands over to the 2D canvas without a visible change.
+1. **The opening.** A yellow all-in-one monitor, built in code with three.js, powers on with the game live on its screen. START sits on the screen, and the monitor turns toward the mouse.
+2. **The dive.** START pins the page and zooms the camera into the screen until one game pixel covers a whole number of device pixels, so the 3D hands over to the 2D canvas without a visible change.
 3. **The run.** In the game, scroll position is the time of day. Sam runs from the morning field (the keynote), through the afternoon streets (the panel) and the night with its windows lighting one by one (the after party), to dawn over the Javits plaza.
-4. **The breakout.** The camera pulls back out to the monitor. Six hits crack its glass, Sam jumps through as it bursts, and he lands on the registration form.
+4. **The breakout.** The camera pulls back out to the monitor. Six hits crack its glass, Sam jumps out through it as it bursts, and the page follows him down onto the registration form. The hero keeps its layout throughout.
 
-Inside the game one timeline drives everything, so scrolling up plays it backwards. When Sam lands, the game closes itself: the pin goes, the page stays exactly where it was, and Sam stays on the form for the rest of the visit. Exit game (or Esc) leaves mid-game, zooming back out to the monitor with focus on PRESS START.
+Inside the game one timeline drives everything, so scrolling up plays it backwards. When Sam lands, the game closes itself: the pin goes, the page stays exactly where it was, and Sam stays on the form for the rest of the visit. Exit game (or Esc) leaves mid-game, zooming back out to the monitor with focus on START.
 
 ## Controls
 
-- PRESS START opens the game. Until then the keys belong to the page, so Space scrolls it.
-- In the game, scroll, or hold → to run and Space to jump. At the monitor's glass, Space or a tap hits it, or wait a second.
+- START opens the game. Until then the keys belong to the page, so Space scrolls it.
+- In the game, scroll, or hold → to run and Space to jump. The run can be scrolled as fast as you like; the breakout can't be skipped. Past the plaza the page goes no faster than the breakout: the camera pulls back at the dive's pace, and scrolling cracks the glass at most one crack every 150 ms. Space, a tap or a click on the screen also hits it. The glass never cracks by itself. The sixth crack starts the finale: the glass bursts, Sam leaps out and the page follows him down onto the form, at its own pace with scrolling held.
 - On phones, the d-pad and the A button drive the world.
-- Exit game in the HUD, or Esc, closes the game: the camera zooms back out of the screen to the monitor, which then shows the game frozen where you left it. PRESS START dives back in and resumes from that spot (in memory only, so a reload starts over). The skip link closes the game at once.
+- Exit game in the HUD, or Esc, closes the game: the camera zooms back out of the screen to the monitor, which then shows the game frozen where you left it. START dives back in and resumes from that spot (in memory only, so a reload starts over). The skip link closes the game at once.
 - "Register now" centres the registration form on the page; in the game it opens the form in a dialog over the paused game, and Esc or its close button closes only the dialog.
-- After Sam lands, the broken monitor stays in a masthead with the event's name, date and tagline. There is no replay.
-- With reduced motion, the page is static with the monitor powered on and no PRESS START: the game is never offered. Without WebGL, the opening is a poster and PRESS START still runs the canvas world.
+- After Sam lands, the hero is as it was on load, with the glass broken and no Start button. There is no replay.
+- With reduced motion, the page is static with the monitor powered on and no START: the game is never offered. Without WebGL, the opening is a poster and START still runs the canvas world.
 
 ## Stack
 

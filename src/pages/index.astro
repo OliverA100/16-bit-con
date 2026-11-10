@@ -11,9 +11,8 @@ import { sessions } from '../data/sessions';
   <World />
 
   <!--
-    The landing: Sam breaks out of the monitor and lands here, on the Register
-    window's title bar. With the breakout this section rises under the pinned monitor through the
-    breakout's last stretch (--rise, set by the world); without it, it simply follows the world.
+    The landing: Sam breaks out of the monitor and lands here, on the Register window's title bar. The
+    section follows the hero as on any page; the game scrolls down to it with him as he falls.
   -->
   <section class="section container landing" aria-labelledby="landing-title">
     <h2 class="sr-only" id="landing-title">Register for 16-Bit Con</h2>
@@ -89,7 +88,6 @@ import { sessions } from '../data/sessions';
   .landing {
     position: relative;
     z-index: 2;
-    margin-top: calc(-1 * var(--rise, 0px));
     padding-top: var(--space-24);
   }
 
@@ -164,7 +162,8 @@ import { sessions } from '../data/sessions';
     background: color-mix(in srgb, var(--color-green-900) 45%, transparent);
   }
 
-  /* The page holds still under the dialog, and while the camera zooms out of the game. */
+  /* The page holds still under the dialog and while the camera zooms out of the game. (Through the
+     breakout's finale the game holds it with listeners instead: src/game/index.ts holdPage.) */
   :global(:root:is(.is-paused, .is-exiting)) {
     overflow: hidden;
   }

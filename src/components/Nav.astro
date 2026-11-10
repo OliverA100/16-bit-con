@@ -23,7 +23,8 @@ import Wordmark from './Wordmark.astro';
     link.addEventListener('click', (e) => {
       const root = document.documentElement;
       if (root.classList.contains('is-playing')) return;
-      if (root.classList.contains('is-exiting')) {
+      // (zooming out of the game, or the finale carrying the page down to the form itself)
+      if (root.classList.contains('is-exiting') || root.classList.contains('is-finale')) {
         e.preventDefault();
         return;
       }

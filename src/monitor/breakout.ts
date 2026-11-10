@@ -1046,14 +1046,17 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       const r = toCss(world.clone().add(across));
       const there = (Math.hypot(r[0] - l[0], r[1] - l[1]) * dpr) / 60;
       const d1 = d0 / Math.max(1, scale / Math.max(1e-3, there));
-      // out through the glass fast, slowing as he comes: the page takes him over from rest
-      const e = 1 - Math.pow(1 - leap, 2.2);
+      // One jump, like a thrown ball: out through the glass and up toward the viewer, his speed falling
+      // evenly (a parabola) to the top of the jump as the leap ends — the one moment he is at rest, where
+      // the page takes him over and he falls on to the Register window. (On review 2026-11-10 a hop up and
+      // back down, then a stop in mid-air, then a second hop read as unnatural.)
+      const e = leap * (2 - leap);
       const d = Math.exp(Math.log(d0) + (Math.log(d1) - Math.log(d0)) * e);
       const at = camPos.clone().add(world.clone().sub(camPos).multiplyScalar(d / d0));
-      // a hop: up the screen first, then on toward the viewer. His size is his own: nearer, he looks bigger.
+      // His size is his own: nearer, he looks bigger.
       const edge = size * O.h * s0;
       const up = new Vector3(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(tmpQ));
-      at.addScaledVector(up, Math.sin(Math.PI * Math.min(1, leap * 1.4)) * edge * 1.5);
+      at.addScaledVector(up, e * edge * 0.7);
       samWorld = { centre: at, size: edge };
       // the billboard lives in the body (it turns with the parallax): back into its space, facing the camera
       const inv = parts.body.matrixWorld.clone().invert();
