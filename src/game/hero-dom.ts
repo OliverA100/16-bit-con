@@ -4,7 +4,6 @@
  * failed or never arrived): the powered-on poster with PRESS START placed on its screen.
  */
 import { POSTER } from '../monitor/poster';
-import { DIMS } from '../monitor/spec';
 import { quadMatrix, subQuad, type Quad } from './quad';
 
 export interface HeroDom {
@@ -29,12 +28,20 @@ export function queryHero(section: HTMLElement): HeroDom | null {
 }
 
 /**
- * PRESS START's rectangle on the screen, u and v across the opening (0–1): centred a little above
- * the middle so Sam and the ground stay in view below it, wider on phones where the screen is small.
+ * START's rectangle on the screen, u and v across the opening (0–1): the window drawn at its true size —
+ * one CSS px per px, like every other window on the page, the same in both directions — measured against
+ * the screen as it is drawn (the poster's screen, which the 3D at rest matches). Only a screen too small to
+ * hold it shrinks it, evenly. Centred a little above the middle so Sam and the ground stay in view below.
  */
 export function startRect(d: HeroDom): [number, number, number, number] {
-  const fw = d.slot.offsetWidth < 260 ? 0.84 : 0.62;
-  const fh = fw * (DIMS.opening.w / DIMS.opening.h) * (d.start.offsetHeight / Math.max(1, d.start.offsetWidth));
+  const q = posterScreen(d);
+  const sw = Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]);
+  const sh = Math.hypot(q[3][0] - q[0][0], q[3][1] - q[0][1]);
+  const w = Math.max(1, d.start.offsetWidth);
+  const h = Math.max(1, d.start.offsetHeight);
+  const k = Math.min(1, (0.9 * sw) / w, (0.8 * sh) / h);
+  const fw = (k * w) / Math.max(1, sw);
+  const fh = (k * h) / Math.max(1, sh);
   const vc = 0.42;
   return [0.5 - fw / 2, vc - fh / 2, 0.5 + fw / 2, vc + fh / 2];
 }

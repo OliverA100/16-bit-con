@@ -138,8 +138,10 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   <p class="eyebrow world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
 
-  <Window size="compact" title="BREAK OUT · 0/6" class="world__prompt" aria-live="polite">
-    <p class="world__prompt-key"><span class="world__prompt-fine">Mash space</span><span class="world__prompt-coarse">Tap to break out</span></p>
+  <Window size="compact" title="Help Sam · 0/7" class="world__prompt" aria-live="polite">
+    <!-- Click or tap the monitor to hit its glass (Space hits it too: said to screen readers). -->
+    <p class="world__prompt-key">Hit the screen</p>
+    <p class="world__prompt-sub">to break the glass<span class="sr-only">, or press Space</span></p>
   </Window>
 
   <div class="world__touch" aria-hidden="true">
@@ -319,15 +321,15 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     image-rendering: pixelated;
   }
 
-  /* START: laid on the screen by a matrix3d from the camera (src/game/quad.ts) and hidden until the
-     screen has powered on. Designed 8rem wide; the transform scales it with the monitor. */
+  /* START: a normal compact window (its shadow, its padding), laid on the screen by a matrix3d from the
+     camera (src/game/quad.ts) at its true size — one CSS px per px (src/game/hero-dom.ts startRect) —
+     and hidden until the screen has powered on. */
   .hero__start {
     position: absolute;
     top: 0;
     left: 0;
     z-index: 3;
     width: 8rem;
-    box-shadow: var(--shadow-hard-sm);
     text-align: left;
     transform-origin: 0 0;
     visibility: hidden;
@@ -335,10 +337,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .hero__start.is-ready {
     visibility: visible;
-  }
-
-  .hero__start :global(.window__body) {
-    padding: var(--space-2);
   }
 
   /* The tube's scanlines run over PRESS START too, at the screen's own period (--scan, from the camera
@@ -367,7 +365,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .hero__start :global(.hero__start-btn)::after {
     content: '';
     position: absolute;
-    inset: calc(-1 * var(--window-bar-h) - var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
+    inset: calc(-1 * var(--window-bar-h) - var(--space-3)) calc(-1 * var(--space-4)) calc(-1 * var(--space-3));
   }
 
   /* ── Live world: the canvas world under the opening, which lies over it and steps out as the run starts ── */
@@ -613,38 +611,34 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   /* Centred at the top under the nav, on the HUD's row; where the two would meet (below 48rem) it
      drops under the HUD instead, still centred. */
+  /* Centred in the room between the nav and the monitor's top (--prompt-top, set by the loop as it shows). */
   .world__prompt {
-    top: calc(var(--nav-h) + var(--space-4));
+    top: var(--prompt-top, calc(var(--nav-h) + var(--space-4)));
     left: 50%;
     width: min(16rem, calc(100% - 2 * var(--gutter)));
     translate: -50% 0;
     text-align: center;
   }
 
-  @media (max-width: 48rem) {
-    .world__prompt {
-      top: calc(var(--nav-h) + var(--space-4) + 5rem + var(--space-3));
-    }
+
+  /* Two lines, evenly set in the window: what to do in the pixel face, what for in the mono. */
+  .world__prompt :global(.window__body) {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: center;
+    padding: var(--space-3) var(--space-4);
   }
 
   .world__prompt-key {
     font-family: var(--font-pixel);
-    font-size: var(--text-2xl);
-    line-height: var(--leading-tight);
+    font-size: var(--text-xl);
+    line-height: 1;
   }
 
-  .world__prompt-coarse {
-    display: none;
-  }
-
-  @media (pointer: coarse) {
-    .world__prompt-fine {
-      display: none;
-    }
-
-    .world__prompt-coarse {
-      display: inline;
-    }
+  .world__prompt-sub {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
   }
 
   .world__session {

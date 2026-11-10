@@ -47,7 +47,7 @@ import { ScreenFrame } from './screen-frame';
 import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
 import type { BreakoutState, Hero } from '../monitor/hero';
-import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, hitTarget, playMs, playP, scrollLengths, smooth } from './segments';
+import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
 import { drawCell, idleOnPerch, queryPerch } from './landing';
 import { createRegisterDialog, focusRegister } from './register-dialog';
 import { typeOut } from './typing';
@@ -80,14 +80,33 @@ const COPY_BACK_MS = { wait: 200, fade: 600 } as const;
 /** The glass's flight, ms: the shatter's own clock (src/monitor/breakout.ts FALL.time), whatever Sam's pace. */
 const GLASS_MS = 1100;
 /**
- * The breakout can't be skipped, however the page is scrolled: past the plaza's end the scroll drives it
- * no faster than this — the pull-back at the dive's own pace (segments.ts PLAY), and a crack at most every
- * CRACK_MIN_MS (mashing speed) — and the page holds at the monitor until Sam
- * has landed. Scroll beyond that is absorbed.
+ * The breakout can't be skipped, however the page is scrolled: past the plaza's end the scroll drives the
+ * pull-back to the monitor no faster than the dive's own pace (segments.ts PLAY) and stops at the glass.
+ * The scroll that brought it there never cracks it, however long its momentum runs; once it has rested
+ * (SCROLL_REST_MS), a new scroll cracks the glass, at most a crack every CRACK_MIN_MS, and breaks it after
+ * the sixth (on review 2026-11-10). Hits crack it at once, any time. The page holds there until Sam has
+ * landed; scroll beyond what has played is absorbed.
  */
 const CRACK_MIN_MS = 150;
+/** At the glass, the scroll must have rested this long before a new one cracks it (momentum never does). */
+const SCROLL_REST_MS = 250;
+/** After the page reaches the glass, a wheel step there counts only after this long (the swipe that arrived doesn't). */
+const GLASS_GRACE_MS = 400;
 /** One crack's stretch of the breakout's progress q. */
 const CRACK_STEP = (BREAKOUT.cracks[1] - BREAKOUT.cracks[0]) / CRACK_STAGES;
+/** The hits it takes: one per crack (six), and one more that breaks the glass. */
+const HITS = CRACK_STAGES + 1;
+/** Where the glass rests with all six cracks: the middle of the last crack's stretch. */
+const LAST_CRACK = BREAKOUT.cracks[0] + (CRACK_STAGES - 0.5) * CRACK_STEP;
+/**
+ * Where a hit takes the breakout from q: one crack further, to the middle of its stretch, all six of them;
+ * with all six showing, the next hit breaks the glass (null). Every hit shows something: before, the sixth
+ * hit both made the last crack and set off the burst (on review 2026-11-10).
+ */
+const hitNext = (q: number): number | null => {
+  const next = crackStage(q) + 1;
+  return next > CRACK_STAGES ? null : BREAKOUT.cracks[0] + (next - 0.5) * CRACK_STEP;
+};
 /** A 3D that is not on screen this long after it was asked for gives way to the static opening. */
 const HERO_TIMEOUT_MS = 10000;
 
@@ -366,6 +385,19 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let allowQ = 0;
   /** A wheel push at the hold (absorbed), when: it keeps the breakout moving at its capped pace. */
   let gatePushAt = -Infinity;
+  /**
+   * At the glass, scrolling cracks it only once the scroll that brought the page there has come to rest
+   * (no push for SCROLL_REST_MS): a fresh scroll is the player's, momentum still settling is not. Hits
+   * (click, tap, Space) crack it any time.
+   */
+  let scrollCracks = false;
+  let lastPushAt = -Infinity;
+  /** When the page reached the glass (the grace before a scroll there counts starts then). */
+  let atGlassSince = -Infinity;
+  /** The last wheel step that was the player's (not momentum's shrinking tail), and the last step's size and time. */
+  let wheelFreshAt = -Infinity;
+  let lastWheelAbs = 0;
+  let lastWheelAt = -Infinity;
   const pinTop = () => trigger?.start ?? 0;
   // Sam stands on the Register window at the game's own scale (--sam-px, CSS px per art px).
   const setLandingVars = () => {
@@ -526,6 +558,23 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let lastFade = -1;
   /** Sam where the run ends, on the monitor's screen: his cell's centre (screen UV) and size (screen heights) — where the cracks start. */
   let samOnScreen: { centre: [number, number]; size: number } | null = null;
+  /**
+   * The breakout's prompt, centred in the room between the nav and the monitor's top (the monitor is at
+   * rest through the cracks; the HUD is hidden then).
+   */
+  let promptTop = '';
+  const placePrompt = (el: HTMLElement) => {
+    if (!d) return;
+    const nav = document.querySelector('.nav-slot')?.getBoundingClientRect().bottom ?? 0;
+    const monitorTop = slotBox(d).y;
+    const h = el.offsetHeight;
+    const top = nav + (monitorTop - nav - h) / 2;
+    const v = `${Math.round(Math.max(nav + 8, top))}px`;
+    if (v !== promptTop) {
+      promptTop = v;
+      el.style.setProperty('--prompt-top', v);
+    }
+  };
   /** The monitor's screen as a tap target through the cracks (the 3D canvas itself takes no pointer events). */
   const hitEl = d ? d.stage.querySelector<HTMLElement>('[data-hit]') : null;
   let hitBox = '';
@@ -805,6 +854,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     syncLengths();
     const resume = saved ? tlOf(saved) : null;
     allowQ = saved?.q ?? 0;
+    scrollCracks = false;
+    lastPushAt = -Infinity;
+    atGlassSince = -Infinity;
+    wheelFreshAt = -Infinity;
     lastCrackSeen = crackStage(allowQ);
     glassT0 = null;
     gatePushAt = -Infinity;
@@ -856,21 +909,39 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const gateY = () => pinTop() + DE + DW + allowQ * DB;
   const gateWheel = (e: WheelEvent) => {
     if (!trigger || e.deltaY <= 0) return;
+    // Momentum (a trackpad's inertia) is a run of steps that shrink, ending in small equal ones; a new
+    // swipe comes in growing, or after a pause, and a mouse wheel's notches come in large and equal. Only
+    // those are the player's at the glass.
+    const t = clockNow();
+    const abs = Math.abs(e.deltaY);
+    const fresh = t - lastWheelAt >= 120 || abs > lastWheelAbs * 1.02 || (abs >= 40 && abs >= lastWheelAbs);
+    lastWheelAbs = abs;
+    lastWheelAt = t;
+    if (fresh) wheelFreshAt = t;
     const y = gateY();
     if (window.scrollY + e.deltaY <= y + 1) return;
     e.preventDefault();
-    gatePushAt = clockNow();
+    gatePushAt = t;
     if (window.scrollY < y - 0.5) {
       window.scrollTo({ top: y, behavior: 'instant' });
       expectedY = window.scrollY;
     }
   };
+  /** A new touch at the glass is the player's: it stops momentum, and the scroll it starts may crack the glass. */
+  const gateTouch = () => {
+    if (allowQ >= BREAKOUT.cracks[0] - 1e-6) scrollCracks = true;
+  };
   let gateWheelOn = false;
   const setGateWheel = (on: boolean) => {
     if (on === gateWheelOn) return;
     gateWheelOn = on;
-    if (on) window.addEventListener('wheel', gateWheel, { passive: false });
-    else window.removeEventListener('wheel', gateWheel);
+    if (on) {
+      window.addEventListener('wheel', gateWheel, { passive: false });
+      window.addEventListener('touchstart', gateTouch, { passive: true });
+    } else {
+      window.removeEventListener('wheel', gateWheel);
+      window.removeEventListener('touchstart', gateTouch);
+    }
   };
   /** The crack stage last seen, so a crack the scroll makes gets Sam's hop, as a hit does. */
   let lastCrackSeen = 0;
@@ -889,11 +960,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     motion.cancel();
     playing = null;
     pendingHit = false;
-    // Keyframes (ms, q) from `from` to the landing, each stretch lasting its FINALE_MS (a share of it
-    // when `from` is inside it): from the sixth hit's crack to the burst, the leap, the landing.
-    const sixthHit = BREAKOUT.cracks[0] + (CRACK_STAGES - 1.5) * CRACK_STEP;
+    // Keyframes (ms, q) from `from` to the top of the leap, each stretch lasting its FINALE_MS (a share of
+    // it when `from` is inside it): the beat from the breaking hit (the glass at six cracks) to the burst,
+    // then the leap.
     const stretches: [number, number, number][] = [
-      [sixthHit, BREAKOUT.shatter[0], FINALE_MS.toBurst],
+      [LAST_CRACK, BREAKOUT.shatter[0], FINALE_MS.toBurst],
       [BREAKOUT.shatter[0], BREAKOUT.land[0], FINALE_MS.leap],
     ];
     const keys: [number, number][] = [[0, from]];
@@ -901,7 +972,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     for (const [a, b, ms] of stretches) {
       if (b <= from) continue;
       // the beat before the burst is always whole, however far into the sixth crack the finale starts
-      prev += a === sixthHit ? ms : (ms * (b - Math.max(from, a))) / (b - a);
+      prev += a === LAST_CRACK ? ms : (ms * (b - Math.max(from, a))) / (b - a);
       keys.push([prev, b]);
     }
     // (the page never goes back up: the picture may trail where the page was let go, behind the pinned monitor)
@@ -1191,7 +1262,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     /** The plaza's end: the run is over, and → or Space pulls the camera back out of the game. */
     const atEnd = DB > 0 && timeline.tTarget >= T_MAX - 1e-6;
     /** The glass is there to hit: the monitor at rest, fewer than six cracks, nothing playing. */
-    const hitZone = DB > 0 && !breakPlay && qT >= BREAKOUT.cracks[0] - 1e-3 && crackStage(qT) < CRACK_STAGES;
+    // (with all six cracks showing the glass is still there to hit: that hit breaks it)
+    const hitZone = DB > 0 && !breakPlay && qT >= BREAKOUT.cracks[0] - 1e-3 && qT < BREAKOUT.shatter[0] - 1e-6;
     /** Out to the monitor, or back into the game: the enter segment's pace, backwards. */
     const pullTo = (to: number) => {
       if (Math.abs(to - qT) < 1e-4) return;
@@ -1200,7 +1272,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     };
     /** One hit on the glass: one crack further, Sam hopping on the screen; the sixth breaks it and the rest plays itself. */
     const hit = () => {
-      const next = hitTarget(qT);
+      const next = hitNext(qT);
       sam.jumpPress(now);
       sam.jumpRelease();
       lastInputAt = now;
@@ -1212,7 +1284,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       lastCrackSeen = crackStage(next);
       window.scrollTo({ top: yOfQ(next), behavior: 'instant' });
       expectedY = window.scrollY;
-      timeline.driveTarget(xOfQ(next), 'mash');
+      // the crack shows the moment it is hit: the picture goes straight there (no ease, and the scroll's
+      // speed limit is not a hit's: on review 2026-11-10 a crack came 224 ms after its click)
+      timeline.drive(xOfQ(next), 0, 'mash');
+      lastPicQ = next;
     };
 
     // While the monitor shows, the keys never drive the world: Space or → at it is PRESS START.
@@ -1291,8 +1366,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // The glass cracks only when the player hits it or scrolls: it never cracks by itself.
 
     // ── The breakout can't be skipped: past the plaza's end the page goes no further than the breakout has
-    //    played (allowQ), which a push down grows at the capped pace — the pull-back at the dive's, then a
-    //    crack every CRACK_MIN_MS at most; scroll beyond it is absorbed. The sixth crack starts the finale.
+    //    played (allowQ). A push down grows it through the pull-back at the dive's pace and stops at the
+    //    glass; once that scroll has rested, a new one grows it on through the cracks to the break, and
+    //    hits move it any time. Scroll beyond it is absorbed.
     // (A scrollbar drag or End straight past the whole pin is a deliberate skip: the end check lands Sam.)
     const gateOn =
       mode === 'play' && wantBreakout && !finale && !exiting && !paused && !zoom && !!trigger && window.scrollY < trigger.end - 1;
@@ -1300,13 +1376,29 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     if (gateOn) {
       const qPage = qOf((window.scrollY - pinTop() - DE) / DW);
       const pushed = now - gatePushAt < 120;
-      if ((qPage > allowQ + 1e-6 || pushed) && allowQ < BREAKOUT.shatter[0]) {
+      // (past the hold by more than a pixel: the page rests on whole pixels, the hold need not)
+      const pushing = window.scrollY > gateY() + 1 || pushed;
+      const atGlass = allowQ >= BREAKOUT.cracks[0] - 1e-6;
+      if (!atGlass) atGlassSince = -Infinity;
+      else if (atGlassSince === -Infinity) atGlassSince = now;
+      // At the glass a scroll cracks it when it is the player's: a fresh wheel step (not momentum's tail)
+      // after the grace, or — for touch and keys — any scroll once the one that arrived has rested (a
+      // new touch at the glass counts as rested: it stops momentum).
+      if (atGlass && !scrollCracks && now - lastPushAt >= SCROLL_REST_MS) scrollCracks = true;
+      if (pushing) lastPushAt = now;
+      const freshWheel = now - wheelFreshAt < 120 && now - atGlassSince >= GLASS_GRACE_MS;
+      const overshoot = window.scrollY > gateY() + 1;
+      const theirs = !atGlass || freshWheel || (scrollCracks && (overshoot || pushed));
+      // how far a scroll may take the breakout: through the pull-back to the glass, then through the cracks
+      // and on to the break, at most a crack every CRACK_MIN_MS
+      const limit = atGlass ? BREAKOUT.shatter[0] : BREAKOUT.cracks[0];
+      if (pushing && theirs && allowQ < limit) {
         const rate = breakoutRate(allowQ);
-        const cap = pushed ? BREAKOUT.shatter[0] : Math.min(qPage, BREAKOUT.shatter[0]);
+        const cap = pushed ? limit : Math.min(qPage, limit);
         allowQ = Math.min(cap, allowQ + rate * dt * 1000);
         lastInputAt = now;
       }
-      if (qPage > allowQ + 1e-6 || pushed) {
+      if (pushing) {
         const y = gateY();
         if (Math.abs(window.scrollY - y) > 0.5) {
           window.scrollTo({ top: y, behavior: 'instant' });
@@ -1329,13 +1421,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (gateOn) {
         // a crack the scroll made, as it shows: Sam hops on the screen, as on a hit
         const stage = crackStage(lastPicQ);
-        if (stage > lastCrackSeen && stage < CRACK_STAGES) {
+        if (stage > lastCrackSeen && stage <= CRACK_STAGES) {
           sam.jumpPress(now);
           sam.jumpRelease();
         }
         lastCrackSeen = Math.max(lastCrackSeen, stage);
-        // the sixth crack, as it shows: the finale, from there
-        if (stage >= CRACK_STAGES) startFinale(Math.min(lastPicQ, BREAKOUT.shatter[0]));
+        // once the sixth crack has shown for its own stretch (the scroll's seventh push): the finale, its
+        // beat (FINALE_MS.toBurst) and then the burst
+        if (lastPicQ >= BREAKOUT.shatter[0] - 1e-6) startFinale(LAST_CRACK);
       }
     }
     // A fast scroll runs ahead of the picture (it eases ~0.3 s behind the page), so the page decides, not the
@@ -1376,8 +1469,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       zoomEnded = heroP === zoom.p1;
     } else if (mode === 'default') heroP = 0;
     lastHeroP = heroP;
-    // While catching up the visual still follows the ease, so Sam faces the way he actually moves.
-    sam.update(dt, timeline.t > 0 && !inBreak && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
+    // While catching up the visual still follows the ease, so Sam faces the way he actually moves. He runs
+    // whenever the world he is drawn in moves through the run — by the picture, not by where the scroll is
+    // headed: a fast scroll's target can be past the plaza while the picture still runs (on review
+    // 2026-11-10 he stood still there with the world sliding under him).
+    sam.update(dt, timeline.t > 0 && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
 
     const X = t * W;
     const camLeft = X - sx;
@@ -1425,17 +1521,20 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         if (fade > 0) {
           const b = inBreakout ? breakState(q, now) : null;
           drawHero({ ...view, samX: X, hideSam: !!b?.sam }, now, heroP, b);
-          // the monitor's screen takes taps through the cracks; BREAK OUT · n/6 labels it
-          const prompting = live && !!b && q >= BREAKOUT.cracks[0] - 0.005 && b.stage < CRACK_STAGES && !breakPlay;
+          // the monitor's screen takes taps through the cracks; "Help Sam · n/6" labels it
+          const prompting = live && !!b && q >= BREAKOUT.cracks[0] - 0.005 && q < BREAKOUT.shatter[0] && !breakPlay;
           o.prompt?.classList.toggle('is-visible', prompting);
-          const count = `BREAK OUT · ${b ? b.stage : 0}/${CRACK_STAGES}`;
+          const count = `Help Sam · ${b ? b.stage : 0}/${HITS}`;
+          if (prompting && o.prompt) placePrompt(o.prompt);
           if (o.promptTitle && o.promptTitle.textContent !== count) o.promptTitle.textContent = count;
           if (hitEl) {
             hitEl.classList.toggle('is-active', prompting);
             if (prompting && hero3d) {
+              // the whole monitor takes the click or tap (the prompt says "Click the screen"): its glass and its body at rest
               const qd = hero3d.quad(0, 0, 1, 1);
-              const xs = qd.map((c) => c[0]);
-              const ys = qd.map((c) => c[1]);
+              const sb = slotBox(d);
+              const xs = [...qd.map((c) => c[0]), sb.x, sb.x + sb.w];
+              const ys = [...qd.map((c) => c[1]), sb.y, sb.y + sb.h];
               const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map(Math.round);
               const key = box.join(',');
               if (key !== hitBox) {
