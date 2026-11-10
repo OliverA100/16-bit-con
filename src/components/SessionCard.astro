@@ -28,18 +28,36 @@ const dark = session.scene === 'night';
 </Window>
 
 <style>
+  /* Every card in a row is as tall as the tallest: the card fills its grid cell, the body takes
+     the height left under the still, and the time · place line sits on the bottom edge. */
+  .session {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .session :global(.window__body) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
   .session__body {
-    display: grid;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     gap: var(--space-2);
-    padding: var(--space-4);
+    padding: var(--window-pad);
+    font-size: var(--text-sm);
+    line-height: var(--leading-ui);
   }
 
   .session__title {
     text-align: left;
     font-family: var(--font-body);
-    font-weight: 600;
+    font-weight: 500;
     font-size: var(--text-lg);
-    line-height: var(--leading-snug);
+    line-height: var(--leading-title);
     color: inherit;
   }
 
@@ -48,7 +66,8 @@ const dark = session.scene === 'night';
   }
 
   .session__meta {
-    margin-top: var(--space-1);
+    margin-top: auto;
+    padding-top: var(--space-1);
   }
 
   .session--dark .session__blurb {

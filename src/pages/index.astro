@@ -2,11 +2,9 @@
 import Base from '../layouts/Base.astro';
 import Window from '../components/Window.astro';
 import World from '../components/World.astro';
-import SectionMarker from '../components/SectionMarker.astro';
 import SessionCard from '../components/SessionCard.astro';
 import RegisterForm from '../components/RegisterForm.astro';
 import { sessions } from '../data/sessions';
-import { sprites } from '../data/sprites.manifest';
 ---
 
 <Base>
@@ -22,7 +20,7 @@ import { sprites } from '../data/sprites.manifest';
     <div class="landing__window">
       <div class="landing__perch" data-landing>
         <canvas class="landing__sam pixel" width="60" height="60" aria-hidden="true" data-landing-sam></canvas>
-        <Window title="Agent Sam" class="landing__bubble" data-landing-bubble>
+        <Window size="compact" title="Agent Sam" class="landing__bubble" data-landing-bubble>
           <p class="mono landing__line">Made it. Find me at Booth 630.</p>
         </Window>
       </div>
@@ -30,27 +28,7 @@ import { sprites } from '../data/sprites.manifest';
     </div>
   </section>
 
-  <section class="section container" id="booth" aria-labelledby="booth-title">
-    <SectionMarker sprite="handMegaphone" />
-    <h2 id="booth-title">Find us at Booth 630</h2>
-    <p class="section__lede">Vega is at the con all weekend. Bring your high scores.</p>
-    <div class="cta">
-      <Window title="Booth 630" id="booth-window">
-        <img class="cta__sign" src="/sprites/ui/vega-logo.svg" alt="Vega" width="138" height="45" />
-        <p class="cta__copy">Stickers, demos, a very good mole. The after party starts at 6:00 PM and ends when the arcade does.</p>
-        <p class="eyebrow">Javits Center · Hall 3B · Booth 630</p>
-        <p class="mono cta__url"><a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a></p>
-      </Window>
-      <Window title="Player 1 bonus" id="bonus" class="bonus" hidden>
-        <p class="bonus__gg">12/12 coins. GG.</p>
-        <p class="bonus__copy">Say <span class="mono">16BIT-GG</span> at Booth 630 for the Player 1 bonus.</p>
-        <p class="eyebrow">Counted in this tab only. Nothing is sent or stored.</p>
-      </Window>
-    </div>
-  </section>
-
   <section class="section container" id="schedule" aria-labelledby="schedule-title">
-    <SectionMarker sprite="handClipboard" />
     <h2 id="schedule-title">Schedule</h2>
     <p class="section__lede">Three sessions. Zero save states.</p>
     <ol class="sessions">
@@ -68,6 +46,8 @@ import { sprites } from '../data/sprites.manifest';
 
 <style>
   /* ── Sections ── */
+  /* 96 px above a section; the last one keeps 48 px under it, which with the footer's own 48 px
+     gives the page the same 96 px at its end. */
   .section {
     display: grid;
     gap: var(--space-6);
@@ -75,13 +55,17 @@ import { sprites } from '../data/sprites.manifest';
     padding-top: var(--space-24);
   }
 
-  .section :global(.marker) {
-    margin-bottom: calc(-1 * var(--space-4));
+  .section:last-of-type {
+    padding-bottom: var(--space-12);
   }
 
   .section__lede {
     color: var(--text-muted);
     text-align: center;
+  }
+
+  .sessions > li {
+    display: flex;
   }
 
   .sessions {
@@ -91,6 +75,7 @@ import { sprites } from '../data/sprites.manifest';
     padding: 0;
     list-style: none;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    grid-auto-rows: 1fr; /* every row as tall as the tallest card: all three match at any width */
   }
 
   /* ── The landing: the Register window with Sam on its title bar (--sam-px: CSS px per art px, whole
@@ -147,41 +132,5 @@ import { sprites } from '../data/sprites.manifest';
   :global(:root.has-breakout) .landing__perch .landing__sam.is-flying {
     transform-origin: 0 0;
     visibility: visible;
-  }
-
-  .cta {
-    display: grid;
-    gap: var(--space-8);
-    width: 100%;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-    align-items: start;
-  }
-
-  .cta__sign {
-    width: calc(2 * 138px);
-    height: auto;
-    margin-bottom: var(--space-4);
-  }
-
-  .cta__copy {
-    margin-bottom: var(--space-2);
-  }
-
-  .cta__url {
-    margin-top: var(--space-4);
-    padding-top: var(--space-3);
-    border-top: var(--border);
-    font-size: var(--text-sm);
-  }
-
-  .bonus__gg {
-    margin-bottom: var(--space-2);
-    font-family: var(--font-pixel);
-    font-size: var(--text-2xl);
-    line-height: var(--leading-tight);
-  }
-
-  .bonus__copy {
-    margin-bottom: var(--space-3);
   }
 </style>

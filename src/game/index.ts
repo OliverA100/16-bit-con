@@ -406,7 +406,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   /** Typewriter pace: one character per this many ms. */
   const TYPE_MS = 32;
 
-  // ── HUD wiring, and the Player 1 bonus in the Arrival section at 12/12 ──
+  // ── HUD wiring, and the Player 1 bonus line in the Register window at 12/12 ──
   const bonus = document.getElementById('bonus');
   const registerBonus = document.getElementById('register-bonus');
   const setCoins = (n: number) => {

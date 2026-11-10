@@ -10,7 +10,8 @@ import Button from './Button.astro';
 const tickets = [
   { value: 'sat', label: 'Saturday', meta: 'Oct 3' },
   { value: 'sun', label: 'Sunday', meta: 'Oct 4' },
-  { value: 'weekend', label: 'Weekend pass', meta: 'Oct 3–5' },
+  { value: 'mon', label: 'Monday', meta: 'Oct 5' },
+  { value: 'all', label: '3-day pass', meta: 'Oct 3–5' },
 ];
 ---
 
@@ -31,14 +32,14 @@ const tickets = [
     </div>
 
     <fieldset class="field register__tickets" data-field="ticket" aria-describedby="reg-ticket-error">
-      <legend>Ticket type · pick one</legend>
+      <legend>Ticket type</legend>
       <div class="register__options" role="presentation">
         {
           tickets.map((t) => (
-            <label class="option">
+            <label class="option ui-button">
               <input type="radio" name="ticket" value={t.value} required />
               <span class="option__label">{t.label}</span>
-              <span class="eyebrow option__meta">{t.meta}</span>
+              <span class="option__meta">{t.meta}</span>
             </label>
           ))
         }
@@ -48,17 +49,15 @@ const tickets = [
 
     <div class="register__actions">
       <Button type="submit">Register now</Button>
-      <p class="eyebrow">Client-side only. Nothing is sent or stored.</p>
     </div>
   </form>
 
   <div id="register-done" class="register__done" hidden tabindex="-1">
     <p class="register__gg">GG. See you at Booth 630.</p>
     <p class="mono register__ticket" id="register-ticket"></p>
-    <p class="eyebrow">Nothing was sent or stored. We already forgot your name.</p>
     <p class="eyebrow register__bonus" id="register-bonus" hidden>Player 1 bonus · promo code 16BIT-GG</p>
     <div class="register__again">
-      <Button id="register-again" variant="ghost" size="sm">Register another player</Button>
+      <Button id="register-again" variant="ghost">Register another player</Button>
     </div>
   </div>
 </Window>
@@ -151,9 +150,9 @@ const tickets = [
     margin-bottom: var(--space-4);
     text-align: left;
     font-family: var(--font-body);
-    font-weight: 600;
+    font-weight: 500;
     font-size: var(--text-lg);
-    line-height: var(--leading-snug);
+    line-height: var(--leading-title);
   }
 
   .register__form {
@@ -167,26 +166,32 @@ const tickets = [
     border: 0;
   }
 
-  /* Radios drawn as a segmented control: one cell lit at a time reads as exclusive. */
+  /* A legend isn't a grid item, so it takes the label-to-field gap and left edge by hand. */
+  .register__tickets > legend {
+    margin-bottom: var(--space-1);
+    padding: 0;
+  }
+
+  /* Each ticket is a ghost `.ui-button` (global.css): the lift on hover and keyboard focus, the
+     picked one inverted to Green 900. Four in a row, or 2 × 2 on phones; the gap leaves room for
+     the lift. */
   .register__options {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
-    border: var(--border);
-    background: var(--outline);
-    gap: 1px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3);
+  }
+
+  @media (max-width: 40rem) {
+    .register__options {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   .option {
-    position: relative;
     display: grid;
     justify-items: center;
     align-content: center;
-    gap: var(--space-1);
-    min-height: var(--space-12);
-    padding: var(--space-2);
-    background: var(--surface-raised);
     text-align: center;
-    cursor: pointer;
   }
 
   .option input {
@@ -197,35 +202,8 @@ const tickets = [
     opacity: 0;
   }
 
-  .option__label {
-    font-weight: 600;
-    font-size: var(--text-sm);
-    line-height: 1.2;
-  }
-
-  .option:hover {
-    box-shadow: inset 0 0 0 1px var(--outline);
-  }
-
-  .option:has(input:checked) {
-    background: var(--accent);
-    box-shadow: inset 0 0 0 2px var(--outline);
-  }
-
-  .option:has(input:checked) .option__label::before {
-    content: '▸ ';
-  }
-
-  .option:has(input:focus-visible) {
-    z-index: 1;
-    outline: 2px solid var(--outline);
-    outline-offset: 2px;
-    box-shadow: 0 0 0 6px var(--focus-ring);
-  }
-
-  .register__tickets[data-invalid='true'] .register__options {
-    outline: 1px solid var(--outline);
-    outline-offset: 0;
+  .register__tickets[data-invalid='true'] .option {
+    --ui-button-ring: inset 0 0 0 2px var(--outline);
   }
 
   .register__actions {

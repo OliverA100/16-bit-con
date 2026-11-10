@@ -5,16 +5,12 @@ import Wordmark from './Wordmark.astro';
 ---
 
 <div class="nav-slot">
-  <Window as="nav" title="16-BIT CON · OCT 3–5, 2026" id="site-nav" class="nav" aria-label="Primary">
+  <Window as="nav" bare title="16-BIT CON · OCT 3–5, 2026" id="site-nav" class="nav" aria-label="Primary">
     <a class="nav__brand" href="/">
       <img src="/favicon.svg" alt="" width="20" height="18" />
       <Wordmark size="nav" />
     </a>
-    <ul class="nav__links">
-      <li><a href="#schedule">Schedule</a></li>
-      <li><a href="#booth">Booth 630</a></li>
-    </ul>
-    <Button href="#register" size="sm">Register now</Button>
+    <Button href="#register">Register now</Button>
   </Window>
 </div>
 
@@ -32,7 +28,7 @@ import Wordmark from './Wordmark.astro';
     display: flex;
     align-items: center;
     gap: var(--space-4);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   }
 
   .nav__brand {
@@ -43,37 +39,7 @@ import Wordmark from './Wordmark.astro';
     text-decoration: none;
   }
 
-  .nav__links {
-    display: flex;
-    gap: var(--space-4);
+  .nav :global(.btn) {
     margin-left: auto;
-    padding: 0;
-    list-style: none;
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    letter-spacing: var(--tracking-mono);
-    text-transform: uppercase;
-  }
-
-  .nav__links a {
-    display: inline-block;
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid transparent;
-    text-decoration: none;
-  }
-
-  .nav__links a:hover {
-    background: var(--accent);
-    border-color: var(--outline);
-  }
-
-  @media (max-width: 40rem) {
-    .nav__links {
-      display: none;
-    }
-
-    .nav :global(.btn) {
-      margin-left: auto;
-    }
   }
 </style>

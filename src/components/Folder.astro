@@ -1,0 +1,79 @@
+---
+/**
+ * Folder — the brand guidelines' folder frame. A tab with slanted sides opens into the body (no
+ * line under it), a second rule runs the full width under the top edge, and the label sits
+ * centred in 13 px Geist Mono. All lines 1 px Green 900 (vega.io's line weight), body Cloud White,
+ * hard offset shadow. The guidelines' frame halved to that 1 px line: tab 44 × 8, slants 6 px (left)
+ * and 5 px (right), the second rule 2 px under the top edge.
+ */
+interface Props {
+  as?: 'div' | 'section' | 'article' | 'li';
+  class?: string;
+  [key: string]: unknown;
+}
+
+const { as: Element = 'div', class: className, ...rest } = Astro.props;
+---
+
+<Element class:list={['folder', className]} {...rest}>
+  <svg class="folder__tab" viewBox="0 0 44 9" width="44" height="9" aria-hidden="true">
+    <path class="folder__tab-fill" d="M1 9V8.4L6.5 1H37.5L43 9Z" />
+    <path class="folder__tab-line" d="M0.5 9V8.3L6.25 0.5H37.75L43.6 8.5" />
+  </svg>
+  <div class="folder__body">
+    <slot />
+  </div>
+</Element>
+
+<style>
+  /* The hard shadow as a drop-shadow, so it follows the tab as well as the body. */
+  .folder {
+    position: relative;
+    padding-top: 8px;
+    color: var(--text);
+    filter: drop-shadow(4px 4px 0 var(--outline));
+  }
+
+  .folder__tab {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    overflow: visible;
+  }
+
+  .folder__tab-fill {
+    fill: var(--surface-card);
+  }
+
+  .folder__tab-line {
+    fill: none;
+    stroke: var(--outline);
+    stroke-width: 1;
+    stroke-linejoin: miter;
+  }
+
+  .folder__body {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 5rem;
+    padding: var(--space-4) var(--space-3) var(--space-3);
+    background: var(--surface-card);
+    border: var(--border);
+    font-family: var(--font-mono);
+    font-size: var(--text-ui);
+    line-height: var(--leading-ui);
+    text-align: center;
+  }
+
+  /* The second rule: 1 px, 2 px under the top edge, wall to wall. */
+  .folder__body::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 0;
+    right: 0;
+    border-top: var(--border);
+  }
+</style>

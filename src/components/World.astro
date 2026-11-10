@@ -56,8 +56,8 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       <noscript><img class="hero__poster" src="/monitor/monitor-on.webp" width={POSTER.w} height={POSTER.h} style={posterStyle} alt={monitorLabel} /></noscript>
     </div>
     <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
-    <Window title="Player 1" class="hero__start" data-start>
-      <Button size="sm" class="hero__start-btn" data-start-button>Press start</Button>
+    <Window size="compact" title="Player 1" class="hero__start" data-start>
+      <Button class="hero__start-btn" data-start-button>Press start</Button>
     </Window>
   </div>
   <script is:inline>
@@ -100,7 +100,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     <p class="eyebrow">{level3.place}</p>
   </Window>
 
-  <Window title="Player 1" class="world__hud" aria-label="Coins, time and level">
+  <Window size="compact" title="Player 1" class="world__hud" aria-label="Coins, time and level">
     <p class="world__hud-row">
       <span class="world__coin pixel" aria-hidden="true"></span>
       <span class="mono" data-hud-coins>00/12</span>
@@ -109,12 +109,12 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     </p>
   </Window>
 
-  <Window as="nav" title="Levels" class="world__rail" aria-label="Progress">
+  <Window as="nav" size="compact" title="Levels" class="world__rail" aria-label="Progress">
     <ol class="rail">
       {
         railStops.map((s) => (
           <li>
-            <button type="button" class="rail__stop" data-rail={s.id} data-jump={String(s.jump)} data-state="next">
+            <button type="button" class="rail__stop ui-button" data-rail={s.id} data-jump={String(s.jump)} data-state="next">
               <svg class="rail__icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" set:html={icons[s.icon]} />
               <span class="rail__label">{s.label}</span>
             </button>
@@ -124,7 +124,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     </ol>
   </Window>
 
-  <Window title="Agent Sam" class="world__sam">
+  <Window size="compact" title="Agent Sam" class="world__sam">
     <div class="sam-bubble">
       <canvas class="sam-bubble__portrait pixel" width="46" height="49" aria-hidden="true" data-sam-portrait></canvas>
       <p class="mono sam-bubble__text" aria-hidden="true" data-sam-typed></p>
@@ -208,7 +208,9 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--space-6);
+    /* The stack breathes with the screen's height: 24 px on a short laptop, up to 56 px on a tall
+       screen, so it fills the hero rather than floating in the middle of it. */
+    gap: clamp(var(--space-6), 5vh, 56px);
     min-height: 100vh;
     min-height: 100dvh;
     padding: calc(var(--nav-h) + var(--space-6)) var(--gutter) var(--space-10);
@@ -220,7 +222,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     z-index: 2;
     display: grid;
     justify-items: center;
-    gap: var(--space-3);
+    gap: var(--space-4);
   }
 
   /* The wordmark fills a phone's width and fits the height too, so the copy and the monitor share
@@ -253,6 +255,14 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     flex: none;
     width: max(22vw, 220px);
     aspect-ratio: var(--slot-aspect);
+  }
+
+  /* Phones: the wordmark already spans the width, so the monitor takes up the height the hero has
+     to spare (the 3D reads the slot's box live, so it lands on this size). */
+  @media (max-width: 40rem) {
+    .hero__monitor {
+      width: min(72vw, 280px);
+    }
   }
 
   .hero__poster {
@@ -343,7 +353,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   /* The button fills the window, and its hit area reaches past it to the window's edges and title
-     bar: a comfortable target even at a phone's scale. It presses 1 px on hover (Button.astro). */
+     bar: a comfortable target even at a phone's scale. It lifts 3 px on hover (Button.astro). */
   .hero__start :global(.hero__start-btn) {
     position: relative;
     width: 100%;
@@ -475,7 +485,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   /* ── Progress rail: a Levels window on the left edge, one stop per level, the current
-        one lit in Florets Yellow; a click jumps the world there with no smear. Phones show the level
+        the current one inverted to Green 900; a click jumps the world there with no smear. Phones show the level
         in the HUD instead. ── */
   .world__rail {
     top: 50%;
@@ -486,34 +496,27 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   .world__rail :global(.window__body) {
-    padding: var(--space-1);
+    padding: var(--space-3);
   }
 
   .rail {
     display: grid;
-    gap: 2px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
+  /* Each stop is a ghost `.ui-button` (global.css), like the tickets: the lift on hover and keyboard
+     focus, the current one (aria-current, set with data-state) inverted to Green 900. Upcoming stops
+     keep their dimmed text. */
   .rail__stop {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     width: 100%;
-    min-height: var(--space-8);
-    padding: 0 var(--space-2);
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--tracking-mono);
-    text-transform: uppercase;
     text-align: left;
     white-space: nowrap;
-    cursor: pointer;
   }
 
   .rail__icon {
@@ -527,25 +530,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .rail__stop[data-state='next'] {
     color: var(--text-subtle);
-  }
-
-  .rail__stop[data-state='current'] {
-    background: var(--accent);
-    border-color: var(--outline);
-  }
-
-  .rail__stop[data-state='current'] .rail__label::before {
-    content: '▸ ';
-  }
-
-  .rail__stop:hover {
-    color: var(--text);
-    border-color: var(--outline);
-    background: var(--surface-raised);
-  }
-
-  .rail__stop[data-state='current']:hover {
-    background: var(--accent);
   }
 
   .world__level {
@@ -567,7 +551,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   /* ── Agent Sam: small and sticky in a corner — top right under the HUD on wide
         screens, above the controls on narrow ones — with his portrait at 2:1 and typewriter mono text. ── */
   .world__sam {
-    top: calc(var(--nav-h) + var(--space-4) + 4.5rem + var(--space-3));
+    top: calc(var(--nav-h) + var(--space-4) + 5rem + var(--space-3));
     right: var(--gutter);
     width: min(22rem, calc(100% - 2 * var(--gutter)));
     text-align: left;
@@ -624,7 +608,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   @media (max-width: 48rem) {
     .world__prompt {
-      top: calc(var(--nav-h) + var(--space-4) + 4.5rem + var(--space-3));
+      top: calc(var(--nav-h) + var(--space-4) + 5rem + var(--space-3));
     }
   }
 
@@ -668,7 +652,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   @media (max-width: 40rem) {
     /* Phones: HUD first, session window stacked under it. */
     .world__session {
-      top: calc(var(--nav-h) + var(--space-4) + 4.5rem + var(--space-3));
+      top: calc(var(--nav-h) + var(--space-4) + 5rem + var(--space-3));
     }
   }
 

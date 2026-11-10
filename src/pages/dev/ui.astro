@@ -1,0 +1,48 @@
+---
+/**
+ * /dev/ui — the brand guidelines' UI frames as our components (Window, the one-square Window,
+ * Folder, Document) at the scale vega.io uses: 1 px lines, 13 px mono, a 33 px title bar.
+ * Review page only (noindex); removed before handoff.
+ */
+import Base from '../../layouts/Base.astro';
+import Window from '../../components/Window.astro';
+import Folder from '../../components/Folder.astro';
+import Document from '../../components/Document.astro';
+---
+
+<Base title="UI frames — 16-Bit Con" description="Review page" noindex>
+  <style is:inline>
+    body > header, body > .site-nav, .nav-slot, .skip-link, .site-footer { display: none !important; }
+  </style>
+  <div class="sheet">
+    <Folder class="f" data-shot="folder">Saved<br />Games</Folder>
+    <Document class="d" title="Patch notes" data-shot="document">
+      <p>Three sessions, one after party, zero save states.</p>
+    </Document>
+    <Window class="w" title="16-bit-con.exe" data-shot="window">
+      <h3 class="card-h">Opening Keynote</h3>
+      <p class="card-p">Why the next decade of play looks a lot like 1994.</p>
+    </Window>
+    <Window class="c" size="compact" title="notes.txt" data-shot="compact">
+      <h3 class="card-h">Panel Room B</h3>
+      <p class="card-p">2:00 PM · Pixel art in the age of AI</p>
+    </Window>
+  </div>
+</Base>
+
+<style>
+  .sheet {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 24px;
+    width: 1150px;
+    padding: 24px;
+  }
+  .f { width: 128px; }
+  .d { width: 176px; }
+  .w { width: 384px; height: 224px; }
+  .c { width: 288px; }
+  .card-h { font-family: var(--font-body); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-title); text-align: left; }
+  .card-p { margin-top: 8px; font-size: var(--text-sm); line-height: var(--leading-ui); }
+</style>

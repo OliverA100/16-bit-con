@@ -48,8 +48,10 @@
   --surface: var(--color-daisy-white);
   --surface-raised: var(--color-cloud-white);
   --surface-dark: var(--color-green-900);
+  --surface-card: var(--color-cloud-white); /* window, folder and document bodies (the guidelines' white) */
+  /* Green 900 is the ink: all body text, all frame lines, all icons default to it. */
   --text: var(--color-green-900);
-  --text-muted: var(--color-grey-700);
+  --text-muted: var(--color-green-900);
   --text-subtle: var(--color-grey-500);
   --text-on-dark: var(--color-daisy-white);
   --text-on-dark-accent: var(--color-green-100);
@@ -73,13 +75,15 @@
   --space-24: 96px;
   --space-32: 128px;
 
-  /* Retro OS window chrome: 1 px border, hard offset shadow, no radius */
+  /* Frame lines at vega.io's scale: 1 px Green 900, no radius, hard offset shadow. */
   --border: 1px solid var(--outline);
   --shadow-hard: 4px 4px 0 var(--outline);
   --shadow-hard-sm: 2px 2px 0 var(--outline);
   --shadow-hard-lg: 8px 8px 0 var(--outline);
-  --window-bar-h: 24px;
-  --window-square: 8px;
+  --window-bar-h: 33px;               /* title bar incl. its 1 px rule (vega.io) */
+  --window-bar-pad: 6px 8px;
+  --window-pad: 20px;                 /* body padding, as vega.io's cards */
+  --window-pad-compact: 12px 16px;    /* body padding, one-square frame */
 
   /* Type */
   --font-display: 'Signifier', 'Iowan Old Style', Georgia, serif;
@@ -98,11 +102,15 @@
   --leading-snug: 1.3;
   --leading-normal: 1.5;
   --tracking-mono: 0.04em;
+  /* UI type at vega.io's scale (measured on vega.io/careers at 1440 px) */
+  --text-ui: 13px;          /* Geist Mono: window titles, buttons, ticket and rail labels */
+  --leading-ui: 20px;       /* its line, and the line of 14 px body copy in cards */
+  --leading-title: 25px;    /* 20 px card headings */
 
   /* Layout */
   --container: 72rem; /* 1152 px: one city tile period */
   --gutter: var(--space-4);
-  --nav-h: 64px; /* fixed nav window + its top margin */
+  --nav-h: 64px; /* fixed nav frame (50 px, no title bar) + its top margin */
 
   /* World art scale: CSS px per art px = k / devicePixelRatio, k from src/game/scale.ts.
      Set by the inline script in Base.astro; 2 is the no-JS fallback. */
@@ -113,4 +121,12 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --steps-16bit: steps(4, end);
+
+  /* Controls at vega.io's scale: one button size, and the lift every button, ticket and rail stop
+     makes on hover and keyboard focus (onto a hard shadow the same size as the lift). */
+  --control-h: 32px;
+  --control-pad: 6px 12px;
+  --lift: 3px;
+  --dur-lift: 150ms;
+  --ease-lift: cubic-bezier(0.4, 0, 0.2, 1);
 }

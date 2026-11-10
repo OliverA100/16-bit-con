@@ -1,0 +1,19 @@
+---
+/**
+ * /dev/buttons — the two button variants alone on Cloud White, for hover captures against
+ * vega.io's. Review page only (noindex); removed before handoff.
+ */
+import Base from '../../layouts/Base.astro';
+import Button from '../../components/Button.astro';
+---
+
+<Base title="Buttons — 16-Bit Con" description="Review page" noindex>
+  <style is:inline>
+    body > header, .nav-slot, .skip-link, .site-footer { display: none !important; }
+    body { background: var(--color-cloud-white); }
+  </style>
+  <div style="display:flex; gap:48px; padding:200px">
+    <Button href="#">Register now</Button>
+    <Button variant="ghost">Register another player</Button>
+  </div>
+</Base>

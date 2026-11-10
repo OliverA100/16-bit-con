@@ -1,0 +1,110 @@
+---
+/**
+ * Document — the brand guidelines' document frame: a page with its top-right corner folded and
+ * its top-left corner clipped, both diagonals drawn as pixel staircases (never smooth lines) whose
+ * steps equal the line weight. The guidelines' frame halved to vega.io's 1 px line: the fold is
+ * 24 × 24 (its crease an L along the fold's left and bottom edges), the clipped corner 6 × 6.
+ * An optional `title` in 13 px Geist Mono over 14 px Geist copy, centred, Green 900 throughout.
+ */
+interface Props {
+  title?: string;
+  as?: 'div' | 'section' | 'article' | 'li';
+  class?: string;
+  [key: string]: unknown;
+}
+
+const { title, as: Element = 'div', class: className, ...rest } = Astro.props;
+
+const LINE = 1;
+const FOLD = 24;
+const CLIP = 6;
+const foldSteps = Array.from({ length: FOLD / LINE }, (_, i) => i * LINE);
+const clipSteps = Array.from({ length: CLIP / LINE }, (_, i) => i * LINE);
+---
+
+<Element class:list={['doc', className]} style={`--fold: ${FOLD}px; --clip: ${CLIP}px`} {...rest}>
+  <svg class="doc__clip" viewBox={`0 0 ${CLIP} ${CLIP}`} width={CLIP} height={CLIP} aria-hidden="true">
+    {clipSteps.map((s) => <rect class="doc__fill" x={s} y={CLIP - s} width={LINE} height={s} />)}
+    {clipSteps.map((s) => <rect class="doc__ink" x={s} y={CLIP - LINE - s} width={LINE} height={LINE} />)}
+  </svg>
+  <svg class="doc__fold" viewBox={`0 0 ${FOLD} ${FOLD}`} width={FOLD} height={FOLD} aria-hidden="true">
+    {foldSteps.map((s) => <rect class="doc__fill" x={s} y={s + LINE} width={LINE} height={FOLD - s - LINE} />)}
+    {foldSteps.map((s) => <rect class="doc__ink" x={s} y={s} width={LINE} height={LINE} />)}
+    <rect class="doc__ink" x="0" y="0" width={LINE} height={FOLD} />
+    <rect class="doc__ink" x="0" y={FOLD - LINE} width={FOLD} height={LINE} />
+  </svg>
+  <div class="doc__body">
+    {title && <p class="doc__title">{title}</p>}
+    <slot />
+  </div>
+</Element>
+
+<style>
+  /* The hard shadow as a drop-shadow, so it steps down the fold and the clipped corner too. */
+  .doc {
+    position: relative;
+    color: var(--text);
+    filter: drop-shadow(4px 4px 0 var(--outline));
+  }
+
+  /* The page: Cloud White with a 1 px frame, its two corners notched out square; the staircases fill them. */
+  .doc::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--surface-card);
+    border: var(--border);
+    clip-path: polygon(
+      var(--clip) 0,
+      calc(100% - var(--fold)) 0,
+      calc(100% - var(--fold)) var(--fold),
+      100% var(--fold),
+      100% 100%,
+      0 100%,
+      0 var(--clip),
+      var(--clip) var(--clip)
+    );
+  }
+
+  .doc__clip,
+  .doc__fold {
+    position: absolute;
+    top: 0;
+    display: block;
+    shape-rendering: crispEdges;
+  }
+
+  .doc__clip {
+    left: 0;
+  }
+
+  .doc__fold {
+    right: 0;
+  }
+
+  .doc__fill {
+    fill: var(--surface-card);
+  }
+
+  .doc__ink {
+    fill: var(--outline);
+  }
+
+  .doc__body {
+    position: relative;
+    display: grid;
+    align-content: end;
+    gap: var(--space-1);
+    min-height: 8rem;
+    padding: calc(var(--fold) + var(--space-2)) var(--space-4) var(--space-4);
+    font-size: var(--text-sm);
+    line-height: var(--leading-ui);
+    text-align: center;
+  }
+
+  .doc__title {
+    font-family: var(--font-mono);
+    font-size: var(--text-ui);
+    line-height: var(--leading-ui);
+  }
+</style>
