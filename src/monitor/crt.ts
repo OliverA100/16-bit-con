@@ -24,7 +24,9 @@
  *             every 1/uStaticRate s, held, then snapping to the next (hashed from its cell and the
  *             frame's index, nothing added to the coordinates: nothing slides)
  * Power-on: a bright line grows from the centre to the full width (uLine, uLineW), then the raster
- * opens vertically from it (uOn, uOpen); the off tube is a dark grey under the glass.
+ * opens vertically from it (uOn, uOpen); the off tube is a dark grey under the glass. Switch-off: the
+ * picture squashes vertically into the line (uSquash: the image scaled toward the centre line, brighter
+ * as it gathers), then the line shrinks to a point.
  */
 import { Color, ShaderMaterial, Vector2, Vector4, type Texture } from 'three';
 import { DIMS } from './spec';
@@ -69,6 +71,8 @@ export interface CrtUniforms {
   uStaticCells: { value: Vector2 };
   uOn: { value: number };
   uOpen: { value: number };
+  /** Switching off: the picture's height, 1 (whole) to the line's, squashed toward the centre line. */
+  uSquash: { value: number };
   uLine: { value: number };
   /** How much of the screen's width the power-on line spans, 0 (a point at the centre) to 1. */
   uLineW: { value: number };
@@ -113,6 +117,7 @@ uniform float uStaticRate;
 uniform vec2 uStaticCells;
 uniform float uOn;
 uniform float uOpen;
+uniform float uSquash;
 uniform float uLine;
 uniform float uLineW;
 uniform float uLineH;
@@ -164,6 +169,10 @@ void main() {
   vec2 e = fwidth(uv) * 1.5;
   vec2 inside = smoothstep(vec2(0.0), e, uv) * smoothstep(vec2(0.0), e, 1.0 - uv);
   float raster = inside.x * inside.y;
+  // switching off, the picture squashes toward the centre line (the raster's height collapses); the
+  // scanlines stay where they are on the glass, so no moiré as it squashes
+  float scanY = uv.y;
+  if (uSquash < 1.0) uv.y = 0.5 + (uv.y - 0.5) / max(uSquash, 0.002);
 
   // The hum bar rolls down once every 6 s; the lines it crosses slip sideways a touch.
   float bar = 1.0 - fract(uTime / 6.0);
@@ -198,7 +207,7 @@ void main() {
   col = mix(col, mix(vec3(luma), col, 0.78) * vec3(1.05, 1.0, 0.86), uGrade);
 
   // Scanlines: a narrow dark gap between the beam's lines.
-  float gap = 0.5 + 0.5 * cos(6.2831853 * uv.y * uScanLines);
+  float gap = 0.5 + 0.5 * cos(6.2831853 * scanY * uScanLines);
   col *= 1.0 - uScan * gap * gap;
 
   // Aperture grille: each column of a triad favours one phosphor (off at rest: it reads as a screen door at this size).
@@ -214,6 +223,8 @@ void main() {
   // The hum bar's light, brightness, grain.
   col += col * uBar * hum;
   col *= uBright;
+  // …and brightens as its light gathers into the line
+  col *= 1.0 + 0.8 * (1.0 - uSquash);
   // (a fresh grain 24 times a second, hashed from the pixel and the frame's index: it flickers in place, never crawls)
   col *= 1.0 + uNoise * (rand(uvec2(clamp(vUv, 0.0, 1.0) * uRes), uint(floor(uTime * 24.0)), 5u) - 0.5);
   // The black level: phosphor glass is never quite black.
@@ -260,6 +271,7 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
     uStaticCells: { value: new Vector2(210, 170) },
     uOn: { value: 1 },
     uOpen: { value: 1 },
+    uSquash: { value: 1 },
     uLine: { value: 0 },
     uLineW: { value: 1 },
     uLineH: { value: 0.006 },

@@ -698,14 +698,67 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       shownAt = now;
       return;
     }
-    if (hero3d.phase === 'off' && now >= shownAt + POWER_DELAY_MS) hero3d.powerOn(now);
+    if (hero3d.phase === 'off' && !powerSwitchedOff && now >= shownAt + POWER_DELAY_MS) hero3d.powerOn(now);
     const phase = hero3d.render(now);
     if (p < ENTER.copyOut[1]) placeStart(d, hero3d.quad(...startUV));
-    if (phase === 'on' && !startShown) {
+    // PRESS START shows once the picture is up, and goes as soon as the tube is switched off
+    if (phase === 'on' && !startShown && hero3d.poweredOn) {
       startShown = true;
       d.start.classList.add('is-ready');
+    } else if (startShown && !hero3d.poweredOn) {
+      startShown = false;
+      d.start.classList.remove('is-ready');
     }
+    placePower(p);
   };
+
+  // ── The monitor's power button: on the landing page, with the monitor at rest, a real button over the 3D
+  //    one. A click switches the tube off (the power-on in reverse; PRESS START goes with the picture) and
+  //    on again (PRESS START comes back once the picture is up, as on load). ──
+  const powerButton = section.querySelector<HTMLButtonElement>('[data-power]');
+  /** Switched off by the visitor: the page does not power the tube on again by itself. */
+  let powerSwitchedOff = false;
+  let powerPlaced = '';
+  const placePower = (p: number) => {
+    if (!powerButton || !hero3d) return;
+    const show = mode === 'default' && p < 0.001;
+    if (powerButton.hidden === show) powerButton.hidden = !show;
+    if (!show) return;
+    const box = hero3d.powerBox();
+    // never smaller than a comfortable target: 32 px with a mouse, 44 px to a finger
+    const hit = Math.max(window.matchMedia('(pointer: coarse)').matches ? 44 : 32, 2.6 * box.r);
+    const key = `${Math.round(box.x - hit / 2)},${Math.round(box.y - hit / 2)},${Math.round(hit)}`;
+    if (key === powerPlaced) return;
+    powerPlaced = key;
+    powerButton.style.left = `${box.x - hit / 2}px`;
+    powerButton.style.top = `${box.y - hit / 2}px`;
+    powerButton.style.width = powerButton.style.height = `${hit}px`;
+  };
+  powerButton?.addEventListener('click', () => {
+    if (!hero3d || !d || mode !== 'default') return;
+    const now = clockNow();
+    if (hero3d.poweredOn) {
+      powerSwitchedOff = true;
+      hero3d.powerOff(now);
+      if (document.activeElement === d.startButton) powerButton.focus();
+    } else {
+      powerSwitchedOff = false;
+      hero3d.powerOn(now);
+    }
+    powerButton.setAttribute('aria-pressed', String(!powerSwitchedOff));
+  });
+  // The 3D button goes down with the pointer or the key and comes back up on release.
+  if (powerButton) {
+    const press = (down: boolean) => hero3d?.pressPower(clockNow(), down);
+    powerButton.addEventListener('pointerdown', () => press(true));
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave', 'blur'] as const) powerButton.addEventListener(ev, () => press(false));
+    powerButton.addEventListener('keydown', (e) => {
+      if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) press(true);
+    });
+    powerButton.addEventListener('keyup', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') press(false);
+    });
+  }
 
   /** The breakout for the monitor at q: the cracks, the shatter, Sam's billboard (his frame drawn into it), the landing's glide. */
   let samBillboard = '';

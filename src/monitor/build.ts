@@ -298,6 +298,8 @@ export interface MonitorParts {
   screen: Mesh;
   glass: Mesh;
   daisy: Mesh | null;
+  /** The power button (it presses in when clicked). */
+  power: Mesh;
   /** The floor that takes the shadow (a ShadowMaterial), and the baked contact darkening on it. */
   floor: Mesh;
   contact: Mesh;
@@ -557,6 +559,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   chin.push(pad(ledX, under, faceRise(ledX, under) - 0.0008, S.led.w, S.led.h, 0.0008, ledMat));
 
   // the power button, a power mark on it
+  let powerButton: Mesh | null = null;
   {
     const g = new LatheGeometry(dome(B.r, B.h), 40);
     const p = g.getAttribute('position');
@@ -582,6 +585,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
     power.rotation.x = Math.PI / 2;
     power.position.set(B.x, SLOT_Y, faceRise(B.x, SLOT_Y) - 0.001);
     chin.push(power);
+    powerButton = power;
   }
 
   // the controller's port
@@ -735,7 +739,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   body.position.set(-CENTRE.x, -CENTRE.y, -CENTRE.z);
   const pivot = new Group();
   pivot.add(body);
-  return { pivot, body, frame, casing, front, back, recess, screen, glass, daisy, floor, contact, remote: remote.group, casters, feet, materials: { plastic, bevel, glass: glassMat } };
+  return { pivot, body, frame, casing, front, back, recess, screen, glass, daisy, power: powerButton!, floor, contact, remote: remote.group, casters, feet, materials: { plastic, bevel, glass: glassMat } };
 }
 
 /** Proportions measured from the built geometry, for the review table. */

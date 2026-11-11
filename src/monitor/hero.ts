@@ -41,6 +41,16 @@ const PARALLAX = { yaw: 8, pitch: 4, tau: 0.13 } as const;
 const SWAY = { yaw: 2, pitch: 1, yawPeriod: 7, pitchPeriod: 9.5 } as const;
 /** Hovering PRESS START brightens the screen 10 %. */
 const HOVER = { bright: 1.1, tau: 0.06 } as const;
+/** The power-on's whole length, ms. */
+const POWER_END = POWER.grow + POWER.brighten + POWER.open + POWER.ready;
+/**
+ * The switch-off runs the power-on's own timeline backwards, so it has the same pace, curves and line:
+ * the picture closes into the line — squashed into it (scaled toward the centre line) rather than cut —
+ * then the line dims and thins and shrinks at an even pace to a point at the centre. 380 ms.
+ */
+const OFF_END = POWER.grow + POWER.brighten + POWER.open;
+/** The power button's press: how far it sinks into the face (most of its height), its ease (s), and the shortest press shown (ms). */
+const PRESS = { travel: 0.0075, tau: 0.03, min: 120 } as const;
 /** The bevel's emissive at full brightness: the screen's light reaching the recess walls, slightly. */
 const BEVEL_GLOW = 0.35;
 /** The glass at rest (src/monitor/index.ts): its opacity and its reflection. */
@@ -87,7 +97,15 @@ export interface Hero {
   /** Touch screens sway instead of following a pointer. */
   sway(on: boolean): void;
   hover(on: boolean): void;
+  /** Power the tube on, or switch it off (it squashes into a line that shrinks to a point). */
   powerOn(now: number): void;
+  powerOff(now: number): void;
+  /** On, or powering on. */
+  readonly poweredOn: boolean;
+  /** The power button held down (pressed in while held, out on release; a quick click still shows a full press). */
+  pressPower(now: number, down: boolean): void;
+  /** Where the power button is on the page: its centre and radius, CSS px of the canvas. */
+  powerBox(): { x: number; y: number; r: number };
   readonly phase: PowerPhase;
   /** Scanlines across the screen's height at rest (PRESS START's own lines match them). */
   readonly scanLines: number;
@@ -200,7 +218,21 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   let turn = { yaw: 0, pitch: 0 };
   let hoverTarget = 1;
   let hoverB = 1;
-  let powerAt = -1;
+  /**
+   * The power: switched on (the power-on from `at`) or off (the switch-off from `at`), on the page's
+   * clock. Unset until the page first powers the tube on.
+   */
+  let power: { at: number; dir: 1 | -1 } | null = null;
+  const setPower = (now: number, dir: 1 | -1) => {
+    if (power?.dir === dir) return;
+    power = { at: now, dir };
+  };
+  /** The power button: held down, since when, and how far in it is. */
+  let pressDown = false;
+  let pressSince = -Infinity;
+  /** How far the button is pressed in, 0–1, easing toward where the press wants it. */
+  let pressed = 0;
+  const powerRest = parts.power.position.z;
   let phase: PowerPhase = 'off';
   let last = -1;
   let p = 0;
@@ -329,7 +361,25 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       hoverTarget = on ? HOVER.bright : 1;
     },
     powerOn(now) {
-      if (powerAt < 0) powerAt = now;
+      setPower(now, 1);
+    },
+    powerOff(now) {
+      setPower(now, -1);
+    },
+    get poweredOn() {
+      return power?.dir === 1;
+    },
+    pressPower(now, down) {
+      if (down && !pressDown) pressSince = now;
+      pressDown = down;
+    },
+    powerBox() {
+      parts.body.updateMatrixWorld(true);
+      const c = parts.power.getWorldPosition(p0);
+      const [x, y] = m.toCss(c);
+      side.setFromMatrixColumn(m.camera.matrixWorld, 0).normalize();
+      const [x1] = m.toCss(p1.copy(c).addScaledVector(side, DIMS.button.r));
+      return { x, y, r: Math.abs(x1 - x) };
     },
     enter(np) {
       p = clamp01(np);
@@ -371,16 +421,24 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
         m.applyPose(at);
       }
 
-      // ── Power: the line grows from the centre, brightens, then the picture opens from it ──
-      // (scrolled in before it had finished: it plays on during the dive)
-      if (p > 0 && powerAt < 0) powerAt = now;
+      // ── Power: the line grows from the centre, brightens, then the picture opens from it; switched off,
+      //    the same in reverse (scrolled in before it had finished, or off: it powers on and plays on
+      //    during the dive) ──
+      if (p > 0 && power?.dir !== 1) setPower(now, 1);
+      // the power button: down while held, and for at least PRESS.min after it went down; it travels in fast and springs back
+      const want = pressDown || now < pressSince + PRESS.min ? 1 : 0;
+      pressed += (want - pressed) * (1 - Math.exp(-dt / PRESS.tau));
+      parts.power.position.z = powerRest - PRESS.travel * pressed;
       let on = 0;
       let open = 0;
       let line = 0;
       let lineW = 0;
       let lineH: number = POWER.thin;
-      if (powerAt >= 0 && now >= powerAt) {
-        const e = now - powerAt;
+      let squash = 1;
+      // switching off: where the power-on would be, running back from the open picture to nothing
+      const off = power && power.dir < 0 ? Math.max(0, OFF_END - (now - power.at)) : null;
+      const e = off ?? (power && power.dir > 0 ? Math.min(POWER_END, Math.max(0, now - power.at)) : 0);
+      if (e > 0) {
         const lineEnd = POWER.grow + POWER.brighten;
         if (e < lineEnd) {
           phase = 'line';
@@ -397,6 +455,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
           line = POWER.bright * (1 - s) ** 2;
           lineW = 1;
           lineH = POWER.thick;
+          // switching off, the picture squashes into the line instead of being cut down to it
+          if (off !== null) squash = Math.max(open, 0.002);
         } else {
           phase = 'on';
           on = open = 1;
@@ -429,6 +489,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       u.uLine.value = line;
       u.uLineW.value = lineW;
       u.uLineH.value = lineH;
+      u.uSquash.value = squash;
       u.uTime.value = now / 1000;
       bevel.emissiveIntensity = BEVEL_GLOW * on * open * hb;
       // The glass: its reflection, the key light's highlight on it and its 15 % shade go as the camera

@@ -38,6 +38,8 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   <div class="hero__stage" data-stage>
     <canvas class="hero__gl" aria-hidden="true" data-gl></canvas>
     <div class="hero__hit" aria-hidden="true" data-hit></div>
+    <!-- Over the monitor's own power button (placed there by src/game/index.ts): switches the screen off and on. -->
+    <button type="button" class="hero__power" aria-label="Monitor power" aria-pressed="true" data-power hidden></button>
     <div class="hero__copy">
       <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
       <Wordmark as="h1" size="hero" id="hero-title" />
@@ -326,6 +328,32 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     -webkit-user-select: none;
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* The monitor's power button: a round target over the 3D button (it presses in itself), placed and sized
+     by the page; only a focus ring of its own. */
+  .hero__power {
+    position: absolute;
+    z-index: 3;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .hero__power[hidden] {
+    display: none;
+  }
+
+  .hero__power:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  :global(:root.is-playing) .hero__power {
+    display: none;
   }
 
   .hero__hit.is-active {
