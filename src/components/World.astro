@@ -442,8 +442,28 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     min-height: 0;
   }
 
+  /* On a touch screen the canvas runs on below the section by the skirt (--world-skirt, src/game/index.ts):
+     the ground's fill under the browser's bottom bar. Clipped by the section until the run fills the screen. */
   .world--live .world__canvas {
     display: block;
+    height: calc(100% + var(--world-skirt, 0px));
+  }
+
+  :global(:root.is-playing) .world--live:not(.world--opening) {
+    overflow: visible;
+  }
+
+  /* ?pin=scroll (src/game/index.ts): the world scrolls with the page, so Safari shows what is just above it
+     behind the status bar — the run's sky (the section's background while it plays), carried on up. */
+  :global(:root.pin-scroll.is-playing) .world--live:not(.world--opening)::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    left: 0;
+    height: 160px;
+    background-color: inherit;
+    pointer-events: none;
   }
 
   .world--live .hero__stage {
@@ -888,7 +908,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       right: 0;
     }
 
-    /* The controller's A, flat and smooth: Leaf Green in a Green 900 rim, its letter in Daisy White. */
+    /* The controller's A, flat and smooth: Florets Yellow in a Green 900 rim, its letter in Cloud White. */
     .world__a {
       width: 64px;
       height: 64px;
@@ -908,11 +928,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
 
     .abtn__face {
-      fill: var(--color-leaf-green);
+      fill: var(--color-florets-yellow);
     }
 
     .abtn__letter {
-      fill: var(--color-daisy-white);
+      fill: var(--color-cloud-white);
       font: 700 28px/1 var(--font-body);
     }
 
@@ -922,7 +942,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
 
     .world__a.is-held .abtn__face {
-      fill: var(--color-green-900);
+      fill: color-mix(in srgb, var(--color-florets-yellow) 80%, var(--color-green-900));
     }
 
     .world__hint {

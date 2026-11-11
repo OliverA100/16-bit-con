@@ -302,25 +302,52 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
    * hero, the canvas world and the 3D keep one size, and nothing moves under the user's thumb.
    */
   const isTouch = () => navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+  const touchScreen = isTouch();
   let heldH = window.innerHeight;
   const viewH = () => heldH;
   section.style.setProperty('--world-h', `${heldH}px`);
+  /**
+   * The skirt, CSS px: on a touch screen the canvas runs on below the section, to the bottom of the
+   * largest viewport (100lvh, the toolbar hidden), so a phone's browser bar — floating over the page, or
+   * gone mid-scroll — has the ground under it, not the page. Sam's ground line stays on the section's
+   * height (F), so nothing he stands on goes under the bar; the rows below it are the ground's fill
+   * carrying on down. It only shows while the run fills the screen (World.astro); it only ever grows.
+   */
+  const lvhProbe = document.createElement('div');
+  lvhProbe.style.cssText = 'position:absolute;top:0;left:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none';
+  const largestH = () => {
+    document.body.append(lvhProbe);
+    const h = lvhProbe.getBoundingClientRect().height;
+    lvhProbe.remove();
+    return Math.max(h, window.innerHeight);
+  };
+  let skirtH = 0;
+  const measureSkirt = () => (isTouch() ? Math.max(0, Math.ceil(largestH() - heldH)) : 0);
+  skirtH = measureSkirt();
   let vp = worldBuffer(viewW(), viewH());
+  let skirtRows = 0;
   let F = vp.bh - GROUND_BAND;
   let sx = Math.round(0.3 * vp.bw);
   let viewport: Rect = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
+  /** What the canvas draws: the viewport and the skirt's rows below it. */
+  let canvasRange: Rect = viewport;
   // The monitor's screen: the same world, with margins (src/game/screen-frame.ts).
   const screen = new ScreenFrame();
 
   const fit = () => {
     vp = worldBuffer(viewW(), viewH());
+    const dpr = window.devicePixelRatio || 1;
+    const skirtDev = Math.round(skirtH * dpr);
+    skirtRows = Math.ceil(skirtDev / vp.k);
+    section.style.setProperty('--world-skirt', `${skirtDev / dpr}px`);
     F = vp.bh - GROUND_BAND;
     sx = Math.round(0.3 * vp.bw);
     viewport = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
+    canvasRange = { ...viewport, y1: vp.bh + skirtRows };
     buffer.width = vp.bw;
-    buffer.height = vp.bh;
+    buffer.height = vp.bh + skirtRows;
     o.canvas.width = vp.devW;
-    o.canvas.height = vp.devH;
+    o.canvas.height = vp.devH + skirtDev;
     bctx.imageSmoothingEnabled = false;
     sctx.imageSmoothingEnabled = false;
     screen.fit(vp.bw, vp.bh);
@@ -471,6 +498,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const frameLag = (now: number) => (vclock ? 0 : Math.min(200, Math.max(0, performance.now() - now)));
   /** When, in a dive from the top, the camera passes the glass: the picture nearly fills the view (the monitor finds it per viewport). */
   const glassMs = () => playMs(hero3d ? hero3d.flatP + ENTER.flatten.lead : ENTER.fillBy);
+  /**
+   * ?pin=scroll (a test, on any build): the pin moves the world with a transform in the page's own scroll rather
+   * than holding it with position: fixed. Safari 26 shows scrolling content behind the status bar but paints a
+   * solid strip over a fixed element there, so this is the run's scene running on up behind the clock.
+   */
+  const scrollPin = new URLSearchParams(location.search).get('pin') === 'scroll';
+  if (scrollPin) root.classList.add('pin-scroll');
   /** The pin, created by PRESS START (never on load), so the page is only as long as its content until then. */
   const createPin = () =>
     ScrollTrigger.create({
@@ -478,6 +512,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       start: 'top top',
       end: () => `+=${D}`,
       pin: true,
+      pinType: scrollPin ? 'transform' : 'fixed',
       pinSpacing: true,
       anticipatePin: 1,
       invalidateOnRefresh: true,
@@ -513,8 +548,17 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       // height (viewH) — re-measuring them would move the page under the user's thumb.
       const heightOnly = w === lastViewW && isTouch();
       lastViewW = w;
-      if (heightOnly) return;
+      if (heightOnly) {
+        // ...except the skirt, which grows to a taller screen than it has seen (the bar gone mid-run)
+        const s = measureSkirt();
+        if (s > skirtH) {
+          skirtH = s;
+          fit();
+        }
+        return;
+      }
       heldH = window.innerHeight;
+      skirtH = measureSkirt();
       section.style.setProperty('--world-h', `${heldH}px`);
       fit();
       if (trigger) ScrollTrigger.refresh();
@@ -593,6 +637,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let slotCentre = { x: 0, y: 0 };
   let lastOut = -1;
   let lastFade = -1;
+  /** The sky colour behind the canvas on a touch screen (Safari's status bar tint), or none. */
+  let lastTint = '';
   /** Sam where the run ends, on the monitor's screen: his cell's centre (screen UV) and size (screen heights) — where the cracks start. */
   let samOnScreen: { centre: [number, number]; size: number } | null = null;
   /**
@@ -1721,13 +1767,21 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         // screen, so the two agree at the handover; it glides at device px while the run moves (where the switch can't be seen).
         const glide = !d || (t > 0 && !inBreakout);
         // The game frame, then the far sky at device resolution (clouds glide) and the buffer over it.
-        level.draw(bctx, { ...view, samX: X });
-        level.drawFar(sctx, { ...view, samX: X }, vp.k, glide);
-        sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, vp.bh * vp.k);
+        level.draw(bctx, { ...view, samX: X, range: canvasRange });
+        level.drawFar(sctx, { ...view, samX: X, range: canvasRange }, vp.k, glide);
+        sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, (vp.bh + skirtRows) * vp.k);
       }
 
       // The game's overlays come in at the end of the enter segment.
       const inGame = mode === 'play' && !exiting && (!d || heroP >= ENTER.overlays);
+      // While the run fills a phone's screen, the page and the section behind the canvas take the sky's
+      // colour: Safari tints its status bar from them, so the sky runs on up behind the clock.
+      const tint = inGame && touchScreen ? view.sky : '';
+      if (tint !== lastTint) {
+        lastTint = tint;
+        root.style.backgroundColor = tint;
+        section.style.backgroundColor = tint;
+      }
       o.hud?.classList.toggle('is-visible', inGame);
       // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.
       for (const el of o.sessions) {

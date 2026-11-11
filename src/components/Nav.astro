@@ -62,6 +62,12 @@ import Wordmark from './Wordmark.astro';
     translate: -50% 0;
   }
 
+  /* ?pin=scroll (src/game/index.ts): through the run the nav sits 12 px down, below the band Safari 26 reads
+     for its status bar, so the bar shows the scene rather than the nav's colour. */
+  :global(:root.pin-scroll.is-playing) .nav-slot {
+    top: var(--space-3);
+  }
+
   .nav :global(.window__body) {
     display: flex;
     align-items: center;
