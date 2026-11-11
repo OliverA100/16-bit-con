@@ -18,7 +18,11 @@
  *  - uNoise   fine grain, 24 times a second
  *  - uGrade   phosphor colour: a little desaturated and warm, the blacks lifted off pure black
  *  - uBright  brightness (the scanlines and the mask take light away; this gives some back)
- *  - uStatic  a broken tube (the breakout): static where the picture was, under the same scanlines
+ *  - uStatic  a broken tube (the breakout): an untuned set's snow where the picture was, through the
+ *             tube's whole look (curvature, bloom, phosphor colour, scanlines, vignette, hum bar) —
+ *             soft grain smeared along each line, every line a little brighter or darker; a fresh field
+ *             every 1/uStaticRate s, held, then snapping to the next (hashed from its cell and the
+ *             frame's index, nothing added to the coordinates: nothing slides)
  * Power-on: a bright line grows from the centre to the full width (uLine, uLineW), then the raster
  * opens vertically from it (uOn, uOpen); the off tube is a dark grey under the glass.
  */
@@ -59,6 +63,10 @@ export interface CrtUniforms {
   uGrade: { value: number };
   uBright: { value: number };
   uStatic: { value: number };
+  /** Static frames a second (0: one frame, held — reduced motion). */
+  uStaticRate: { value: number };
+  /** The static's cells across and down the screen: 2 device px each at rest, fixed through the zoom and the landing. */
+  uStaticCells: { value: Vector2 };
   uOn: { value: number };
   uOpen: { value: number };
   uLine: { value: number };
@@ -101,6 +109,8 @@ uniform float uNoise;
 uniform float uGrade;
 uniform float uBright;
 uniform float uStatic;
+uniform float uStaticRate;
+uniform vec2 uStaticCells;
 uniform float uOn;
 uniform float uOpen;
 uniform float uLine;
@@ -115,8 +125,35 @@ vec3 frame(vec2 uv) {
   return texture2D(uMap, mix(uFrame.xy, uFrame.zw, uv)).rgb;
 }
 
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+// An integer hash (PCG3D, Jarzynski & Olano 2020): every (cell, frame) its own value, unrelated to its
+// neighbours in space or in time, at any frame index.
+uvec3 pcg3d(uvec3 v) {
+  v = v * 1664525u + 1013904223u;
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  v ^= v >> 16u;
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  return v;
+}
+float rand(uvec2 cell, uint frame, uint k) {
+  return float(pcg3d(uvec3(cell, frame * 4u + k)).x >> 8u) / 16777216.0;
+}
+
+// An untuned set's snow at screen UV (the tube's own, curved): grains twice as wide as tall (the beam
+// smears them along its line), blended softly from one to the next along the line; every line a touch
+// brighter or darker than its neighbours, now and then a bright streak. One frame of it per
+// 1/uStaticRate s, held — each frame its own field, hashed from the cell and the frame's index.
+float snow(vec2 uv) {
+  uint frame = uint(floor(uTime * uStaticRate));
+  vec2 g = clamp(uv, 0.0, 1.0) * uStaticCells * vec2(0.5, 1.0);
+  uvec2 c = uvec2(g);
+  float f = smoothstep(0.0, 1.0, fract(g.x));
+  float n = mix(rand(c, frame, 0u), rand(c + uvec2(1u, 0u), frame, 0u), f);
+  float fine = rand(uvec2(g * vec2(2.0, 1.0)), frame, 1u);
+  n = mix(n, fine, 0.35);
+  float line = rand(uvec2(0u, c.y), frame, 2u);
+  float streak = step(0.985, rand(uvec2(1u, c.y), frame, 3u));
+  float v = n * n * (0.75 + 0.5 * line) + 0.5 * streak * n;
+  return 0.04 + 0.9 * v;
 }
 
 void main() {
@@ -153,6 +190,9 @@ void main() {
     col = mix(col, g, 0.35 * uGlow) + g * 0.08 * uGlow;
   }
 
+  // A broken tube: the snow of an untuned set where the picture was, before the tube's look goes over it.
+  if (uStatic > 0.0) col = mix(col, vec3(snow(uv)), uStatic);
+
   // Phosphor colour: greyer, warm.
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
   col = mix(col, mix(vec3(luma), col, 0.78) * vec3(1.05, 1.0, 0.86), uGrade);
@@ -174,12 +214,8 @@ void main() {
   // The hum bar's light, brightness, grain.
   col += col * uBar * hum;
   col *= uBright;
-  col *= 1.0 + uNoise * (hash(floor(vUv * uRes) + floor(uTime * 24.0)) - 0.5);
-  // A broken tube: static where the picture was, in 2 px cells 30 times a second, under the scanlines.
-  if (uStatic > 0.0) {
-    float n = hash(floor(vUv * uRes * 0.5) + vec2(floor(uTime * 30.0) * 7.0, 0.0));
-    col = mix(col, vec3(0.06 + 0.8 * n * n) * (1.0 - uScan * gap * gap), uStatic);
-  }
+  // (a fresh grain 24 times a second, hashed from the pixel and the frame's index: it flickers in place, never crawls)
+  col *= 1.0 + uNoise * (rand(uvec2(clamp(vUv, 0.0, 1.0) * uRes), uint(floor(uTime * 24.0)), 5u) - 0.5);
   // The black level: phosphor glass is never quite black.
   col += uGrade * 0.006 * (1.0 - col);
 
@@ -220,6 +256,8 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
     uGrade: { value: CRT_REST.grade },
     uBright: { value: CRT_REST.bright },
     uStatic: { value: 0 },
+    uStaticRate: { value: STATIC_RATE },
+    uStaticCells: { value: new Vector2(210, 170) },
     uOn: { value: 1 },
     uOpen: { value: 1 },
     uLine: { value: 0 },
@@ -234,18 +272,22 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
 }
 
 
+/** The broken tube's static: a new frame this many times a second (each held ~1/18 s, as an untuned set snaps). */
+export const STATIC_RATE = 18;
+
 /** One scanline every this many device px of the screen at rest (the reference shows about 4). */
 export const SCAN_PX = 4;
 
 /**
- * The sizes set in device px of the screen at rest (w × h device px): a dark gap every 4 px and an
- * RGB triad every 3 px — counts across the tube, so they grow with the zoom as a real tube's would
+ * The sizes set in device px of the screen at rest (w × h device px): a dark gap every 4 px, an
+ * RGB triad every 3 px and the static's 2 px cells — counts across the tube, so they grow with the zoom as a real tube's would
  * (the reference's lines grow the same way) — and the sizes tuneOnScreen holds.
  */
 export function tuneAtRest(crt: CrtMaterial, w: number, h: number): void {
   const u = crt.uniforms;
   u.uScanLines.value = h / SCAN_PX;
   u.uMaskCols.value = w / 3;
+  u.uStaticCells.value.set(Math.round(w / 2), Math.round(h / 2));
   tuneOnScreen(crt, w, h);
 }
 

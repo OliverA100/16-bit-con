@@ -1,12 +1,23 @@
 /**
  * The monitor scene: plain three.js, lazy-loaded, the only 3D on the page. A
  * transparent canvas so the floor is the page's own Daisy White; RoomEnvironment through PMREM
- * (no HDR file), a key light from the top left and a faint rim from the back right, ACES Filmic,
+ * (no HDR file), a key light from the top left and a faint rim from the back right, Neutral tone
+ * mapping (it keeps the brand's colours and lets the blacks be black; ACES greyed them),
  * sRGB out, antialias, device pixel ratio capped at 2.
  *
- * The camera frames the monitor by its projected silhouette (sampled casing vertices, not a
- * bounding box), so "22 % of the viewport width" means the visible monitor, and a view offset puts
- * that silhouette's centre on the layout slot's centre.
+ * Shadows: one shadow-casting light, high above and a little in front, from the key light's side, adds
+ * no light of its own (the plastic's shading is the key's, swept against the reference) and casts one
+ * soft shadow (VSM, a 512² map blurred wide, its camera fitted tight round the monitor, the only caster:
+ * the controller and the cable lie on the floor, grounded by baked contact darkening) onto a
+ * ShadowMaterial floor: short, back and to the right as in the
+ * reference, so it stays inside a phone's width (anything behind the monitor lands right of it on the
+ * page). The map is redrawn only when asked (renderer.shadowMap.needsUpdate): nothing moves but the
+ * monitor's turn, so the hero redraws it while the monitor turns, and never in the dive.
+ *
+ * At rest the camera frames the monitor by its screen: the screen's projected box takes the size and
+ * place in the layout slot that SCREEN_AT_REST gives (src/monitor/spec.ts), through the lens's focal
+ * length and a view offset, so the screen sits on the page where it always has whatever the casing.
+ * The silhouette (sampled casing vertices, not a bounding box) is still measured, for the posters.
  *
  * Setup is a sequence of steps (renderer, room light, the build, the camera) so the page can run
  * them one task at a time and keep every main-thread task short (createMonitorAsync). Nearly all of
@@ -14,16 +25,18 @@
  * 1 ms), so the page compiles the room's programs in parallel first and only then renders it.
  */
 import {
-  ACESFilmicToneMapping,
   Color,
   CubeCamera,
   DirectionalLight,
   HalfFloatType,
   LinearMipmapLinearFilter,
+  NeutralToneMapping,
   NearestFilter,
   PerspectiveCamera,
   PMREMGenerator,
+  Box3,
   Scene,
+  VSMShadowMap,
   SRGBColorSpace,
   Vector3,
   WebGLCubeRenderTarget,
@@ -34,11 +47,14 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { readToken } from '../game/palette';
 import { buildMonitor, measure, type MonitorParts } from './build';
 import { createCrtMaterial, coverRect } from './crt';
-import { CENTRE, DIMS, FOV, OPENING_Y, REST, restWidth, scaleAt, type Slot, type View } from './spec';
+import { CENTRE, DIMS, FOV, OPENING_Y, REST, restWidth, scaleAt, SCREEN_AT_REST, type Slot, type View } from './spec';
 
 const DEG = Math.PI / 180;
 
 const color = (token: string) => new Color().setStyle(readToken(token));
+
+/** Where the screen's centre sits at rest in a slot (CSS px): SCREEN_AT_REST's offset, in slot widths. */
+const restScreenCentre = (slot: Slot) => ({ x: slot.cx + SCREEN_AT_REST.dx * slot.w, y: slot.cy + SCREEN_AT_REST.dy * slot.w });
 
 /** A box in CSS px of the canvas. */
 export interface Box {
@@ -86,7 +102,7 @@ export interface Monitor {
   setSize(cssW: number, cssH: number): void;
   /** The drawing buffer, bufW × bufH px, under a CSS box of cssW × cssH. */
   setBuffer(cssW: number, cssH: number, bufW: number, bufH: number): void;
-  /** Place the camera for `view` with the monitor on `slot`; returns its silhouette box and the screen's projected size (CSS px). */
+  /** Place the camera for `view` with the monitor on `slot` (the screen fitted to it); returns the silhouette's box and the screen's projected size (CSS px). */
   frame(view: View, slot: Slot): { box: Box; screenW: number; screenH: number };
   /**
    * The rest pose on `slot`. The camera stands where the posters were rendered from (DIST_REST, the
@@ -120,12 +136,28 @@ export interface Monitor {
 function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Generator<Promise<unknown> | void, Monitor> {
   const renderer = new WebGLRenderer({ canvas, context, antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.5;
+  renderer.toneMapping = NeutralToneMapping;
+  renderer.toneMappingExposure = 1.2;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = VSMShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
   // Reading a program's link status makes the main thread wait for the GPU's compile; only dev reads the log.
   renderer.debug.checkShaderErrors = import.meta.env.DEV;
+  // Vega's daisy for the side panel, straight from its SVG (a small file, fetched while the room compiles).
+  let daisySvg = '';
+  const daisyLoad = fetch('/sprites/ui/vega-daisy.svg')
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((t) => (daisySvg = t))
+    .catch(() => '');
+  // …and Vega's wordmark, raised on the chin
+  let logoSvg = '';
+  const logoLoad = fetch('/sprites/ui/vega-logo.svg')
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((t) => (logoSvg = t))
+    .catch(() => '');
   yield;
 
   const scene = new Scene();
@@ -146,33 +178,77 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
   // key light shapes the casing (front lit, the side falling into orange). Exposure, room and key were
   // swept against a reference image's front and side colours.
   scene.environment = env;
-  scene.environmentIntensity = 0.22;
-  yield;
+  scene.environmentIntensity = 0.32;
+  yield Promise.all([daisyLoad, logoLoad]);
 
   const key = new DirectionalLight(0xffffff, 3);
   key.position.set(-2.4, 3.4, 2.8);
   const rim = new DirectionalLight(0xffffff, 0.7);
   rim.position.set(2.8, 1.6, -3.2);
-  scene.add(key, rim);
+  // the shadow's light: from high above, a little in front and to the left; no light of its own
+  const shade = new DirectionalLight(0xffffff, 0);
+  shade.position.set(-1, 5, 2.2);
+  scene.add(key, rim, shade);
 
   // The tube when it is off: Outline Black lifted a little toward Grey 700.
   const tube = color('--color-outline-black').lerp(color('--color-grey-700'), 0.35);
   const crt = createCrtMaterial(tube);
-  // ACES Filmic compresses red first, so a lit Florets Yellow drifts green (measured red/green 1.09
-  // against the token's 1.22). The plastic's albedo is Florets mixed 75 % toward Yellow 500, which
-  // lands the lit front back on Florets' hue (1.19) and lets the side fall into orange (1.41).
+  // Neutral tone mapping keeps a lit Florets Yellow on its hue; a third of Yellow 500 in the albedo
+  // keeps the side in shade warm (plain Florets shades toward olive).
   const parts = buildMonitor(
     {
-      plastic: color('--color-florets-yellow').lerp(color('--color-yellow-500'), 0.75),
+      plastic: color('--color-florets-yellow').lerp(color('--color-yellow-500'), 0.35),
       bevel: color('--color-yellow-500'),
       slot: color('--color-grey-700'),
       button: color('--color-daisy-white'),
-      led: color('--color-green-100'),
       shadow: color('--color-outline-black'),
+      brand: color('--color-leaf-green'),
+      led: color('--color-leaf-green'),
+      ink: color('--color-green-900'),
+      remoteA: color('--color-leaf-green'),
+      remoteB: color('--color-yellow-600'),
+      remoteLetter: color('--color-daisy-white'),
+      remoteInk: color('--color-green-900'),
     },
     crt,
+    daisySvg,
+    logoSvg,
   );
   scene.add(parts.pivot);
+  // The shadow light's camera, fitted round the casters (the monitor square to the world) in the
+  // light's own view, with room for the parallax turn; its far plane reaches past the floor behind.
+  {
+    shade.castShadow = true;
+    shade.shadow.mapSize.set(512, 512);
+    shade.shadow.radius = 24;
+    shade.shadow.blurSamples = 20;
+    shade.shadow.bias = -0.0004;
+    parts.pivot.updateMatrixWorld(true);
+    const box = new Box3();
+    for (const c of parts.casters) box.expandByObject(c);
+    shade.updateMatrixWorld();
+    shade.target.updateMatrixWorld();
+    const cam = shade.shadow.camera;
+    cam.position.copy(shade.position);
+    cam.lookAt(shade.target.position);
+    cam.updateMatrixWorld();
+    const view = cam.matrixWorldInverse;
+    const lo = new Vector3(Infinity, Infinity, Infinity);
+    const hi = new Vector3(-Infinity, -Infinity, -Infinity);
+    for (let i = 0; i < 8; i++) {
+      const c = new Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).applyMatrix4(view);
+      lo.min(c);
+      hi.max(c);
+    }
+    const pad = 0.18;
+    cam.left = lo.x - pad;
+    cam.right = hi.x + pad;
+    cam.bottom = lo.y - pad;
+    cam.top = hi.y + pad;
+    cam.near = Math.max(0.05, -hi.z - 1);
+    cam.far = -lo.z + 3;
+    cam.updateProjectionMatrix();
+  }
   // The glass gets the room directly: a material on scene.environment has its envMapIntensity
   // overwritten by scene.environmentIntensity, and the pane needs a much stronger reflection.
   parts.materials.glass.envMap = env;
@@ -190,10 +266,10 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
   const dirOf = (yaw: number, pitch: number) =>
     new Vector3(Math.sin(yaw * DEG) * Math.cos(pitch * DEG), Math.sin(pitch * DEG), Math.cos(yaw * DEG) * Math.cos(pitch * DEG));
 
-  // Silhouette samples (body space, so they turn with the monitor): every third casing and foot vertex.
+  // Silhouette samples (body space, so they turn with the monitor): every third frame, body and foot vertex.
   const silhouette: Vector3[] = [];
   parts.pivot.updateMatrixWorld(true);
-  for (const m of [parts.casing, ...parts.feet]) {
+  for (const m of [parts.frame, parts.casing, ...parts.feet]) {
     const p = m.geometry.getAttribute('position');
     for (let i = 0; i < p.count; i += 3) silhouette.push(new Vector3(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(m.matrix));
   }
@@ -262,20 +338,22 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
       camera.position.copy(target).addScaledVector(dirOf(REST.yaw, REST.pitch), DIST_REST);
       camera.lookAt(target);
       camera.updateMatrixWorld();
-      // From a fixed point the picture scales exactly with the lens's focal length.
+      // From a fixed point the picture scales exactly with the lens's focal length: fit the screen's width.
+      const screenCorners = corners.map(([u, v]) => monitor.screenPoint(u, v));
       let fov = FOV;
       for (let i = 0; i < 2; i++) {
         camera.fov = fov;
         camera.updateProjectionMatrix();
-        const box = project(silhouette, 'body');
-        fov = (2 * Math.atan((Math.tan((fov * DEG) / 2) * (box.x1 - box.x0)) / slot.w)) / DEG;
+        const box = project(screenCorners, 'world');
+        fov = (2 * Math.atan((Math.tan((fov * DEG) / 2) * (box.x1 - box.x0)) / (SCREEN_AT_REST.w * slot.w))) / DEG;
       }
       camera.fov = fov;
       camera.updateProjectionMatrix();
-      const box = project(silhouette, 'body');
+      const box = project(screenCorners, 'world');
       parts.pivot.quaternion.copy(turned);
       parts.pivot.updateMatrixWorld(true);
-      return { target, dist: DIST_REST, yaw: REST.yaw, pitch: REST.pitch, fov, ox: (box.x0 + box.x1) / 2 - slot.cx, oy: (box.y0 + box.y1) / 2 - slot.cy };
+      const at = restScreenCentre(slot);
+      return { target, dist: DIST_REST, yaw: REST.yaw, pitch: REST.pitch, fov, ox: (box.x0 + box.x1) / 2 - at.x, oy: (box.y0 + box.y1) / 2 - at.y };
     },
     nativePose(fr, k, devW, devH, fov) {
       const f = crt.uniforms.uFrame.value;
@@ -319,8 +397,9 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
       parts.pivot.updateMatrixWorld(true);
       const screenCorners = corners.map(([u, v]) => monitor.screenPoint(u, v));
       const target = view.fit === 'screen' ? monitor.screenPoint(0.5, 0.5) : new Vector3(0, 0, 0);
-      const fitPts = view.fit === 'screen' ? screenCorners : silhouette;
-      const space = view.fit === 'screen' ? 'world' : 'body';
+      // at rest the screen takes its place in the slot (SCREEN_AT_REST); otherwise it fills the slot's width
+      const fitW = view.fit === 'rest' ? SCREEN_AT_REST.w * slot.w : slot.w;
+      const at = view.fit === 'rest' ? restScreenCentre(slot) : { x: slot.cx, y: slot.cy };
       const yaw = view.yaw * DEG;
       const pitch = view.pitch * DEG;
       const dir = new Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
@@ -333,14 +412,14 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
         camera.position.copy(target).addScaledVector(dir, d);
         camera.lookAt(target);
         camera.updateMatrixWorld();
-        box = project(fitPts, space);
-        d *= (box.x1 - box.x0) / slot.w;
+        box = project(screenCorners, 'world');
+        d *= (box.x1 - box.x0) / fitW;
       }
       camera.position.copy(target).addScaledVector(dir, d);
       camera.lookAt(target);
       camera.updateMatrixWorld();
-      box = project(fitPts, space);
-      camera.setViewOffset(cssW, cssH, (box.x0 + box.x1) / 2 - slot.cx, (box.y0 + box.y1) / 2 - slot.cy, cssW, cssH);
+      box = project(screenCorners, 'world');
+      camera.setViewOffset(cssW, cssH, (box.x0 + box.x1) / 2 - at.x, (box.y0 + box.y1) / 2 - at.y, cssW, cssH);
       camera.updateMatrixWorld();
       const s = project(screenCorners, 'world');
       const result = { box: project(silhouette, 'body'), screenW: s.x1 - s.x0, screenH: s.y1 - s.y0 };

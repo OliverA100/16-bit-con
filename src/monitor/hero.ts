@@ -26,7 +26,7 @@ import { createBreakout } from './breakout';
 import { readToken } from '../game/palette';
 import type { Quad } from '../game/quad';
 import { DIVE, ENTER, smooth } from '../game/segments';
-import { CRT_REST, tuneAtRest, tuneOnScreen } from './crt';
+import { CRT_REST, STATIC_RATE, tuneAtRest, tuneOnScreen } from './crt';
 import { createMonitorAsync, type FrameGeom, type Monitor, type Pose } from './index';
 import { DIMS, type Slot } from './spec';
 
@@ -151,6 +151,11 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   bevel.emissive.copy(new Color().setStyle(readToken('--color-blue-300')).lerp(new Color().setStyle(readToken('--color-cloud-white')), 0.5));
   bevel.emissiveIntensity = 0;
   const glass = parts.materials.glass;
+  // With reduced motion the broken tube's static is one frame, held.
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  const staticRate = () => (u.uStaticRate.value = still.matches ? 0 : STATIC_RATE);
+  staticRate();
+  still.addEventListener('change', staticRate);
 
   // A first size so the programs compile for the real render target, then every program in parallel
   // (KHR_parallel_shader_compile where there is one) and every texture uploaded, each in its own task.
@@ -177,8 +182,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   bo.showAll(false);
   await pause();
   t0 = performance.now();
-  const shadowMap = (parts.shadow.material as { map?: Texture | null }).map ?? null;
-  for (const t of [parts.materials.plastic.roughnessMap, bevel.emissiveMap, shadowMap, texture]) {
+  const contactMap = (parts.contact.material as { map?: Texture | null }).map ?? null;
+  for (const t of [parts.materials.plastic.roughnessMap, bevel.emissiveMap, contactMap, texture]) {
     if (t) renderer.initTexture(t);
   }
   mark('textures', t0);
@@ -189,6 +194,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   const qPitch = new Quaternion();
   const Y = new Vector3(0, 1, 0);
   let swaying = false;
+  /** The turn the shadow was last drawn for: it is redrawn only when the monitor has turned since. */
+  const shadowTurn = new Quaternion(0, 0, 0, 0);
   let target = { yaw: 0, pitch: 0 };
   let turn = { yaw: 0, pitch: 0 };
   let hoverTarget = 1;
@@ -343,6 +350,14 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       qPitch.setFromAxisAngle(right, turn.pitch * settle * DEG);
       parts.pivot.quaternion.copy(qYaw).multiply(qPitch);
       parts.pivot.updateMatrixWorld(true);
+      if (1 - Math.abs(parts.pivot.quaternion.dot(shadowTurn)) > 1e-9) {
+        shadowTurn.copy(parts.pivot.quaternion);
+        renderer.shadowMap.needsUpdate = true;
+      }
+      // The controller is part of the opening: gone once the dive is well under way (it has left the
+      // view by then), back for the pull-back. The monitor has stopped turning by then too, so its shadow
+      // in the map stays as it was.
+      parts.remote.visible = p < ENTER.fullRes;
 
       // ── The camera: rest → native ──
       if (rest && native) {
@@ -466,6 +481,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       return [c(u0, v0), c(u1, v0), c(u1, v1), c(u0, v1)];
     },
     dispose() {
+      still.removeEventListener('change', staticRate);
       texture.dispose();
       bo.dispose();
       m.dispose();

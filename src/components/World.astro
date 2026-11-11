@@ -148,8 +148,24 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     <div class="world__dpad">
       <button type="button" class="world__dpad-arm world__dpad-arm--left" data-dpad="left" tabindex="-1"></button>
       <button type="button" class="world__dpad-arm world__dpad-arm--right" data-dpad="right" tabindex="-1"></button>
+      <svg class="world__dpad-art" viewBox="0 0 104 104" width="104" height="104">
+        <rect class="dpad__body" x="35" y="2" width="34" height="100" rx="7" />
+        <rect class="dpad__body" x="2" y="35" width="100" height="34" rx="7" />
+        <path class="dpad__arrow" d="M52 12l9 11H43z" />
+        <path class="dpad__arrow" d="M52 92l9-11H43z" />
+        <path class="dpad__arrow dpad__arrow--left" d="M12 52l11-9v18z" />
+        <path class="dpad__arrow dpad__arrow--right" d="M92 52l-11-9v18z" />
+      </svg>
     </div>
-    <button type="button" class="world__a" data-button="a" tabindex="-1"></button>
+    <button type="button" class="world__a" data-button="a" tabindex="-1">
+      <svg class="world__a-art" viewBox="0 0 64 64" width="64" height="64">
+        <circle class="abtn__rim" cx="32" cy="32" r="31" />
+        <g class="abtn__top">
+          <circle class="abtn__face" cx="32" cy="32" r="27" />
+          <text class="abtn__letter" x="32" y="33" text-anchor="middle" dominant-baseline="central">A</text>
+        </g>
+      </svg>
+    </button>
   </div>
 
   <!-- The game's mode changes, announced (the overlays' own live regions are hidden outside the game). -->
@@ -736,14 +752,35 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     .world__dpad,
     .world__a {
       pointer-events: auto;
-      image-rendering: pixelated;
     }
 
+    /* The controller's d-pad, flat and smooth: Green 900 (the brand's ink), its arrows in Leaf Green. */
     .world__dpad {
       position: relative;
-      width: calc(2 * 52px);
-      height: calc(2 * 53px);
-      background: url('/sprites/ui/dpad.png') 0 0 / 100% 100% no-repeat;
+      width: 104px;
+      height: 106px;
+    }
+
+    .world__dpad-art {
+      position: absolute;
+      top: 1px;
+      left: 0;
+      display: block;
+      pointer-events: none;
+    }
+
+    .dpad__body {
+      fill: var(--color-green-900);
+    }
+
+    .dpad__arrow {
+      fill: var(--color-leaf-green);
+    }
+
+    /* Held: the arm's arrow lights up in Florets Yellow. */
+    .world__dpad-arm--left.is-held ~ svg .dpad__arrow--left,
+    .world__dpad-arm--right.is-held ~ svg .dpad__arrow--right {
+      fill: var(--color-florets-yellow);
     }
 
     .world__dpad-arm {
@@ -761,27 +798,46 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       left: 0;
     }
 
-    /* Pressed: a flat Green 900 shade over the arm (no filter on the art). */
-    .world__dpad-arm.is-held {
-      background: color-mix(in srgb, var(--color-green-900) 28%, transparent);
-    }
 
     .world__dpad-arm--right {
       right: 0;
     }
 
-    /* a-button.png is two 22 px frames side by side: up, then pressed. */
+    /* The controller's A, flat and smooth: Leaf Green in a Green 900 rim, its letter in Daisy White. */
     .world__a {
-      width: calc(2 * 22px);
-      height: calc(2 * 36px);
+      width: 64px;
+      height: 64px;
       padding: 0;
-      background: url('/sprites/ui/a-button.png') 0 0 / 200% 100% no-repeat;
+      background: none;
       border: 0;
       touch-action: none;
     }
 
-    .world__a.is-held {
-      background-position: 100% 0;
+    .world__a-art {
+      display: block;
+      pointer-events: none;
+    }
+
+    .abtn__rim {
+      fill: var(--color-green-900);
+    }
+
+    .abtn__face {
+      fill: var(--color-leaf-green);
+    }
+
+    .abtn__letter {
+      fill: var(--color-daisy-white);
+      font: 700 28px/1 var(--font-body);
+    }
+
+    /* Held: pressed in, a touch down and darker. */
+    .world__a.is-held .abtn__top {
+      transform: translateY(2px);
+    }
+
+    .world__a.is-held .abtn__face {
+      fill: var(--color-green-900);
     }
 
     .world__hint {

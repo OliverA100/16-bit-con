@@ -1,13 +1,14 @@
 /**
- * The monitor, built in code (no model file): a late-80s all-in-one in the spirit of a compact
- * Macintosh. Every part is its own mesh so the glass can crack and shatter later.
+ * The monitor, built in code (no model file): a simple vintage all-in-one CRT. Every part is its own
+ * mesh so the glass can crack and shatter later.
  *
- * Units: the front face is 1 wide (W = 1). x right, y up from the bottom of the casing, z toward the
- * viewer; the front face sits at z = 0 and the back at z = −DEPTH. The casing is a sweep of its
- * rounded-rect outline along z — the inset of the outline follows a quarter circle at the front and
- * back, which rounds those edges with the same radius as the vertical corners, so nothing is sharp —
- * then tapered toward the back about the bottom centre, so it stands flat. The seam and the vents are
- * dips in that sweep; the screen opening is a second sweep (rounded lip, then the recess walls).
+ * Units (src/monitor/spec.ts): the screen opening is 0.7 wide. x right, y up from the bottom of the
+ * front frame, z toward the viewer; the front face sits at z = 0 and the back at z = −DEPTH. Two
+ * sweeps of rounded-rect outlines along z, each ring's outline pushed in along its normals so the
+ * edges round off: the front frame (a soft lip round its face, a small round at its back), and behind
+ * it, standing back from the frame by frame.step all round, the deep body, its top and sides tapering
+ * toward a smaller back about its flat bottom (a trapezoid from the side). The screen opening is a
+ * third sweep (the rounded lip, then the recess walls). Vega's daisy is embossed on the right side.
  */
 import {
   BufferGeometry,
@@ -19,6 +20,7 @@ import {
   Group,
   LatheGeometry,
   LinearFilter,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
@@ -31,14 +33,19 @@ import {
   RGBAFormat,
   Shape,
   ShapeGeometry,
-  SphereGeometry,
+  ShapeUtils,
+  ShadowMaterial,
   SRGBColorSpace,
   Vector2,
+  Vector3,
   type Color,
   type Material,
 } from 'three';
 
-import { CENTRE, DIMS, OPENING_Y, SLOT_Y, scaleAt } from './spec';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildRemote, REMOTE } from './remote';
+import { portShape, subdivide, svgShapes } from './mesh';
+import { CENTRE, CHIN, DIMS, faceRise, OPENING_Y, ROW2_Y, SLOT_Y, scaleAt } from './spec';
 
 export { CENTRE, CHIN, DIMS, OPENING_Y, SCREEN_ASPECT, SLOT_Y } from './spec';
 
@@ -52,7 +59,7 @@ interface OutlinePt {
 
 /**
  * A rounded rectangle, counter-clockwise from its bottom-right corner, with outward normals.
- * `rightBreaks` / `leftBreaks` add points along the vertical sides (the vents need them).
+ * `sideBreaks` adds points along the vertical sides (the vents' grooves need them).
  */
 function roundedRect(cx: number, cy: number, w: number, h: number, r: number, seg: number, sideBreaks: number[] = []): OutlinePt[] {
   const pts: OutlinePt[] = [];
@@ -78,13 +85,15 @@ function roundedRect(cx: number, cy: number, w: number, h: number, r: number, se
 
 /**
  * Sweep an outline along z: `rings` give each cross-section's z and how far the outline is pushed
- * along its normals (negative = inward); `extra(pt, ring)` adds a local push (the vents). Indexed
- * and closed around the outline; `facing` 'out' faces the outline's normals, 'in' faces away.
+ * along its normals (negative = inward), tapered by scaleAt about (0, pivotY); `extra(pt, ring)` adds a
+ * local push (the vents). Indexed and closed around the outline; `facing` 'out' faces the outline's
+ * normals, 'in' faces away.
  */
 function sweep(
   outline: OutlinePt[],
   rings: { z: number; push: number; v: number }[],
   facing: 'out' | 'in',
+  pivotY = 0,
   extra?: (pt: OutlinePt, ring: number) => number,
 ): BufferGeometry {
   const n = outline.length;
@@ -100,7 +109,7 @@ function sweep(
     const s = scaleAt(ring.z);
     outline.forEach((p, i) => {
       const push = ring.push + (extra ? extra(p, ri) : 0);
-      pos.push((p.x + p.nx * push) * s, (p.y + p.ny * push) * s, ring.z);
+      pos.push((p.x + p.nx * push) * s, pivotY + (p.y + p.ny * push - pivotY) * s, ring.z);
       uv.push(along[i]! / perim, ring.v);
     });
   });
@@ -124,15 +133,15 @@ function sweep(
   return g;
 }
 
-/** A flat cap from an outline (deduplicated) with optional holes, at depth z, facing +z or −z. */
-function cap(outer: Vector2[], holes: Vector2[][], z: number, facing: 1 | -1): BufferGeometry {
+/** A flat cap from an outline (deduplicated) with optional holes, at depth z, facing +z or −z, tapered about (0, pivotY). */
+function cap(outer: Vector2[], holes: Vector2[][], z: number, facing: 1 | -1, pivotY = 0): BufferGeometry {
   const dedupe = (pts: Vector2[]) => pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]!) > 1e-9).filter((p, i, a) => i < a.length - 1 || p.distanceTo(a[0]!) > 1e-9);
   const shape = new Shape(dedupe(outer));
   for (const h of holes) shape.holes.push(new Path(dedupe(h)));
   const g = new ShapeGeometry(shape, 24);
   const p = g.getAttribute('position');
   const s = scaleAt(z);
-  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * s, p.getY(i) * s, z);
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * s, pivotY + (p.getY(i) - pivotY) * s, z);
   if (facing < 0) {
     const idx = g.getIndex()!;
     for (let i = 0; i < idx.count; i += 3) {
@@ -205,47 +214,55 @@ function glowRamp(): DataTexture {
   return t;
 }
 
+/** The cast shadow's strength fades from full to nothing between these distances from the monitor's footprint (body units). */
+const FADE = [0.05, 0.6] as const;
+
+/** A soft dark patch on the floor: centre (x, z), radii, its turn about y (radians), and alpha stops from its centre out. */
+interface Blob {
+  x: number;
+  z: number;
+  rx: number;
+  rz: number;
+  turn?: number;
+  stops: [number, number][];
+}
+
 /**
- * The contact shadow, baked once: a tight dark core under the footprint and a soft lobe falling
- * away from the key light, on a transparent plane, so the floor stays the page's own Daisy White.
+ * The contact darkening, baked once: soft patches right under the feet, the body and the controller,
+ * on a transparent plane (the floor stays the page's own Daisy White). The shadow proper is cast
+ * (src/monitor/index.ts); this keeps the monitor grounded where it meets the floor.
  */
-function shadowTexture(rect: { x0: number; x1: number; z0: number; z1: number }, lobe: { x: number; z: number; rx: number; rz: number; a: number }): CanvasTexture {
+function contactTexture(rect: { x0: number; x1: number; z0: number; z1: number }, blobs: Blob[], lines: { pts: [number, number][]; width: number; alpha: number }[] = []): CanvasTexture {
   const S = 256;
   const c = document.createElement('canvas');
   c.width = c.height = S;
   const ctx = c.getContext('2d')!;
   const toPx = (x: number, z: number): [number, number] => [((x - rect.x0) / (rect.x1 - rect.x0)) * S, (1 - (z - rect.z0) / (rect.z1 - rect.z0)) * S];
-  const blob = (x: number, z: number, rx: number, rz: number, stops: [number, number][]) => {
-    const [px, py] = toPx(x, z);
-    const sx = (rx / (rect.x1 - rect.x0)) * S;
-    const sy = (rz / (rect.z1 - rect.z0)) * S;
+  for (const b of blobs) {
+    const [px, py] = toPx(b.x, b.z);
     ctx.save();
     ctx.translate(px, py);
-    ctx.scale(sx, sy);
+    // the canvas's y runs toward +z, so a turn about y (x toward −z) is a turn the other way here
+    ctx.rotate(b.turn ?? 0);
+    ctx.scale((b.rx / (rect.x1 - rect.x0)) * S, (b.rz / (rect.z1 - rect.z0)) * S);
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    for (const [o, a] of stops) g.addColorStop(o, `rgba(255,255,255,${a})`);
+    for (const [o, a] of b.stops) g.addColorStop(o, `rgba(255,255,255,${a})`);
     ctx.fillStyle = g;
     ctx.fillRect(-1, -1, 2, 2);
     ctx.restore();
-  };
-  // the soft lobe first, then the contact core on top of it
-  blob(lobe.x, lobe.z, lobe.rx, lobe.rz, [
-    [0, lobe.a],
-    [0.45, lobe.a * 0.6],
-    [1, 0],
-  ]);
-  blob(0, -DIMS.DEPTH / 2, 0.6, 0.64, [
-    [0, 0.62],
-    [0.7, 0.52],
-    [0.88, 0.2],
-    [1, 0],
-  ]);
-  // the contact itself: a tight, darker band right under the base, densest on the side away from the key
-  blob(0.12, -DIMS.DEPTH / 2 + 0.02, 0.55, 0.57, [
-    [0, 0.3],
-    [0.85, 0.24],
-    [1, 0],
-  ]);
+  }
+  // lines lying on the floor (the cable), softened a little
+  ctx.filter = 'blur(1.5px)';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const l of lines) {
+    ctx.strokeStyle = `rgba(255,255,255,${l.alpha})`;
+    ctx.lineWidth = (l.width / (rect.x1 - rect.x0)) * S;
+    ctx.beginPath();
+    l.pts.forEach(([x, z], i) => (i ? ctx.lineTo(...toPx(x, z)) : ctx.moveTo(...toPx(x, z))));
+    ctx.stroke();
+  }
+  ctx.filter = 'none';
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
   return t;
@@ -256,28 +273,60 @@ export interface MonitorColors {
   bevel: Color;
   slot: Color;
   button: Color;
-  led: Color;
   shadow: Color;
+  /** Vega's wordmark on the chin, the drive's activity LED, and the mark on the power button. */
+  brand: Color;
+  led: Color;
+  ink: Color;
+  /** The controller's A and B, their letters, and its ink parts (d-pad, plugs, cable). */
+  remoteA: Color;
+  remoteB: Color;
+  remoteLetter: Color;
+  remoteInk: Color;
 }
 
 export interface MonitorParts {
   /** Turns with the parallax; its origin is the monitor's visual centre. */
   pivot: Group;
   body: Group;
+  /** The front frame's sweep, and the body's (the silhouette is sampled from both and the feet). */
+  frame: Mesh;
   casing: Mesh;
   front: Mesh;
   back: Mesh;
   recess: Mesh;
   screen: Mesh;
   glass: Mesh;
-  shadow: Mesh;
+  daisy: Mesh | null;
+  /** The floor that takes the shadow (a ShadowMaterial), and the baked contact darkening on it. */
+  floor: Mesh;
+  contact: Mesh;
+  /** The controller and its cable, on the floor (in the body, so it turns with the monitor). */
+  remote: Group;
+  /** Every mesh that casts the shadow. */
+  casters: Mesh[];
+  /** One mesh, all four. */
   feet: Mesh[];
   materials: { plastic: MeshPhysicalMaterial; bevel: MeshPhysicalMaterial; glass: MeshPhysicalMaterial };
 }
 
-/** Build every mesh; the screen gets its own material from the caller (the CRT shader). */
-export function buildMonitor(colors: MonitorColors, screenMaterial: Material): MonitorParts {
+/** A foot's profile for LatheGeometry: the rounded sole `h` below y = 0, then straight up to `up` (into the casing). */
+function footProfile(r: number, h: number, up: number): Vector2[] {
+  // hanging down: the dome mirrored, and reversed so it still faces outward
+  const pts = dome(r, h)
+    .map((p) => new Vector2(p.x, -p.y))
+    .reverse();
+  pts.push(new Vector2(r, up), new Vector2(0, up));
+  return pts;
+}
+
+/**
+ * Build every mesh; the screen gets its own material from the caller (the CRT shader). `daisySvg` is the
+ * daisy's SVG source and `logoSvg` Vega's wordmark's ('' for none).
+ */
+export function buildMonitor(colors: MonitorColors, screenMaterial: Material, daisySvg = '', logoSvg = ''): MonitorParts {
   const { R, W, H, DEPTH, opening: O } = DIMS;
+  const F = DIMS.frame;
 
   // ── Materials ──
   const plastic = new MeshPhysicalMaterial({
@@ -298,9 +347,9 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material): M
     emissiveMap: glowRamp(),
     emissiveIntensity: 0,
   });
-  const slotMat = new MeshStandardMaterial({ color: colors.slot, roughness: 0.85, metalness: 0 });
-  const buttonMat = new MeshPhysicalMaterial({ color: colors.button, roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.2 });
-  const ledMat = new MeshStandardMaterial({ color: colors.led, emissive: colors.led, emissiveIntensity: 1.4, roughness: 0.3 });
+  // the inside of the slot and the port: dark walls, a black back
+  const pocketWall = new MeshStandardMaterial({ color: colors.slot, roughness: 0.9, metalness: 0 });
+  const pocketBack = new MeshStandardMaterial({ color: colors.shadow, roughness: 1, metalness: 0 });
   // Glass: transmission off. Its reflection is added on top (One) while the tube behind is dimmed by
   // the glass's 15 % (One − src alpha), so a mostly clear pane still carries a visible reflection.
   const glassMat = new MeshPhysicalMaterial({
@@ -317,29 +366,36 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material): M
     blendDst: OneMinusSrcAlphaFactor,
   });
 
-  // ── Casing: one sweep, front and back edges rounded by R, the seam and the vents as dips ──
-  const vent = DIMS.vents;
-  // Guard rows and rings a hair outside every groove: without them the grooves' tilted normals are
-  // averaged into the long flat quads beside them and shade the whole side in streaks.
-  const GUARD = 0.002;
-  const sideBreaks = [vent.y0 - GUARD, vent.y0, vent.y0 + vent.wall, vent.y1 - vent.wall, vent.y1, vent.y1 + GUARD];
-  const outline = roundedRect(0, H / 2, W, H, R, 10, sideBreaks);
-  const rings: { z: number; push: number; v: number }[] = [];
   const edgeSeg = 10;
-  for (let i = 0; i <= edgeSeg; i++) {
-    const a = (i / edgeSeg) * (Math.PI / 2);
-    rings.push({ z: -R * (1 - Math.cos(a)), push: -R * (1 - Math.sin(a)), v: 0 });
-  }
-  const seam = DIMS.seam;
-  const mid: { z: number; push: number }[] = [
-    { z: -(seam.z - seam.half - GUARD), push: 0 },
-    { z: -(seam.z - seam.half), push: 0 },
-    { z: -seam.z, push: -seam.depth },
-    { z: -(seam.z + seam.half), push: 0 },
-    { z: -(seam.z + seam.half + GUARD), push: 0 },
-  ];
-  const ventRing: number[] = [];
-  for (const vz of vent.z) {
+  const quarter = (i: number) => (i / edgeSeg) * (Math.PI / 2);
+
+  // ── The front frame: a soft lip round its face, straight sides, a small round at its back ──
+  const frameOutline = roundedRect(0, H / 2, W, H, F.r, 12);
+  const frameRings: { z: number; push: number; v: number }[] = [];
+  for (let i = 0; i <= edgeSeg; i++) frameRings.push({ z: -F.lip * (1 - Math.cos(quarter(i))), push: -F.lip * (1 - Math.sin(quarter(i))), v: 0 });
+  for (let i = 0; i <= edgeSeg; i++) frameRings.push({ z: -(F.depth - F.back) - F.back * Math.sin(quarter(i)), push: -F.back * (1 - Math.cos(quarter(i))), v: 0 });
+  frameRings.forEach((r) => (r.v = -r.z / DEPTH));
+  const frame = new Mesh(sweep(frameOutline, frameRings, 'out'), plastic);
+
+  // ── The body: frame.step in from the frame all round, tapering to the back about its flat bottom ──
+  //    The vents are grooves pressed into the left side near the back (the right carries the daisy alone):
+  //    dips in the sweep, so they catch
+  //    the light and the shade as the plastic round them does. Guard rows and rings a hair outside each
+  //    groove keep its tilted normals out of the long flat quads beside it (else the side shades in streaks).
+  const vent = DIMS.vents;
+  const GUARD = 0.002;
+  const bodyOutline = roundedRect(0, H / 2, W - 2 * F.step, H - 2 * F.step, F.r - F.step, 12, [
+    vent.y0 - GUARD,
+    vent.y0,
+    vent.y0 + vent.wall,
+    vent.y1 - vent.wall,
+    vent.y1,
+    vent.y1 + GUARD,
+  ]);
+  const bodyBottom = F.step;
+  const bodyRings: { z: number; push: number; v: number }[] = [{ z: -(F.depth - 0.004), push: 0, v: 0 }];
+  const deepZ = new Set<number>();
+  for (const vz of vent.z)
     for (const [dz, deep] of [
       [-vent.half - GUARD, false],
       [-vent.half, false],
@@ -348,31 +404,49 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material): M
       [vent.half, false],
       [vent.half + GUARD, false],
     ] as const) {
-      mid.push({ z: -(vz + dz), push: 0 });
-      if (deep) ventRing.push(mid.length - 1);
+      bodyRings.push({ z: -(vz + dz), push: 0, v: 0 });
+      if (deep) deepZ.add(-(vz + dz));
     }
-  }
-  const ventRingZ = new Set(ventRing.map((i) => mid[i]!.z));
-  for (const m of mid.sort((a, b) => b.z - a.z)) rings.push({ ...m, v: 0 });
-  for (let i = 0; i <= edgeSeg; i++) {
-    const a = (i / edgeSeg) * (Math.PI / 2);
-    rings.push({ z: -(DEPTH - R) - R * Math.sin(a), push: -R * (1 - Math.cos(a)), v: 0 });
-  }
-  rings.forEach((r) => (r.v = -r.z / DEPTH));
-  const ventDeep = (p: OutlinePt, ri: number) => {
-    const r = rings[ri]!;
-    if (!ventRingZ.has(r.z)) return 0;
-    if (Math.abs(p.nx) !== 1) return 0;
-    return p.y > vent.y0 + 1e-6 && p.y < vent.y1 - 1e-6 ? -vent.depth : 0;
-  };
-  const casing = new Mesh(sweep(outline, rings, 'out', ventDeep), plastic);
+  bodyRings.sort((a, b) => b.z - a.z);
+  for (let i = 0; i <= edgeSeg; i++) bodyRings.push({ z: -(DEPTH - R) - R * Math.sin(quarter(i)), push: -R * (1 - Math.cos(quarter(i))), v: 0 });
+  bodyRings.forEach((r) => (r.v = -r.z / DEPTH));
+  const ventDeep = (p: OutlinePt, ri: number) =>
+    deepZ.has(bodyRings[ri]!.z) && p.nx === -1 && p.y > vent.y0 + 1e-6 && p.y < vent.y1 - 1e-6 ? -vent.depth : 0;
+  const casing = new Mesh(sweep(bodyOutline, bodyRings, 'out', bodyBottom, ventDeep), plastic);
 
-  // ── Front face (with the opening, widened by the lip) and back face ──
-  const frontRing = outline.map((p) => new Vector2(p.x - p.nx * R, p.y - p.ny * R));
-  const openOutline = roundedRect(0, OPENING_Y, O.w, O.h, O.r, 8);
-  const hole = openOutline.map((p) => new Vector2(p.x + p.nx * DIMS.lip, p.y + p.ny * DIMS.lip));
-  const front = new Mesh(cap(frontRing, [hole], 0, 1), plastic);
-  const back = new Mesh(cap(frontRing, [], -DEPTH, -1), plastic);
+  // ── Faces: the frame's front (with the opening, widened by the lip), the step round its back, the body's back ──
+  const ring = (o: OutlinePt[], push: number) => o.map((p) => new Vector2(p.x + p.nx * push, p.y + p.ny * push));
+  const openOutline = roundedRect(0, OPENING_Y, O.w, O.h, O.r, 10);
+  // The face: a cushion, not a plane (faceRise) — subdivided so it can bend, holes cut for the floppy
+  // slot and the controller's port.
+  const S = DIMS.slot;
+  const B = DIMS.button;
+  const P = DIMS.port;
+  const slotY = SLOT_Y + S.dy;
+  const slotOutline = roundedRect(S.x, slotY, S.w, S.h, 0.004, 4);
+  // the port: its own outline (src/monitor/mesh.ts portShape), points with outward normals
+  const portOutline: OutlinePt[] = (() => {
+    let pts = portShape(P.w, P.h).getPoints(4).map((q) => new Vector2(q.x + B.x, q.y + ROW2_Y));
+    pts = pts.filter((q, i) => q.distanceTo(pts[(i + 1) % pts.length]!) > 1e-7);
+    if (ShapeUtils.isClockWise(pts)) pts.reverse();
+    return pts.map((q, i) => {
+      const a = pts[(i + pts.length - 1) % pts.length]!;
+      const b = pts[(i + 1) % pts.length]!;
+      const e1 = new Vector2(q.y - a.y, a.x - q.x).normalize();
+      const e2 = new Vector2(b.y - q.y, q.x - b.x).normalize();
+      const n = e1.add(e2).normalize();
+      return { x: q.x, y: q.y, nx: n.x, ny: n.y };
+    });
+  })();
+  const frontGeo = subdivide(cap(ring(frameOutline, -F.lip), [ring(openOutline, DIMS.lip), ring(slotOutline, 0), ring(portOutline, 0)], 0, 1), 0.016);
+  {
+    const p = frontGeo.getAttribute('position');
+    for (let i = 0; i < p.count; i++) p.setZ(i, faceRise(p.getX(i), p.getY(i)));
+    frontGeo.computeVertexNormals();
+  }
+  const front = new Mesh(frontGeo, plastic);
+  const step = new Mesh(cap(ring(frameOutline, -F.back), [ring(bodyOutline, 0)], -F.depth, -1), plastic);
+  const back = new Mesh(cap(ring(bodyOutline, -R), [], -DEPTH, -1, bodyBottom), plastic);
 
   // ── The opening: the rounded lip (plastic), then the recess walls (the darker bevel) ──
   const lipSeg = 6;
@@ -433,121 +507,271 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material): M
   const glass = new Mesh(glassGeo, glassMat);
   glass.renderOrder = 2;
 
-  // ── Chin: the floppy slot in its lip, the power button, the LED ──
-  const S = DIMS.slot;
-  const lipShape = new Shape();
+  // ── Chin, on two rows, every part straight on the face's cushion where it stands. The floppy drive:
+  //    the slot (a real pocket, its dark flap inside) in a soft raised lip, the activity LED and the
+  //    eject button under it. The power button, a power mark on it. Below: Vega's raised wordmark, its
+  //    left edge on the drive's; the controller's port under the power button. ──
+  /** A rounded ring standing proud round a hole (w × h, corner r), `lip` wide, `depth` proud, its back at z. */
+  const lipRing = (x: number, y: number, z: number, w: number, h: number, r: number, lip: number, depth: number) => {
+    const shape = new Shape(roundedRect(0, 0, w + 2 * lip, h + 2 * lip, Math.min((h + 2 * lip) / 2 - 0.001, r + lip), 6).map((p) => new Vector2(p.x, p.y)));
+    shape.holes.push(new Path(roundedRect(0, 0, w, h, r, 4).map((p) => new Vector2(p.x, p.y))));
+    const m = new Mesh(new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0018, bevelSegments: 3, curveSegments: 8 }), plastic);
+    m.position.set(x, y, z);
+    return m;
+  };
+  /** The pocket behind a hole in the face, from just proud of `top` back to `bottom`: its walls and its back. */
+  const pocketOf = (o: OutlinePt[], top: number, bottom: number) => [
+    new Mesh(sweep(o, [{ z: top + 0.004, push: 0, v: 0 }, { z: bottom, push: 0, v: 1 }], 'in'), pocketWall),
+    new Mesh(cap(o.map((p) => new Vector2(p.x, p.y)), [], bottom, 1), pocketBack),
+  ];
+  /** A small raised rounded rectangle (a button, an LED) at (x, y), its back at z. */
+  const pad = (x: number, y: number, z: number, w: number, h: number, depth: number, mat: Material) => {
+    const m = new Mesh(
+      new ExtrudeGeometry(new Shape(roundedRect(0, 0, w, h, h / 2 - 0.0005, 5).map((p) => new Vector2(p.x, p.y))), {
+        depth,
+        bevelEnabled: true,
+        bevelThickness: 0.0012,
+        bevelSize: 0.001,
+        bevelSegments: 2,
+        curveSegments: 5,
+      }),
+      mat,
+    );
+    m.position.set(x, y, z);
+    return m;
+  };
+  const ledMat = new MeshStandardMaterial({ color: colors.led, emissive: colors.led, emissiveIntensity: 0.5, roughness: 0.3 });
+  const chin: Mesh[] = [];
+
+  // the floppy drive
+  const zSlot = faceRise(S.x, slotY);
+  chin.push(lipRing(S.x, slotY, zSlot - 0.0018, S.w, S.h, 0.004, S.lip, S.lipDepth));
+  chin.push(...pocketOf(slotOutline, zSlot, zSlot - S.deep));
+  const flap = new Mesh(new PlaneGeometry(S.w - 0.004, S.h * 0.62), pocketWall);
+  flap.position.set(S.x, slotY - S.h * 0.19, zSlot - S.flap);
+  chin.push(flap);
+  const under = slotY - S.h / 2 - S.lip - 0.016;
+  const ejectX = S.x + S.w / 2 - S.eject.w / 2;
+  chin.push(pad(ejectX, under, faceRise(ejectX, under) - 0.0012, S.eject.w, S.eject.h, 0.002, plastic));
+  const ledX = S.x - S.w / 2 + S.led.w / 2;
+  chin.push(pad(ledX, under, faceRise(ledX, under) - 0.0008, S.led.w, S.led.h, 0.0008, ledMat));
+
+  // the power button, a power mark on it
   {
-    const o = roundedRect(0, 0, S.w + 2 * S.lip, S.h + 2 * S.lip, (S.h + 2 * S.lip) / 2 - 0.002, 6).map((p) => new Vector2(p.x, p.y));
-    lipShape.setFromPoints(o);
-    lipShape.holes.push(new Path(roundedRect(0, 0, S.w, S.h, 0.004, 4).map((p) => new Vector2(p.x, p.y))));
+    const g = new LatheGeometry(dome(B.r, B.h), 40);
+    const p = g.getAttribute('position');
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / (2 * B.r) + 0.5, -p.getZ(i) / (2 * B.r) + 0.5);
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = colors.button.getStyle();
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = colors.ink.getStyle();
+    ctx.lineWidth = 9;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(64, 68, 26, -Math.PI / 2 + 0.75, -Math.PI / 2 - 0.75 + 2 * Math.PI);
+    ctx.moveTo(64, 32);
+    ctx.lineTo(64, 64);
+    ctx.stroke();
+    const map = new CanvasTexture(c);
+    map.colorSpace = SRGBColorSpace;
+    map.anisotropy = 4;
+    const power = new Mesh(g, new MeshPhysicalMaterial({ color: 0xffffff, map, roughness: 0.35, metalness: 0, clearcoat: 0.5, clearcoatRoughness: 0.2 }));
+    power.rotation.x = Math.PI / 2;
+    power.position.set(B.x, SLOT_Y, faceRise(B.x, SLOT_Y) - 0.001);
+    chin.push(power);
   }
-  const slotLip = new Mesh(
-    new ExtrudeGeometry(lipShape, { depth: S.lipDepth, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0018, bevelSegments: 3, curveSegments: 8 }),
-    plastic,
-  );
-  slotLip.position.set(0, SLOT_Y, -0.0018);
-  const slot = new Mesh(new PlaneGeometry(S.w, S.h), slotMat);
-  slot.position.set(0, SLOT_Y, 0.0012);
-  const button = new Mesh(new LatheGeometry(dome(DIMS.button.r, DIMS.button.h), 40), buttonMat);
-  button.rotation.x = Math.PI / 2;
-  button.position.set(DIMS.button.x, SLOT_Y, 0);
-  const led = new Mesh(new SphereGeometry(DIMS.led.r, 16, 10), ledMat);
-  led.scale.z = 0.45;
-  led.position.set(DIMS.led.x, SLOT_Y, 0.0008);
 
-  // ── Feet ──
-  const feet: Mesh[] = [];
-  // hanging down from the casing's underside: mirrored, and reversed so it still faces outward
-  const footGeo = new LatheGeometry(
-    dome(DIMS.feet.r, DIMS.feet.h)
-      .map((p) => new Vector2(p.x, -p.y))
-      .reverse(),
-    28,
-  );
-  for (const fz of DIMS.feet.z)
-    for (const sx of [-1, 1]) {
-      const m = new Mesh(footGeo, plastic);
-      m.position.set(sx * DIMS.feet.x * scaleAt(-fz), 0, -fz);
-      feet.push(m);
-    }
+  // the controller's port
+  const zPort = faceRise(B.x, ROW2_Y);
+  {
+    // a soft raised bezel round the socket, following its outline
+    const outer = new Shape(portOutline.map((q) => new Vector2(q.x + q.nx * P.lip - B.x, q.y + q.ny * P.lip - ROW2_Y)));
+    outer.holes.push(new Path(portOutline.map((q) => new Vector2(q.x - B.x, q.y - ROW2_Y))));
+    const bezel = new Mesh(new ExtrudeGeometry(outer, { depth: 0.003, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0018, bevelSegments: 3 }), plastic);
+    bezel.position.set(B.x, ROW2_Y, zPort - 0.0015);
+    chin.push(bezel);
+  }
+  chin.push(...pocketOf(portOutline, zPort, zPort - P.deep));
 
-  // ── Contact shadow on the floor, under the feet ──
-  const rect = { x0: -1.2, x1: 1.9, z0: -1.9, z1: 0.9 };
-  const shadowGeo = new BufferGeometry();
-  const fy = -DIMS.feet.h - 0.0005;
-  shadowGeo.setAttribute(
-    'position',
-    new Float32BufferAttribute([rect.x0, fy, rect.z1, rect.x1, fy, rect.z1, rect.x1, fy, rect.z0, rect.x0, fy, rect.z0], 3),
-  );
-  shadowGeo.setAttribute('uv', new Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));
-  shadowGeo.setIndex([0, 1, 2, 0, 2, 3]);
-  const shadowMat = new MeshBasicMaterial({
+  // Vega's wordmark, raised: its letters stand a few mm proud of the chin, in the logo's Leaf Green, its
+  // left edge on the drive's
+  const logoShapes = logoSvg ? svgShapes(logoSvg, DIMS.logo.h) : [];
+  if (logoShapes.length) {
+    const geo = new ExtrudeGeometry(logoShapes, { depth: 0.002, bevelEnabled: true, bevelThickness: 0.0008, bevelSize: 0.0005, bevelSegments: 1 });
+    geo.computeBoundingBox();
+    const left = S.x - S.w / 2 - S.lip - geo.boundingBox!.min.x;
+    // laid onto the cushion where each point of it stands, so no letter sinks into the face
+    const p = geo.getAttribute('position');
+    for (let i = 0; i < p.count; i++) p.setZ(i, p.getZ(i) + faceRise(left + p.getX(i), ROW2_Y + p.getY(i)) - 0.0004);
+    geo.computeVertexNormals();
+    const badge = new Mesh(geo, new MeshPhysicalMaterial({ color: colors.brand, roughness: 0.35, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.2 }));
+    badge.position.set(left, ROW2_Y, 0);
+    chin.push(badge);
+  }
+
+  // ── Feet: the front pair under the frame's corners, the back pair under the body's (reaching up to it) — one mesh ──
+  const ft = DIMS.feet;
+  const front2 = new LatheGeometry(footProfile(ft.r, ft.h, 0.02), 24);
+  const back2 = new LatheGeometry(footProfile(ft.r, ft.h, bodyBottom + 0.02), 24);
+  const feetGeo = mergeGeometries(
+    [-1, 1].flatMap((sx) => [
+      front2.clone().translate(sx * ft.x, 0, -ft.zFront),
+      back2.clone().translate(sx * ft.x * scaleAt(-ft.zBack), 0, -ft.zBack),
+    ]),
+  )!;
+  front2.dispose();
+  back2.dispose();
+  const feet = [new Mesh(feetGeo, plastic)];
+
+  // ── The sides' flat parts are planes: x = ±sideX · s(z), whatever y. A frame on one: along it toward
+  //    the back on the right (toward the front on the left, so both read unmirrored from outside), up,
+  //    and out of it; at depth zc and height yc (as at the body's front: tapered with it), `lift` out ──
+  const sideX = W / 2 - F.step;
+  const onSide = (side: 1 | -1, zc: number, yc: number, lift: number) => {
+    const z0 = -F.depth;
+    const z1 = -DEPTH;
+    const along = new Vector3(side * sideX * (scaleAt(z1) - scaleAt(z0)), 0, z1 - z0).normalize();
+    const up = new Vector3(0, 1, 0);
+    const out = side > 0 ? new Vector3().crossVectors(along, up) : new Vector3().crossVectors(up, along);
+    if (side < 0) along.negate();
+    const sc = scaleAt(zc);
+    return new Matrix4().makeBasis(along, up, out).setPosition(side * sideX * sc + out.x * lift, bodyBottom + (yc - bodyBottom) * sc, zc + out.z * lift);
+  };
+
+  // ── Vega's daisy on the right side: big and flush with it, the monitor's own yellow but glossy, so it
+  //    shows by its shine against the matt plastic round it ──
+  let daisy: Mesh | null = null;
+  const shape = daisySvg ? svgShapes(daisySvg, DIMS.daisy.size) : [];
+  if (shape.length) {
+    // flush with the side, not raised: a flat shape on its plane, only its finish differs
+    const geo = new ShapeGeometry(shape, 8);
+    const daisyMat = new MeshPhysicalMaterial({
+      color: colors.plastic,
+      roughness: 0.18,
+      metalness: 0,
+      clearcoat: 1,
+      clearcoatRoughness: 0.04,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+    daisy = new Mesh(geo, daisyMat);
+    daisy.matrixAutoUpdate = false;
+    daisy.matrix.copy(onSide(1, DIMS.daisy.z, DIMS.daisy.y, 0.0003));
+  }
+
+  // ── The controller and its cable, on the floor to the front right ──
+  const remote = buildRemote({ body: colors.plastic, a: colors.remoteA, b: colors.remoteB, letter: colors.remoteLetter, ink: colors.remoteInk, arrow: colors.brand }, logoSvg);
+
+  // ── The floor: a ShadowMaterial plane at the soles, taking the shadow in Outline Black at
+  //    the strength the baked shadow had; the contact darkening on it, baked, right where things meet it ──
+  const floorY = -DIMS.feet.h - 0.0005;
+  const floorGeo = new PlaneGeometry(4.4, 4.4).rotateX(-Math.PI / 2).translate(0.5, floorY, -0.6);
+  const floorMat = new ShadowMaterial({ color: colors.shadow, opacity: 0.42, depthWrite: false, toneMapped: false });
+  // As in the reference, the shadow is strongest where it leaves the monitor and fades as it falls
+  // away: its strength eases off with the distance from the monitor's footprint (FADE, body units).
+  floorMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec2 vFloor;\nvoid main() {').replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFloor = position.xz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('void main() {', 'varying vec2 vFloor;\nvoid main() {')
+      .replace(
+        'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
+        `vec2 q = abs(vFloor - vec2(0.0, ${(-DEPTH / 2).toFixed(4)})) - vec2(${(W / 2).toFixed(4)}, ${(DEPTH / 2).toFixed(4)});
+  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  float fade = 1.0 - smoothstep(${FADE[0].toFixed(3)}, ${FADE[1].toFixed(3)}, d);
+  gl_FragColor = vec4( color, opacity * fade * ( 1.0 - getShadowMask() ) );`,
+      );
+  };
+  floorMat.customProgramCacheKey = () => 'monitor-floor';
+  const floor = new Mesh(floorGeo, floorMat);
+  floor.receiveShadow = true;
+  floor.renderOrder = -2;
+  const rect = { x0: -0.75, x1: 1.15, z0: -1.15, z1: 0.6 };
+  const foot = (x: number, z: number): Blob => ({ x, z, rx: ft.r * 2.6, rz: ft.r * 2.6, stops: [[0, 0.5], [0.45, 0.32], [1, 0]] });
+  const backX = ft.x * scaleAt(-ft.zBack);
+  const contactMat = new MeshBasicMaterial({
     color: colors.shadow,
-    map: shadowTexture(rect, { x: 0.55, z: -0.75, rx: 1.0, rz: 0.75, a: 0.42 }),
+    map: contactTexture(rect, [
+      // the body's underside, just above the floor: a darkening within its footprint, leaning to the side
+      // away from the light (none spills onto the lit left), and a dense band along the right side's foot,
+      // where the cast shadow begins
+      { x: 0.04, z: -DEPTH / 2 - 0.02, rx: 0.44, rz: 0.52, stops: [[0, 0.24], [0.78, 0.18], [1, 0]] },
+      { x: W / 2 - F.step * 2, z: -DEPTH / 2 - 0.04, rx: 0.07, rz: 0.5, stops: [[0, 0.34], [0.6, 0.2], [1, 0]] },
+      foot(-ft.x, -ft.zFront),
+      foot(ft.x, -ft.zFront),
+      foot(-backX, -ft.zBack),
+      foot(backX, -ft.zBack),
+      // the controller lies on the floor: a tight band all along its underside
+      { x: REMOTE.at[0], z: REMOTE.at[1] - 0.02 * REMOTE.scale, rx: 0.27 * REMOTE.scale, rz: 0.13 * REMOTE.scale, turn: -REMOTE.turn, stops: [[0, 0.36], [0.7, 0.24], [1, 0]] },
+    ], [
+      // the cable, where it lies on the floor
+      { pts: remote.cable.filter((q) => q.y < -DIMS.feet.h + REMOTE.cable.r * 1.6).map((q) => [q.x, q.z] as [number, number]), width: REMOTE.cable.r * 3, alpha: 0.42 },
+    ]),
     transparent: true,
     depthWrite: false,
     toneMapped: false,
   });
-  // the map's alpha is the shadow; its rgb is white so the colour stays Outline Black
-  const shadow = new Mesh(shadowGeo, shadowMat);
-  shadow.renderOrder = -1;
+  const contactGeo = new BufferGeometry();
+  const cy = floorY + 0.0002;
+  contactGeo.setAttribute('position', new Float32BufferAttribute([rect.x0, cy, rect.z1, rect.x1, cy, rect.z1, rect.x1, cy, rect.z0, rect.x0, cy, rect.z0], 3));
+  contactGeo.setAttribute('uv', new Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));
+  contactGeo.setIndex([0, 1, 2, 0, 2, 3]);
+  // the map's alpha is the darkening; its rgb is white so the colour stays Outline Black
+  const contact = new Mesh(contactGeo, contactMat);
+  contact.renderOrder = -1;
+
+  // The shadow: only the monitor's outer shapes cast, only the floor takes it. The controller and the cable
+  // lie on the floor and are grounded by the contact darkening: cast too, inside the monitor's soft shadow
+  // so near the floor, they made VSM light a pale halo round them (its light bleeding).
+  const casters = [frame, casing, front, step, back, ...feet];
+  for (const m of casters) m.castShadow = true;
 
   const body = new Group();
-  body.add(casing, front, back, recess, screen, glass, slotLip, slot, button, led, ...feet, shadow);
+  body.add(floor, contact, frame, casing, front, step, back, recess, screen, glass, ...chin, ...feet, remote.group);
+  if (daisy) body.add(daisy);
   body.position.set(-CENTRE.x, -CENTRE.y, -CENTRE.z);
   const pivot = new Group();
   pivot.add(body);
-  return { pivot, body, casing, front, back, recess, screen, glass, shadow, feet, materials: { plastic, bevel, glass: glassMat } };
+  return { pivot, body, frame, casing, front, back, recess, screen, glass, daisy, floor, contact, remote: remote.group, casters, feet, materials: { plastic, bevel, glass: glassMat } };
 }
 
 /** Proportions measured from the built geometry, for the review table. */
 export function measure(parts: MonitorParts): Record<string, number> {
+  const box = (m: Mesh) => {
+    m.geometry.computeBoundingBox();
+    return m.geometry.boundingBox!;
+  };
+  const f = box(parts.frame);
   const pos = parts.casing.geometry.getAttribute('position');
-  let frontW = 0;
   let backW = 0;
-  let maxH = 0;
   let backH = 0;
-  let minZ = 0;
+  let frontW = 0;
+  let frontH = 0;
   for (let i = 0; i < pos.count; i++) {
-    const x = Math.abs(pos.getX(i));
-    const y = pos.getY(i);
     const z = pos.getZ(i);
-    minZ = Math.min(minZ, z);
-    if (z > -DIMS.R - 1e-6) frontW = Math.max(frontW, 2 * x);
-    if (z > -DIMS.R - 1e-6) maxH = Math.max(maxH, y);
     if (z < -(DIMS.DEPTH - DIMS.R) + 1e-6) {
-      backW = Math.max(backW, 2 * x);
-      backH = Math.max(backH, y);
+      backW = Math.max(backW, 2 * Math.abs(pos.getX(i)));
+      backH = Math.max(backH, pos.getY(i));
+    } else if (z > -DIMS.frame.depth) {
+      frontW = Math.max(frontW, 2 * Math.abs(pos.getX(i)));
+      frontH = Math.max(frontH, pos.getY(i));
     }
   }
-  const rp = parts.recess.geometry.getAttribute('position');
-  let ox0 = Infinity;
-  let ox1 = -Infinity;
-  let oy0 = Infinity;
-  let oy1 = -Infinity;
-  for (let i = 0; i < rp.count; i++) {
-    if (Math.abs(rp.getZ(i) + DIMS.lip) > 1e-6) continue; // the ring where the lip meets the walls
-    ox0 = Math.min(ox0, rp.getX(i));
-    ox1 = Math.max(ox1, rp.getX(i));
-    oy0 = Math.min(oy0, rp.getY(i));
-    oy1 = Math.max(oy1, rp.getY(i));
-  }
+  const frameW = f.max.x - f.min.x;
+  const frameH = f.max.y - f.min.y;
   return {
-    frontWidth: frontW,
-    frontHeight: maxH,
-    depth: -minZ,
-    depthOverWidth: -minZ / frontW,
+    frameWidth: frameW,
+    frameHeight: frameH,
+    heightOverWidth: frameH / frameW,
+    depth: DIMS.DEPTH,
     taperWidth: 1 - backW / frontW,
-    taperHeight: 1 - backH / maxH,
-    openingWidth: (ox1 - ox0) / frontW,
-    openingHeight: (oy1 - oy0) / maxH,
-    topBezel: (maxH - oy1) / maxH,
-    chin: oy0 / maxH,
-    openingCentreX: (ox0 + ox1) / 2,
-    edgeRadius: DIMS.R,
-    recess: DIMS.recess,
-    bulgeOverScreenWidth: DIMS.bulge / DIMS.opening.w,
-    slotWidth: DIMS.slot.w / frontW,
-    slotAtChin: SLOT_Y / oy0,
+    taperHeight: 1 - (backH - DIMS.frame.step) / (frontH - DIMS.frame.step),
+    openingWidth: DIMS.opening.w / frameW,
+    openingHeight: DIMS.opening.h / frameH,
+    topBezel: DIMS.opening.top / frameH,
+    chin: CHIN / frameH,
   };
 }

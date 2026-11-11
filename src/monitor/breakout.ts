@@ -5,7 +5,8 @@
  * spot, which he punches out, at the viewer and past the camera; the rest out and down — tumbling,
  * glinting, falling, bouncing (a big piece breaks again where it lands) and coming to rest on the floor
  * round the monitor, with a dust of fine glass. A jagged rim
- * stays in the frame and the tube behind it shows static. Sam is a billboard from then on — his own
+ * stays in the frame — the same glass as the shards, its broken edge as thick and as lit as theirs —
+ * and the tube behind it shows static. Sam is a billboard from then on — his own
  * pixels, nearest-filtered — leaping on toward the viewer until he is a whole number of device px per
  * art px on the page, where the page takes him over.
  *
@@ -23,7 +24,6 @@ import {
   CanvasTexture,
   Color,
   CustomBlending,
-  DataTexture,
   DoubleSide,
   Float32BufferAttribute,
   Mesh,
@@ -34,7 +34,6 @@ import {
   PlaneGeometry,
   Points,
   Quaternion,
-  RGBAFormat,
   SRGBColorSpace,
   ShaderMaterial,
   Vector3,
@@ -44,6 +43,7 @@ import {
 import { readToken } from '../game/palette';
 import type { MonitorParts } from './build';
 import type { CrtMaterial } from './crt';
+import { REMOTE } from './remote';
 import { DIMS, OPENING_Y, scaleAt } from './spec';
 
 const O = DIMS.opening;
@@ -469,6 +469,9 @@ const glassVertex = /* glsl */ `
 attribute vec2 aLocal;
 attribute float aOut;
 attribute float aEdge;
+#ifdef RIM
+varying vec2 vUv;
+#endif
 varying float vEdge;
 varying vec3 vN;
 varying vec3 vTx;
@@ -482,9 +485,17 @@ void main() {
   vN = normalMatrix * normal;
   vTx = normalMatrix * vec3(1.0, 0.0, 0.0);
   vTy = normalMatrix * vec3(0.0, 1.0, 0.0);
+#ifdef RIM
+  // the rim's face: the pane itself (its own curve, no lean), cut by the rim's mask
+  vUv = uv;
+  vLocal = vec2(0.0);
+  vOut = 0.0;
+  vEdge = 0.0;
+#else
   vLocal = aLocal;
   vOut = aOut;
   vEdge = aEdge;
+#endif
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -494,6 +505,10 @@ uniform vec3 uPage;
 uniform vec3 uSky;
 uniform vec3 uSkyHigh;
 uniform float uLean;
+#ifdef RIM
+uniform sampler2D uRimMask;
+varying vec2 vUv;
+#endif
 varying float vEdge;
 varying vec3 vN;
 varying vec3 vTx;
@@ -531,6 +546,11 @@ vec4 room(vec3 r) {
   return vec4(mix(c, vec3(1.0), lit), lit);
 }
 void main() {
+#ifdef RIM
+  // the mask: 1 keeps the glass, 0 is the hole the shards left, a band in between runs along the broken edge
+  float mask = texture2D(uRimMask, vUv).r;
+  if (mask < 0.5) discard;
+#endif
   vec3 v = normalize(vView);
   // the side of the piece toward the viewer, whichever way its outline winds
   float toward = dot(vN, v) < 0.0 ? -1.0 : 1.0;
@@ -545,6 +565,10 @@ void main() {
   vec3 col = env.rgb * F + uSky * 0.025 + vec3(env.a * (0.16 + 0.5 * F) + glint);
   // the light caught in the break: the broken edges, and a line along each face's outline
   float line = vEdge > 0.5 ? 0.7 + 0.5 * max(dot(n, uKey), 0.0) : 1.0 - smoothstep(0.0, fwidth(vOut) * 2.0, 1.0 - vOut);
+#ifdef RIM
+  // the face's line along its broken edge, as on a shard's face
+  line = 1.0 - smoothstep(0.8, 0.95, mask);
+#endif
   float e = clamp((vEdge > 0.5 ? 0.42 : 0.5) * line, 0.0, 0.7);
   col = vec3(e) + col * (1.0 - e);
   a = e + a * (1.0 - e);
@@ -602,7 +626,7 @@ export interface BreakoutParts {
   readonly samWorld: { centre: Vector3; size: number } | null;
   /** Everything the breakout added, made visible for the shader compile, then hidden again. */
   showAll(on: boolean): void;
-  /** The texture a layout changes (the rim's alpha map), to upload ahead of time. */
+  /** The texture a layout changes (the rim's mask), to upload ahead of time. */
   textures(): Texture[];
   dispose(): void;
 }
@@ -637,8 +661,6 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
   rimCtx.fillStyle = 'white';
   rimCtx.fillRect(0, 0, rimCanvas.width, rimCanvas.height);
   const rim = new CanvasTexture(rimCanvas);
-  const white = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, RGBAFormat);
-  white.needsUpdate = true;
   const light = new Color().setStyle(readToken('--color-cloud-white'));
   const crackMat = new ShaderMaterial({
     uniforms: {
@@ -660,11 +682,6 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
   crackMesh.renderOrder = 3;
   crackMesh.visible = false;
   parts.body.add(crackMesh);
-  // The glass keeps its rim once the shards have gone: its alpha map, white (the whole pane) until then.
-  // Set from the start so the glass's program never has to change mid-scroll.
-  const glassMat = parts.materials.glass;
-  glassMat.alphaMap = white;
-  glassMat.needsUpdate = true;
 
   // ── The shards: glossy clear glass (glassFragment), the broken edges lit; both faces drawn ──
   /** A token's colour as the display shows it (the glass is composed in display colours). */
@@ -672,25 +689,43 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
     const c = new Color().setStyle(readToken(token)).convertLinearToSRGB();
     return new Vector3(c.r, c.g, c.b);
   };
-  const shardMat = new ShaderMaterial({
-    uniforms: {
-      // the key light, up and to the left of the view, as the monitor's own key light falls
-      uKey: { value: new Vector3(-0.42, 0.62, 0.66).normalize() },
-      uPage: { value: asShown('--color-daisy-white') },
-      uSky: { value: asShown('--color-blue-100') },
-      uSkyHigh: { value: asShown('--color-sky-blue') },
-      uLean: { value: 0.2 },
-    },
-    vertexShader: glassVertex,
-    fragmentShader: glassFragment,
-    transparent: true,
-    depthWrite: false,
-    side: DoubleSide,
-    blending: CustomBlending,
-    blendSrc: OneFactor,
-    blendDst: OneMinusSrcAlphaFactor,
-  });
+  const glassUniforms = {
+    // the key light, up and to the left of the view, as the monitor's own key light falls
+    uKey: { value: new Vector3(-0.42, 0.62, 0.66).normalize() },
+    uPage: { value: asShown('--color-daisy-white') },
+    uSky: { value: asShown('--color-blue-100') },
+    uSkyHigh: { value: asShown('--color-sky-blue') },
+    uLean: { value: 0.2 },
+    uRimMask: { value: rim },
+  };
+  /** The glass's one material, for the shards and the rim's broken edge; with RIM, for the rim's face (the pane, cut by its mask). */
+  const glassMaterial = (rimFace: boolean) =>
+    new ShaderMaterial({
+      uniforms: glassUniforms,
+      defines: rimFace ? { RIM: '' } : {},
+      vertexShader: glassVertex,
+      fragmentShader: glassFragment,
+      transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
+      blending: CustomBlending,
+      blendSrc: OneFactor,
+      blendDst: OneMinusSrcAlphaFactor,
+    });
+  const shardMat = glassMaterial(false);
+  const rimMat = glassMaterial(true);
   const shards: Shard[] = [];
+
+  // ── The rim that stays: the pane itself (its geometry shared with the glass) in the shards' glass, cut
+  //    by the rim's mask; and its broken edge, a wall THICK deep along the rim's inner edge, lit as theirs ──
+  const rimFace = new Mesh(parts.glass.geometry, rimMat);
+  rimFace.renderOrder = 2;
+  rimFace.visible = false;
+  const rimEdge = new Mesh(new BufferGeometry(), shardMat);
+  rimEdge.renderOrder = 2;
+  rimEdge.visible = false;
+  rimEdge.frustumCulled = false;
+  parts.body.add(rimFace, rimEdge);
 
   // ── Fine glass dust ──
   const dustGeo = new BufferGeometry();
@@ -727,7 +762,6 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
 
   let pattern: Pattern | null = null;
   let key = '';
-  let rimSet = false;
   let shown = false;
   const tmpQ = new Quaternion();
   const tmpQ2 = new Quaternion();
@@ -796,6 +830,35 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
     return { geo, at };
   };
 
+  /** The rim's broken edge: a wall from the glass's face to THICK behind it, along the rim's inner edge, facing into the hole. */
+  const buildRimEdge = (p: Pattern): BufferGeometry => {
+    const loop = signedArea(p.rim) < 0 ? [...p.rim].reverse() : p.rim;
+    const f = loop.map(onGlass);
+    const pos: number[] = [];
+    const nor: number[] = [];
+    const up = new Vector3(0, 0, 1);
+    for (let j = 0; j < f.length; j++) {
+      const a = f[j]!;
+      const c = f[(j + 1) % f.length]!;
+      // the outline runs counter-clockwise round the hole, so into the hole is to its left
+      const n = new Vector3().crossVectors(up, new Vector3().subVectors(c, a)).normalize();
+      const ab = a.clone().setZ(a.z - THICK);
+      const cb = c.clone().setZ(c.z - THICK);
+      for (const q of [a, ab, cb, a, cb, c]) {
+        pos.push(q.x, q.y, q.z);
+        nor.push(n.x, n.y, n.z);
+      }
+    }
+    const n = pos.length / 3;
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new Float32BufferAttribute(nor, 3));
+    geo.setAttribute('aLocal', new Float32BufferAttribute(new Float32Array(n * 2), 2));
+    geo.setAttribute('aOut', new Float32BufferAttribute(new Float32Array(n).fill(1), 1));
+    geo.setAttribute('aEdge', new Float32BufferAttribute(new Float32Array(n).fill(1), 1));
+    return geo;
+  };
+
   const buildShards = (p: Pattern) => {
     for (const sh of shards) {
       sh.mesh.geometry.dispose();
@@ -807,6 +870,7 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
     const sign = () => (rnd() < 0.5 ? -1 : 1);
     const spin = () => new Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
     const imp = onGlass(p.impact);
+    const ctrl = { x: REMOTE.at[0], z: REMOTE.at[1], r: REMOTE.reach * REMOTE.scale + 0.02 };
     const rest = FALL.floor + THICK / 2;
     const piece = (poly: P2[]) => {
       const { geo, at } = prism(poly);
@@ -825,6 +889,13 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       const t2 = (2 * bounceV) / FALL.g;
       const slideV = new Vector3(v.x, 0, v.z).multiplyScalar(FALL.keep);
       const end = hit.clone().addScaledVector(slideV, t2 + FALL.slide);
+      // no glass comes to rest inside the controller on the floor: a piece that would is slid just past it
+      {
+        const dx = end.x - ctrl.x;
+        const dz = end.z - ctrl.z;
+        const d = Math.hypot(dx, dz);
+        if (d < ctrl.r) end.set(ctrl.x + (dx / (d || 1)) * ctrl.r, end.y, ctrl.z + (dz / (d || 1)) * ctrl.r);
+      }
       const restQ = new Quaternion().setFromAxisAngle(Y, rnd() * Math.PI * 2).multiply(tmpQ.setFromAxisAngle(X, sign() * Math.PI * 0.5));
       return { v, t1, t2, hit, bounceV, slideV, rest: end, restQ, gone: end.z > FALL.far || Math.abs(end.x) > FALL.wide };
     };
@@ -929,6 +1000,11 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       else rimCtx.lineTo(x, y);
     });
     rimCtx.closePath();
+    // the band along the broken edge (the face's line), then the hole over its inner half
+    rimCtx.strokeStyle = 'rgb(180,180,180)';
+    rimCtx.lineWidth = 6;
+    rimCtx.lineJoin = 'round';
+    rimCtx.stroke();
     rimCtx.fill();
     rim.needsUpdate = true;
   };
@@ -985,6 +1061,8 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       crackMesh.geometry.dispose();
       crackMesh.geometry = ribbons(pattern, onGlass);
       buildShards(pattern);
+      rimEdge.geometry.dispose();
+      rimEdge.geometry = buildRimEdge(pattern);
       drawRim(pattern);
     },
     set(stage, shatter, camera) {
@@ -993,10 +1071,9 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       crackMat.uniforms.uStage!.value = stage;
       const broken = on && shatter > 0;
       crackMat.uniforms.uRimOnly!.value = broken ? 1 : 0;
-      if (broken !== rimSet) {
-        glassMat.alphaMap = broken ? rim : white;
-        rimSet = broken;
-      }
+      // once broken, the pane is the rim: in the shards' glass, shown wherever the pane would be
+      rimFace.visible = rimEdge.visible = broken && parts.glass.visible;
+      if (broken) parts.glass.visible = false;
       crt.uniforms.uStatic.value = broken ? 1 : 0;
       dust.visible = broken;
       if (!broken) {
@@ -1072,16 +1149,18 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       crackMesh.visible = on;
       samMesh.visible = on;
       dust.visible = on;
+      rimFace.visible = rimEdge.visible = on;
       for (const s of shards) s.mesh.visible = on;
     },
     textures() {
       return [rim];
     },
     dispose() {
-      for (const t of [rim, white, samTex] as Texture[]) t.dispose();
+      for (const t of [rim, samTex] as Texture[]) t.dispose();
       crackMesh.geometry.dispose();
+      rimEdge.geometry.dispose();
       for (const s of shards) s.mesh.geometry.dispose();
-      for (const m of [crackMat, shardMat, samMat, dustMat]) m.dispose();
+      for (const m of [crackMat, shardMat, rimMat, samMat, dustMat]) m.dispose();
       dustGeo.dispose();
       samMesh.geometry.dispose();
     },
