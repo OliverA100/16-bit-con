@@ -9,12 +9,28 @@ import Wordmark from './Wordmark.astro';
     <a class="nav__brand" href="/" aria-label="16-Bit Con home">
       <Wordmark size="nav" daisy={false} />
     </a>
-    <!-- In the game it opens the form in a dialog over it (src/game/index.ts); otherwise it scrolls to it. -->
-    <Button href="#register" data-register-link>Register now</Button>
+    <!-- The home page's form from any page. On the home page it scrolls to it (the script below), and in the
+         game it opens the form in a dialog over it (src/game/index.ts). -->
+    <Button href="/#register" data-register-link>Register now</Button>
   </Window>
 </div>
 
 <script>
+  // Arriving at /#register from another page (the 404's nav): the form centred on screen, as the click does
+  // here, once the page above it has its height. The browser's own scroll to the hash heads for the form's top
+  // edge; this one takes over from it in the page's own scroll-behavior (a glide, or at once with reduced
+  // motion), so the page glides on to the centre instead of jumping there.
+  if (location.hash === '#register') {
+    const centre = () => {
+      const target = document.getElementById('register');
+      if (!target) return;
+      target.scrollIntoView({ block: 'center' });
+      target.focus({ preventScroll: true });
+    };
+    if (document.readyState === 'complete') centre();
+    else window.addEventListener('load', centre, { once: true });
+  }
+
   // "Register now" centres the Register window on screen (smoothly, or at once with reduced motion: the
   // page's own scroll-behavior) and moves focus there. In the game it opens the form in a dialog over it
   // instead (src/game/index.ts).
