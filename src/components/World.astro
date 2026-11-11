@@ -276,19 +276,15 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
   }
 
+  /* The monitor grows with the page and never shrinks as it widens: 72vw on a phone (the wordmark
+     already spans the width, so it takes the height the hero has to spare) up to 280 px, held there
+     until 22vw — the desktop's size — passes it. (A phone-only 280 px over a 220 px floor made it
+     shrink at 641 px and only catch up at ~1270.) The 3D reads the slot's box live. */
   .hero__monitor {
     position: relative;
     flex: none;
-    width: max(22vw, 220px);
+    width: max(min(72vw, 280px), 22vw);
     aspect-ratio: var(--slot-aspect);
-  }
-
-  /* Phones: the wordmark already spans the width, so the monitor takes up the height the hero has
-     to spare (the 3D reads the slot's box live, so it lands on this size). */
-  @media (max-width: 40rem) {
-    .hero__monitor {
-      width: min(72vw, 280px);
-    }
   }
 
   .hero__poster {
