@@ -80,6 +80,13 @@ const {
       <slot />
     </main>
     <footer class="site-footer container">
+      <!-- The host: Vega's own logo, wordmark and daisy together, as Vega draws it. -->
+      <p class="site-footer__host">
+        <span class="eyebrow">Hosted by</span>
+        <a href="https://vega.io" class="site-footer__vega">
+          <img src="/sprites/ui/vega-logo.svg" alt="Vega" width="487" height="158" loading="lazy" decoding="async" />
+        </a>
+      </p>
       <p class="eyebrow">
         16-Bit Con · Oct 3–5, 2026 · Javits Center, New York · Find Vega at Booth 630 ·{' '}
         <a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a>
@@ -94,7 +101,29 @@ const {
   }
 
   .site-footer {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-6);
     padding: var(--space-12) 0 var(--space-8);
     text-align: center;
+  }
+
+  .site-footer__host {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0;
+  }
+
+  /* About as tall as vega.io's own nav logo; width from the file's aspect. */
+  .site-footer__vega {
+    display: block;
+    line-height: 0;
+  }
+
+  .site-footer__vega img {
+    display: block;
+    width: auto;
+    height: 1.5rem;
   }
 </style>

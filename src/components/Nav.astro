@@ -7,7 +7,7 @@ import Wordmark from './Wordmark.astro';
 <div class="nav-slot">
   <Window as="nav" bare title="16-BIT CON · OCT 3–5, 2026" id="site-nav" class="nav" aria-label="Primary">
     <a class="nav__brand" href="/" aria-label="16-Bit Con home">
-      <Wordmark size="nav" />
+      <Wordmark size="nav" daisy={false} />
     </a>
     <!-- In the game it opens the form in a dialog over it (src/game/index.ts); otherwise it scrolls to it. -->
     <Button href="#register" data-register-link>Register now</Button>
@@ -53,7 +53,7 @@ import Wordmark from './Wordmark.astro';
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   }
 
-  /* Just the wordmark, the way vega.io's nav shows just its logo. */
+  /* Just the wordmark (the letters alone: the daisy is the hero's), the way vega.io's nav shows just its logo. */
   .nav__brand {
     display: inline-flex;
     align-items: center;
