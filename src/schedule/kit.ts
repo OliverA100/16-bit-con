@@ -20,6 +20,9 @@ export interface View {
    * when the text is above the scene): scenes keep their detail right of x or below y there.
    */
   clear: { x: number; y: number };
+  /** Device px per art px: the canvas is drawn in device pixels, everything placed on whole art pixels
+      except what drifts (clouds), which may step by a device pixel for smooth slow motion. */
+  k: number;
 }
 
 export interface Scene {
@@ -29,6 +32,8 @@ export interface Scene {
   /** Scene time to start from, and the time of the reduced-motion still. */
   start?: number;
   still?: number;
+  /** Draw over the text's area on phones too (the runner otherwise clips the scene below the text there). */
+  overText?: boolean;
 }
 
 export interface SceneModule {
@@ -133,6 +138,19 @@ export function put(ctx: CanvasRenderingContext2D, src: Drawable, x: number, y: 
   ctx.restore();
 }
 
+/**
+ * Someone (or something) on the ground: drawn with its bottom row, where every sheet's feet are, on a
+ * feet line, at a scene time, optionally mirrored to face the other way.
+ */
+export type Standing = (ctx: CanvasRenderingContext2D, t: number, x: number, feet: number) => void;
+
+/** A single pose standing on a feet line. */
+export const standStill = (src: Drawable, flip = false): Standing => (ctx, _t, x, feet) => put(ctx, src, x, feet - src.height + 1, flip);
+
+/** An animated strip standing on a feet line, looping at `fps`. */
+export const standAnim = (s: Strip, fps: number, flip = false): Standing => (ctx, t, x, feet) =>
+  s.draw(ctx, frameAt(t, fps, s.frames), x, feet - s.fh + 1, flip);
+
 export interface Cloud {
   src: Drawable;
   /** Start x as a fraction of the view, row from the top, speed in art px / s. */
@@ -142,28 +160,37 @@ export interface Cloud {
 }
 
 /**
- * Clouds drifting right and wrapping round the sky beside the text: from the text block's right edge
- * (`clear.x`) to the view's, cut at that edge so a cloud never passes behind the text.
+ * The top of a scene's sky in art px: under the text on phones (the text sits over the scene's top),
+ * the folder's top on wide folders (where the sky beside the text is the scene's too).
  */
+export const skyTop = (v: View) => (v.narrow ? v.clear.y : 0);
+
+/** 0 → len → 0 → …: a position that drifts to an end and back, never wrapping. */
+const pingpong = (x: number, len: number) => {
+  if (len <= 0) return 0;
+  const m = wrap(x, 2 * len);
+  return m <= len ? m : 2 * len - m;
+};
+
+/**
+ * Clouds drifting slowly to and fro in the sky beside the text (right of it on wide folders, under it on
+ * phones), each turning back at the edge of that sky: never cut by an edge, never popping in.
+ */
+/** Clouds drift at this many times their own speed, a device pixel at a time. */
+const CLOUD_PACE = 2;
+
+const cloudX = (c: Cloud, t: number, v: View) => {
+  const x0 = v.narrow ? 0 : v.clear.x;
+  const room = v.w - x0 - c.src.width;
+  return Math.round((x0 + pingpong(c.x * room + c.speed * CLOUD_PACE * t, room)) * v.k) / v.k;
+};
+
 export function drawClouds(ctx: CanvasRenderingContext2D, clouds: Cloud[], t: number, v: View): void {
-  const x0 = v.clear.x;
-  const range = v.w - x0;
-  ctx.save();
-  if (x0 > 0) {
-    ctx.beginPath();
-    ctx.rect(x0, 0, range, v.h);
-    ctx.clip();
-  }
-  for (const c of clouds) {
-    const span = range + c.src.width;
-    const x = x0 + wrap(c.x * range + c.speed * t + c.src.width, span) - c.src.width;
-    put(ctx, c.src, x, c.y);
-  }
-  ctx.restore();
+  for (const c of clouds) ctx.drawImage(c.src, cloudX(c, t, v), Math.round(skyTop(v) + c.y));
 }
 
 export function cloudsKey(clouds: Cloud[], t: number, v: View): number {
-  return stateKey(v.clear.x, ...clouds.map((c) => Math.floor(c.x * (v.w - v.clear.x) + c.speed * t)));
+  return stateKey(skyTop(v), ...clouds.map((c) => cloudX(c, t, v) * v.k));
 }
 
 /** A canvas the size of `w` × `h`, drawn once by `paint`, for layers that never move. */

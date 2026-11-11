@@ -1,6 +1,8 @@
 /**
  * Talk: Cheat Codes and Other Security Holes — Vega's night-rain landscape: dead trees, dark hills,
- * wet ground and its puddles, with the rain falling and the puddles catching it.
+ * wet ground and its puddles, Vega's pale far range behind them under sage rain clouds, a mole out in
+ * it reading their phone, and the rain (in a day cloud's pale blue) falling over the whole folder, the
+ * text too, the puddles catching it. The landscape repeats as it is, never mirrored.
  *
  * Built at load from Vega's "Threat Detected" picture, which is a 3600/509 upscale of a 508 × 266
  * pixel picture: it is sampled back to its own pixels (one sample per pixel centre), and only the
@@ -9,9 +11,9 @@
  * falls again as the animated rain. The logo and the window are not used.
  */
 import { sprites } from '../../data/sprites.manifest';
-import { img, layer, put, stateKey, wrap, type SceneModule } from '../kit';
+import { cloudsKey, drawClouds, frameAt, img, layer, put, stateKey, strip, wrap, type Cloud, type SceneModule, type View } from '../kit';
 
-const files = [sprites.threatScene.file];
+const files = [sprites.threatScene.file, sprites.hillsSilhouetteLight.file, sprites.cloudLg.file, sprites.cloudMd.file, sprites.cloudSm.file, sprites.cloudXs.file, sprites.cloudA.file, sprites.molePhone.file];
 
 /** The picture's pixel pitch and the centre of its first whole pixel (measured from its edges). */
 const PITCH = 3600 / 509;
@@ -28,6 +30,17 @@ const SKY_AREAS: [number, number, number, number][] = [
 ];
 const LOGO: [number, number, number, number] = [174, 24, 160, 65];
 const TREES: [number, number, number, number] = [0, 154, 60, 70];
+
+/** bg-hills-silhouette-light: the range's box in its file. */
+const RANGE = { x: 85, y: 111, w: 316, h: 110 };
+/**
+ * Where the far range stands: [x as a fraction of the folder, how far its foot sinks below the ground's
+ * line], wide and on phones. Under the text a copy sinks further, its peaks below the text.
+ */
+const RANGES = { wide: [[0.02, 0], [0.33, 0], [0.67, 0], [0.88, 24]], narrow: [[-0.25, 12], [0.42, 0]] } as const;
+
+/** A mole out in the rain, reading their phone: x as a fraction of the folder, feet in band rows. */
+const MOLE = { wide: 0.74, narrow: 0.56, feet: 92 };
 
 const RAIN_SPEED = 150; // art px / s down
 const RAIN_SLANT = 0.43; // px left per px down (the streaks' own slope)
@@ -163,36 +176,85 @@ const rand = (i: number) => {
 const scene: SceneModule = {
   files,
   async load() {
-    const { band, streak, puddles, glint } = build(await img(sprites.threatScene.file));
+    const [threat, rangeSheet, lg, md, sm, xs, dayCloud, phone] = await Promise.all([
+      img(sprites.threatScene.file),
+      img(sprites.hillsSilhouetteLight.file),
+      img(sprites.cloudLg.file),
+      img(sprites.cloudMd.file),
+      img(sprites.cloudSm.file),
+      img(sprites.cloudXs.file),
+      img(sprites.cloudA.file),
+      strip(sprites.molePhone.file, 60, 60),
+    ]);
+    // the rain's clouds: Vega's sage set, the far range's own colours, drifting over it
+    const clouds: Cloud[] = [
+      { src: lg, x: 0.1, y: 0, speed: 2 },
+      { src: md, x: 0.8, y: 22, speed: 3 },
+      { src: sm, x: 0.5, y: 64, speed: 4 },
+      { src: xs, x: 0.95, y: 6, speed: 3 },
+    ];
+    const { band, streak, puddles, glint } = build(threat);
+    /**
+     * The rain, everywhere, in the blue of a day cloud's shading (Vega's cloud-a: its darkest blue): light
+     * enough for the text to read through, blue enough to show against the sage range.
+     */
+    const rain = (() => {
+      const d = layer(dayCloud.width, dayCloud.height, (c) => c.drawImage(dayCloud, 0, 0)).getContext('2d')!.getImageData(0, 0, dayCloud.width, dayCloud.height).data;
+      let [k, lum] = [0, Infinity];
+      for (let i = 0; i < d.length; i += 4) {
+        const [r, g, b] = [d[i]!, d[i + 1]!, d[i + 2]!];
+        if (d[i + 3] && b > r + 20 && r + g + b < lum) [k, lum] = [(r << 16) | (g << 8) | b, r + g + b];
+      }
+      return layer(streak.width, streak.height, (c) => {
+        c.drawImage(streak, 0, 0);
+        c.globalCompositeOperation = 'source-in';
+        c.fillStyle = `rgb(${k >> 16} ${(k >> 8) & 255} ${k & 255})`;
+        c.fillRect(0, 0, streak.width, streak.height);
+      });
+    })();
+    const range = layer(RANGE.w, RANGE.h, (c) => c.drawImage(rangeSheet, RANGE.x, RANGE.y, RANGE.w, RANGE.h, 0, 0, RANGE.w, RANGE.h));
     const W = band.width;
     const bandY = (h: number) => h - band.height + 6;
-    /** The band centred, mirrored copies either side on wide folders. */
-    const bandX = (w: number) => Math.round((w - W) / 2);
+    /** The band's copies, right-aligned and repeating leftward as they are (its two ends meet well). */
+    const bandXs = (w: number) => {
+      const xs: number[] = [];
+      for (let x = w - W; x + W > 0; x -= W) xs.push(x);
+      return xs;
+    };
+    /** The far range's copies: their x and top, out of the text. */
+    const ranges = (v: View) =>
+      (v.narrow ? RANGES.narrow : RANGES.wide).map(([f, sink]) => {
+        // its foot behind the ground's line: hidden whatever the hills do above it
+        const x = Math.round(f * v.w);
+        const top = bandY(v.h) + BAND.ground + sink - RANGE.h;
+        return { x, top: !v.narrow && x < v.clear.x ? Math.max(top, v.clear.y + 4) : top };
+      });
     const drops = (v: { w: number; h: number }) => Math.round((v.w * v.h) / 900);
     const fall = (t: number) => Math.floor(t * RAIN_SPEED);
 
     return {
+      overText: true,
       start: 0,
       still: 0.4,
       key(t, v) {
-        return stateKey(fall(t), Math.floor(t * 8), v.w, v.h);
+        return stateKey(fall(t), Math.floor(t * 8), frameAt(t, 1.5, phone.frames), cloudsKey(clouds, t, v), v.w, v.h);
       },
       draw(ctx, t, v) {
-        const x0 = bandX(v.w);
         const y0 = bandY(v.h);
-        for (let k = -2; k <= 2; k++) {
-          const x = x0 + k * W;
-          if (x + W > 0 && x < v.w) put(ctx, band, x, y0, k % 2 !== 0);
-        }
-        // Glints run along the puddles (centre copy, and its mirrors).
+        drawClouds(ctx, clouds, t, v);
+        for (const r of ranges(v)) put(ctx, range, r.x, r.top);
+        const xs = bandXs(v.w);
+        for (const x of xs) put(ctx, band, x, y0);
+        phone.draw(ctx, frameAt(t, 1.5, phone.frames), Math.round((v.narrow ? MOLE.narrow : MOLE.wide) * v.w), y0 + MOLE.feet - phone.fh + 1);
+        // Glints run along the puddles, in every copy.
         ctx.fillStyle = glint;
         const phase = Math.floor(t * 8);
         for (const p of puddles) {
           const px = p % W;
           const py = (p / W) | 0;
           if ((px + py * 3 + phase) % 23 !== 0) continue;
-          for (let k = -2; k <= 2; k++) {
-            const x = x0 + k * W + (k % 2 !== 0 ? W - 1 - px : px);
+          for (const bx of xs) {
+            const x = bx + px;
             if (x >= 0 && x < v.w) ctx.fillRect(x, y0 + py, 1, 1);
           }
         }
@@ -201,9 +263,9 @@ const scene: SceneModule = {
         for (let i = 0, n = drops(v); i < n; i++) {
           const y = wrap(rand(i) * span + f * (0.85 + rand(i + 99) * 0.3), span) - streak.height;
           const x = wrap(rand(i + 7) * (v.w + 40) - (y + streak.height) * RAIN_SLANT, v.w + 40) - 20;
-          // the rain falls beside and below the text, never across it
-          if (x < v.clear.x && y < v.clear.y) continue;
-          put(ctx, streak, x, y);
+          // over the text, half the drops
+          if (x < v.clear.x && y < v.clear.y && i % 2) continue;
+          put(ctx, rain, x, y);
         }
       },
     };

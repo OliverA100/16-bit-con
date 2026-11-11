@@ -3,7 +3,7 @@
  * Vega's daisies swaying out of it and clouds drifting home.
  */
 import { sprites } from '../../data/sprites.manifest';
-import { backdrop, cloudsKey, daisyFrames, DAISY, drawClouds, frameAt, img, put, stateKey, tileX, type Cloud, type SceneModule } from '../kit';
+import { backdrop, cloudsKey, daisyFrames, DAISY, drawClouds, frameAt, img, put, skyTop, stateKey, tileX, type Cloud, type SceneModule, type View } from '../kit';
 
 const MEADOW = '/sprites/world/ground-desert-strip_509x51.png';
 const files = [sprites.hillsGolden.file, MEADOW, sprites.daisySway.file, sprites.cloudLg.file, sprites.cloudMd.file];
@@ -29,13 +29,15 @@ const scene: SceneModule = {
       tileX(ctx, meadow, 0, meadow.height, gy - MEADOW_TOP, v.w, 60);
     });
     /** Two daisies on wide folders, one on narrow, out of step with each other; heads in view. */
-    const daisies = (w: number, gy: number) =>
-      w < 400
-        ? [{ x: w - DAISY.w - 4, y: Math.max(2, gy + 40 - DAISY.h), phase: 0 }]
+    const daisies = (v: View, gy: number) => {
+      const top = skyTop(v);
+      return v.w < 400
+        ? [{ x: v.w - DAISY.w - 4, y: Math.max(top + 2, gy + 40 - DAISY.h), phase: 0 }]
         : [
-            { x: w - DAISY.w - 30, y: Math.max(2, gy + 40 - DAISY.h), phase: 0 },
-            { x: w - DAISY.w * 2 - 10, y: Math.max(40, gy + 60 - DAISY.h) + 34, phase: 3 },
+            { x: v.w - DAISY.w - 30, y: Math.max(top + 2, gy + 40 - DAISY.h), phase: 0 },
+            { x: v.w - DAISY.w * 2 - 10, y: Math.max(top + 40, gy + 60 - DAISY.h) + 34, phase: 3 },
           ];
+    };
 
     return {
       start: 0,
@@ -48,7 +50,7 @@ const scene: SceneModule = {
         drawClouds(ctx, clouds, t, v);
         ctx.drawImage(back(v), 0, 0);
         const f = frameAt(t, 6, daisy.length);
-        for (const d of daisies(v.w, gy).reverse()) put(ctx, daisy[(f + d.phase) % daisy.length]!, d.x, d.y);
+        for (const d of daisies(v, gy).reverse()) put(ctx, daisy[(f + d.phase) % daisy.length]!, d.x, d.y);
         ctx.drawImage(front(v), 0, 0);
       },
     };

@@ -208,13 +208,14 @@ export class SceneRunner {
       if (textBottom > top) clear = { x: toArt(textRight - slot.box.offsetLeft) + CLEAR.x, y: toArt(textBottom - top) + CLEAR.y };
     }
     const v = slot.view;
-    if (v && v.w === w && v.h === h && v.clear.x === clear.x && v.clear.y === clear.y) return;
+    if (v && v.w === w && v.h === h && v.k === k && v.clear.x === clear.x && v.clear.y === clear.y) return;
     // Write only what changed: a canvas rewritten as it starts to move relayouts mid-flight (a layout shift).
     const css = { width: `${(w * k) / dpr}px`, height: `${(h * k) / dpr}px`, transform: `translateY(${r.height - (h * k) / dpr}px)` };
-    if (slot.canvas.width !== w) slot.canvas.width = w;
-    if (slot.canvas.height !== h) slot.canvas.height = h;
+    // The buffer is in device pixels; scenes draw in art pixels under a scale of k (see draw).
+    if (slot.canvas.width !== w * k) slot.canvas.width = w * k;
+    if (slot.canvas.height !== h * k) slot.canvas.height = h * k;
     for (const [prop, value] of Object.entries(css) as [keyof typeof css, string][]) if (slot.canvas.style[prop] !== value) slot.canvas.style[prop] = value;
-    slot.view = { w, h, narrow: phone.matches, clear };
+    slot.view = { w, h, narrow: phone.matches, clear, k };
     slot.dirty = true;
   }
 
@@ -265,9 +266,19 @@ export class SceneRunner {
     if (slot.dirty || key !== slot.lastKey) {
       const ctx = slot.canvas.getContext('2d');
       if (!ctx) return;
+      ctx.setTransform(slot.view.k, 0, 0, slot.view.k, 0, 0);
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, slot.view.w, slot.view.h);
+      // On phones the text sits over the scene's top: nothing is drawn behind it, unless the scene says so.
+      const under = slot.view.narrow && slot.view.clear.y > 0 && !slot.scene.overText;
+      if (under) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, slot.view.clear.y, slot.view.w, slot.view.h - slot.view.clear.y);
+        ctx.clip();
+      }
       slot.scene.draw(ctx, slot.t, slot.view);
+      if (under) ctx.restore();
       slot.lastKey = key;
       slot.dirty = false;
       // A canvas shows once it has a frame, fading in the first time (the page's first stills).

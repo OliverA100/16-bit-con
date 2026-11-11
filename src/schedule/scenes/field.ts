@@ -5,7 +5,7 @@
 import { sprites } from '../../data/sprites.manifest';
 import { patchTileSeam } from '../../game/palette';
 import { FOOT_SINK } from '../../game/sam';
-import { backdrop, cloudsKey, daisyFrames, DAISY, drawClouds, frameAt, img, put, samStrip, stateKey, tileX, type Cloud, type SceneModule } from '../kit';
+import { backdrop, cloudsKey, daisyFrames, DAISY, drawClouds, frameAt, img, put, samStrip, skyTop, stateKey, tileX, type Cloud, type SceneModule } from '../kit';
 
 const files = [
   sprites.hills.file,
@@ -47,8 +47,9 @@ const scene: SceneModule = {
     const front = backdrop((ctx, v) => {
       tileX(ctx, grass, 0, grass.height, ground(v.h) - GRASS_TOP, v.w, 60);
     });
-    const samX = (w: number) => Math.round(w * (w > 400 ? 0.62 : 0.3));
     const daisyX = (w: number) => w - DAISY.w - (w > 400 ? 40 : 6);
+    /** Sam stands at the daisy's foot, just left of its stem (the stem at column 62 of the daisy frame). */
+    const samX = (w: number) => daisyX(w) + 62 - 50;
 
     return {
       start: 0,
@@ -60,8 +61,8 @@ const scene: SceneModule = {
         const gy = ground(v.h);
         drawClouds(ctx, clouds, t, v);
         ctx.drawImage(back(v), 0, 0);
-        // The daisy's head stays in view; its stem runs down behind the grass.
-        put(ctx, daisy[frameAt(t, 6, daisy.length)]!, daisyX(v.w), Math.max(4, gy + 30 - DAISY.h));
+        // The daisy's head stays in view, under the text on phones; its stem runs down behind the grass.
+        put(ctx, daisy[frameAt(t, 6, daisy.length)]!, daisyX(v.w), Math.max(skyTop(v) + 4, gy + 30 - DAISY.h));
         ctx.drawImage(front(v), 0, 0);
         idle.draw(ctx, frameAt(t, 10, idle.frames), samX(v.w), gy - 60 + FOOT_SINK);
       },

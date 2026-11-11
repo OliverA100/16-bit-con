@@ -108,7 +108,7 @@ export const sessions: Session[] = [
     title: 'Final Boss Tournament',
     tab: 'Final Boss',
     place: 'Main stage',
-    blurb: 'Sixty-four players, one bracket, one very heavy trophy.',
+    blurb: 'Sixty-four players, one Super Smash Bros. bracket, one very heavy trophy.',
     scene: 'park',
   },
   {
