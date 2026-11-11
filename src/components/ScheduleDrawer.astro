@@ -29,7 +29,7 @@ const panels = days.map(({ day, sessions }) => {
   };
 });
 
-const plate = 'Session files · Oct 3–5';
+const plate = 'Files · Oct 3–5';
 ---
 
 <div class="drawer" data-day="oct-3" data-open={OPEN} data-drawer>
@@ -323,6 +323,18 @@ const plate = 'Session files · Oct 3–5';
     clip-path: polygon(0 calc(100% - 1px), var(--slant) 0, calc(100% - var(--slant)) 0, 100% calc(100% - 1px));
   }
 
+  /* Under a folder tab, a plain Cloud White strip between its feet over its body's top line, a line
+     either side of it: however a browser rounds the line and the tab's foot (at a zoom such as 110 % or
+     220 % a line straddles two device pixels), no sliver of the line shows under an open tab. Plain fill,
+     no outline in it, so no antialiased edge of ink either. */
+  .tab--folder::before {
+    content: '';
+    position: absolute;
+    inset: auto var(--slant-foot) calc(-1 * var(--line-w));
+    height: calc(3 * var(--line-w));
+    background: var(--surface-card);
+  }
+
   .tab__shape::after {
     content: '';
     position: absolute;
@@ -502,17 +514,30 @@ const plate = 'Session files · Oct 3–5';
     white-space: nowrap;
   }
 
+  /* The screws and the pull drawn as the window's title-bar squares are: a one-line outline whose corner
+     pixels are left out (four lines, each stopping a line short of the corners), so the corners read as
+     pixel-art notches at any size. */
+  .drawer__plate::before,
+  .drawer__plate::after,
+  .drawer__pull {
+    --edge: linear-gradient(var(--folder-ink), var(--folder-ink));
+    background:
+      var(--edge) left var(--line-w) top 0 / calc(100% - 2 * var(--line-w)) var(--line-w) no-repeat,
+      var(--edge) left var(--line-w) bottom 0 / calc(100% - 2 * var(--line-w)) var(--line-w) no-repeat,
+      var(--edge) left 0 top var(--line-w) / var(--line-w) calc(100% - 2 * var(--line-w)) no-repeat,
+      var(--edge) right 0 top var(--line-w) / var(--line-w) calc(100% - 2 * var(--line-w)) no-repeat;
+  }
+
   /* a screw at each end */
   .drawer__plate::before,
   .drawer__plate::after {
     content: '';
     position: absolute;
-    top: 50%;
-    width: 7px;
-    height: 7px;
-    margin-top: -3.5px;
-    border: var(--line-folder);
-    border-radius: 50%;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    height: 8px;
+    margin: auto 0;
   }
 
   .drawer__plate::before {
@@ -526,8 +551,6 @@ const plate = 'Session files · Oct 3–5';
   .drawer__pull {
     width: 144px;
     height: 14px;
-    border: var(--line-folder);
-    border-radius: 999px;
   }
 
   /* ── Narrow: the same drawer, the open folder's text on top and its scene in a band below ── */
@@ -540,7 +563,6 @@ const plate = 'Session files · Oct 3–5';
       --view: 400px;
       --inset: var(--space-3);
       --front-h: 132px;
-      --scene-h: calc(var(--view) - 236px); /* a band under the text */
     }
 
     .folder__text {
@@ -552,8 +574,10 @@ const plate = 'Session files · Oct 3–5';
       font-size: var(--text-xl);
     }
 
+    /* the label thinner on the phone's shorter front, as wide as on wide screens (the pull keeps its
+       proportion to it) */
     .drawer__plate {
-      padding-inline: var(--space-8);
+      padding-block: var(--space-2);
     }
 
     /* on phones, label and pull close together in the middle of the front */
