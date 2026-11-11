@@ -5,7 +5,7 @@
  * under the clouds and back down, again and again.
  */
 import { sprites } from '../../data/sprites.manifest';
-import { backdrop, img, layer, put, skyTop, stateKey, strip, frameAt, wrap, type SceneModule, type View } from '../kit';
+import { backdrop, CLIMB_HANDS, img, layer, put, samStrip, skyTop, stateKey, stemTable, strip, SWAY_FPS, frameAt, wrap, type SceneModule, type View } from '../kit';
 
 const files = [sprites.canyonBeanstalk.file, sprites.beanstalkSway.file, sprites.samClimb.file, sprites.cloudB.file, sprites.cloudG.file, sprites.cloudH.file];
 
@@ -54,12 +54,17 @@ const scene: SceneModule = {
     const [canyonImg, stalk, climb, cloudB, cloudG, cloudH] = await Promise.all([
       img(sprites.canyonBeanstalk.file),
       strip(sprites.beanstalkSway.file, 175, 258),
-      strip(sprites.samClimb.file, 60, 60),
+      samStrip(sprites.samClimb.file),
       img(sprites.cloudB.file),
       img(sprites.cloudG.file),
       img(sprites.cloudH.file),
     ]);
     const canyon = withoutStalk(canyonImg);
+    // the stem's centre on each row, so his hands stay round it as it curves (as on the page)
+    const stemFrame = layer(stalk.fw, stalk.fh, (ctx) => ctx.drawImage(stalk.image, 0, 0, stalk.fw, stalk.fh, 0, 0, stalk.fw, stalk.fh));
+    const stem = stemTable(stemFrame.getContext('2d')!.getImageData(0, 0, stalk.fw, stalk.fh).data, stalk.fw, stalk.fw, stalk.fh);
+    /** His hands' row in his climb cell (its rows 22–29): where he holds the stem. */
+    const HANDS_ROW = 25;
     const ground = (h: number) => h - GROUND;
     const stalkX = (w: number) => Math.round(w < 400 ? w * 0.62 : w * 0.76);
     const back = backdrop((ctx, v) => {
@@ -91,17 +96,20 @@ const scene: SceneModule = {
       start: 2,
       still: 4,
       key(t, v) {
-        return stateKey(frameAt(t, 7, stalk.frames), Math.floor(climbed(t, v)), v.w, v.h);
+        return stateKey(frameAt(t, SWAY_FPS, stalk.frames), Math.floor(climbed(t, v)), v.w, v.h);
       },
       draw(ctx, t, v) {
         const gy = ground(v.h);
         ctx.drawImage(back(v), 0, 0);
         const sx = stalkX(v.w);
-        stalk.draw(ctx, frameAt(t, 7, stalk.frames), sx - STEM_X, footOf(v) - stalk.fh);
-        const up = Math.floor(climbed(t, v));
-        climb.draw(ctx, Math.floor(up / CLIMB_STEP) % climb.frames, sx - 27, gy - 54 - up);
-        // the clouds the stalk grows into: the big one over its top, two small ones either side
         const top = footOf(v) - stalk.fh;
+        stalk.draw(ctx, frameAt(t, SWAY_FPS, stalk.frames), sx - STEM_X, top);
+        const up = Math.floor(climbed(t, v));
+        const y = gy - 54 - up;
+        // his hands round the stem's centre at his height, his body beside it
+        const row = Math.min(stalk.fh - 1, Math.max(0, Math.round(y + HANDS_ROW - top)));
+        climb.draw(ctx, Math.floor(up / CLIMB_STEP) % climb.frames, Math.round(sx - STEM_X + stem[row]! + 0.5 - CLIMB_HANDS), y);
+        // the clouds the stalk grows into: the big one over its top, two small ones either side
         put(ctx, cloudB, sx - CLOUD.x, top - CLOUD.y);
         put(ctx, cloudG, sx - CLOUD.x - cloudG.width + 30, top - CLOUD.y + 34);
         put(ctx, cloudH, sx + cloudB.width - CLOUD.x - 26, top - CLOUD.y + 22);

@@ -14,9 +14,10 @@ export function hexToRgb(hex: string): [number, number, number] {
 const pack = (r: number, g: number, b: number) => (r << 16) | (g << 8) | b;
 
 /**
- * Sam's careers-game sheets (run / jump / idle / portrait) use GREEN goggles and a slightly
+ * Sam's careers-game sheets (run / jump / idle / smoking / portrait) use GREEN goggles and a slightly
  * different body palette from the brand sheets (propeller / side / climb). One pass maps
  * every careers colour to its brand counterpart, measured in sam-propeller-idle_8f_60x60.png.
+ * The climb sheet (brand already) goes through it too: only its pure-black outline and nose change.
  * Single pass on the original pixel values: no chaining (#2E5700 → #1A0505 directly).
  */
 export const SAM_BRAND_MAP: ColorMap = {
@@ -31,6 +32,9 @@ export const SAM_BRAND_MAP: ColorMap = {
   '#BD8A51': '#C09564', // hands (run / jump)
   '#C58F53': '#C09564', // hands (idle)
   '#000000': '#1A0505', // outline
+  // the two odd ones out, measured 2026-11-11, so all five page sheets (idle, run, jump, smoking, climb) match
+  '#77A50E': '#097FCA', // smoking: four lens pixels left green → lens blue
+  '#FF4646': '#E34D56', // climb: its brighter nose → the nose pink of the other four
 };
 
 /** Returns a new canvas with `map` applied to every opaque pixel of `image` (exact RGB match). */

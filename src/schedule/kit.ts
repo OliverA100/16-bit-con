@@ -4,7 +4,7 @@
  * whole art pixel. Vega's files are never changed; everything derived is made in memory at load.
  */
 import { loadImage, makeStrip, type Drawable, type Strip } from '../game/sprites';
-import { remap, SAM_BRAND_MAP } from '../game/palette';
+import { patchTileSeam, remap, SAM_BRAND_MAP } from '../game/palette';
 import { sprites } from '../data/sprites.manifest';
 
 export type { Drawable, Strip };
@@ -95,6 +95,94 @@ export function daisyFrames(): Promise<HTMLCanvasElement[]> {
   );
   return daisy;
 }
+
+/**
+ * Vega's golden evening field, as the Closing Credits folder draws it and the page's footer too: the golden
+ * hills (seam patched, tiled plainly) standing on the ground line with their last 12 rows under it, the
+ * sand-and-daisy meadow with its surface (row 6) on the ground line, and two of Vega's daisies swaying out of it.
+ */
+export const MEADOW_TOP = 6;
+
+export interface SunsetArt {
+  hills: HTMLCanvasElement;
+  meadow: HTMLImageElement;
+}
+
+let sunset: Promise<SunsetArt> | null = null;
+export function sunsetArt(): Promise<SunsetArt> {
+  sunset ??= Promise.all([img(sprites.hillsGolden.file), img(sprites.meadow.file)]).then(([hills, meadow]) => ({ hills: patchTileSeam(hills), meadow }));
+  return sunset;
+}
+
+/** The golden hills across [0, w), standing on the ground line `gy`. */
+export function paintGoldenHills(ctx: CanvasRenderingContext2D, art: SunsetArt, gy: number, w: number): void {
+  tileX(ctx, art.hills, 0, art.hills.height, gy - art.hills.height + 12, w, 200);
+}
+
+/** The meadow across [0, w), its surface on the ground line `gy`. */
+export function paintMeadow(ctx: CanvasRenderingContext2D, art: SunsetArt, gy: number, w: number): void {
+  tileX(ctx, art.meadow, 0, art.meadow.height, gy - MEADOW_TOP, w, 60);
+}
+
+/** Where the daisies stand (`top`: the sky's top): two on wide views, out of step, one on narrow; heads in view. */
+export function sunsetDaisies(w: number, gy: number, top: number): { x: number; y: number; phase: number }[] {
+  return w < 400
+    ? [{ x: w - DAISY.w - 4, y: Math.max(top + 2, gy + 40 - DAISY.h), phase: 0 }]
+    : [
+        { x: w - DAISY.w - 30, y: Math.max(top + 2, gy + 40 - DAISY.h), phase: 0 },
+        { x: w - DAISY.w * 2 - 10, y: Math.max(top + 40, gy + 60 - DAISY.h) + 34, phase: 3 },
+      ];
+}
+
+/** Vega's own sway pace for its plants (the daisies and the beanstalk), as vega.io steps them: a frame every 250 ms. */
+export const SWAY_FPS = 4;
+
+/**
+ * The beanstalk's stem: its centre column on each row of one frame (frame 0 of an RGBA sheet `width` px
+ * wide), tracked from its foot up — the opaque run, at most 16 wide, round where it was a row lower; where a
+ * leaf joins and the run is wider it keeps its last centre — then smoothed round the period (the sheet tiles
+ * vertically), so Sam glides along the stem's curve rather than stepping. The stem is the same in every frame.
+ */
+export function stemTable(data: Uint8ClampedArray, width: number, fw: number, fh: number): Float32Array {
+  const opaque = (x: number, y: number) => data[(y * width + x) * 4 + 3]! > 0;
+  let prev = -1;
+  for (let x = 0; x < fw && prev < 0; x++) if (opaque(x, fh - 1)) {
+    let e = x;
+    while (e + 1 < fw && opaque(e + 1, fh - 1)) e++;
+    prev = (x + e) / 2; // the foot: the bottom row holds the stem alone
+  }
+  const raw = new Float32Array(fh);
+  for (let y = fh - 1; y >= 0; y--) {
+    let best: [number, number] | null = null;
+    let x = 0;
+    while (x < fw) {
+      if (!opaque(x, y)) {
+        x++;
+        continue;
+      }
+      const s = x;
+      while (x < fw && opaque(x, y)) x++;
+      const e = x - 1;
+      if (e - s <= 16 && s - 2 <= prev && prev <= e + 2) {
+        const c = (s + e) / 2;
+        if (!best || Math.abs(c - prev) < Math.abs((best[0] + best[1]) / 2 - prev)) best = [s, e];
+      }
+    }
+    if (best) prev = (best[0] + best[1]) / 2;
+    raw[y] = prev;
+  }
+  const stem = new Float32Array(fh);
+  const R = 6;
+  for (let y = 0; y < fh; y++) {
+    let sum = 0;
+    for (let d = -R; d <= R; d++) sum += raw[(y + d + fh) % fh]!;
+    stem[y] = sum / (2 * R + 1);
+  }
+  return stem;
+}
+
+/** Sam climbing a stem: his cell's left this many art px left of its centre, his hands (the climb cell's columns 28–36) round it. */
+export const CLIMB_HANDS = 33;
 
 /** Frame of a looping animation at `fps`. */
 export const frameAt = (t: number, fps: number, frames: number) => Math.floor(t * fps) % frames;

@@ -5,7 +5,7 @@
 import { sprites } from '../../data/sprites.manifest';
 import { patchTileSeam } from '../../game/palette';
 import { FOOT_SINK } from '../../game/sam';
-import { backdrop, cloudsKey, daisyFrames, DAISY, drawClouds, frameAt, img, put, samStrip, skyTop, stateKey, tileX, type Cloud, type SceneModule } from '../kit';
+import { backdrop, cloudsKey, daisyFrames, DAISY, drawClouds, frameAt, img, put, samStrip, skyTop, stateKey, SWAY_FPS, tileX, type Cloud, type SceneModule } from '../kit';
 
 const files = [
   sprites.hills.file,
@@ -55,14 +55,14 @@ const scene: SceneModule = {
       start: 0,
       still: 0,
       key(t, v) {
-        return stateKey(frameAt(t, 10, idle.frames), frameAt(t, 6, daisy.length), cloudsKey(clouds, t, v), v.w, v.h);
+        return stateKey(frameAt(t, 10, idle.frames), frameAt(t, SWAY_FPS, daisy.length), cloudsKey(clouds, t, v), v.w, v.h);
       },
       draw(ctx, t, v) {
         const gy = ground(v.h);
         drawClouds(ctx, clouds, t, v);
         ctx.drawImage(back(v), 0, 0);
         // The daisy's head stays in view, under the text on phones; its stem runs down behind the grass.
-        put(ctx, daisy[frameAt(t, 6, daisy.length)]!, daisyX(v.w), Math.max(skyTop(v) + 4, gy + 30 - DAISY.h));
+        put(ctx, daisy[frameAt(t, SWAY_FPS, daisy.length)]!, daisyX(v.w), Math.max(skyTop(v) + 4, gy + 30 - DAISY.h));
         ctx.drawImage(front(v), 0, 0);
         idle.draw(ctx, frameAt(t, 10, idle.frames), samX(v.w), gy - 60 + FOOT_SINK);
       },

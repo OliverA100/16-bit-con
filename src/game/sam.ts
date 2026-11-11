@@ -23,7 +23,23 @@ export async function loadSamSheets(): Promise<SamSheets> {
   };
 }
 
+/**
+ * The two sheets Sam needs only once he is out on the page (src/game/journey.ts): climbing the beanstalk
+ * and smoking on the footer's ground, through the same brand map so all five sheets are one Sam.
+ */
+export interface PageSheets {
+  climb: Strip;
+  smoke: Strip;
+}
+
+export async function loadPageSheets(): Promise<PageSheets> {
+  const [climb, smoke] = await Promise.all([loadImage(sprites.samClimb.file), loadImage(sprites.samSmoking.file)]);
+  return { climb: makeStrip(remap(climb, SAM_BRAND_MAP)), smoke: makeStrip(remap(smoke, SAM_BRAND_MAP)) };
+}
+
 export const SAM_CELL = 60;
+/** The climb sheet's soles sit on its row 52, not on the cell's last row like the standing sheets. */
+export const CLIMB_FEET = 52;
 /** Opaque body inside the 60 px cell (measured on run.png). */
 export const SAM_HITBOX = { left: 14, right: 46, top: 15 };
 /**
@@ -35,9 +51,9 @@ export const SAM_HITBOX = { left: 14, right: 46, top: 15 };
 export const FOOT_SINK = 5;
 
 /** World px of travel per run frame: one 4-frame cycle every 48 px, ~13 fps at full speed. */
-const STRIDE = 12;
+export const STRIDE = 12;
 /** A fast scrub never strobes the cycle faster than this. */
-const RUN_FPS_MAX = 16;
+export const RUN_FPS_MAX = 16;
 
 /** Variable jump: hold for height. Tap ≈ 15 px hop, full hold (450 ms) = 40 px, snappy fall. */
 const JUMP_V0 = 178; // px/s
