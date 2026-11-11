@@ -9,11 +9,11 @@
  * purpose, so his body runs straight into the bottom edge. Corners: radius 12 on the 64 grid.
  * Sizes above 64 are nearest-neighbour from the master; sizes below are box-averaged.
  *
- * No dependencies: PNG is read and written with node:zlib. Run with `npm run icons`.
+ * No dependencies (PNG via scripts/lib/png.mjs on node:zlib). Run with `npm run icons`.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { deflateSync, inflateSync } from 'node:zlib';
 import { SAM_BRAND_MAP } from '../src/game/palette.ts';
+import { decodePng, encodeIco, encodePng } from './lib/png.mjs';
 
 const root = new URL('../', import.meta.url);
 const SPRITE = 'public/sprites/sam/portrait-sam.png';
@@ -22,104 +22,6 @@ const GRID = 64;
 const RADIUS = 12; // on the 64 grid
 const ART_X = 11;
 const ART_Y = 16;
-
-// ── PNG in / out ──────────────────────────────────────────────────────────────────────
-
-const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-function decodePng(buf) {
-  if (!buf.subarray(0, 8).equals(PNG_SIG)) throw new Error('not a PNG');
-  let off = 8;
-  let ihdr;
-  const idat = [];
-  while (off < buf.length) {
-    const len = buf.readUInt32BE(off);
-    const type = buf.toString('latin1', off + 4, off + 8);
-    const body = buf.subarray(off + 8, off + 8 + len);
-    if (type === 'IHDR') ihdr = body;
-    else if (type === 'IDAT') idat.push(body);
-    else if (type === 'IEND') break;
-    off += 12 + len;
-  }
-  const w = ihdr.readUInt32BE(0);
-  const h = ihdr.readUInt32BE(4);
-  const [depth, colorType, , , interlace] = ihdr.subarray(8, 13);
-  if (depth !== 8 || colorType !== 6 || interlace !== 0) throw new Error(`unsupported PNG (depth ${depth}, type ${colorType}, interlace ${interlace})`);
-  const raw = inflateSync(Buffer.concat(idat));
-  const bpp = 4;
-  const stride = w * bpp;
-  const out = Buffer.alloc(w * h * bpp);
-  for (let y = 0; y < h; y++) {
-    const filter = raw[y * (stride + 1)];
-    const line = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
-    for (let x = 0; x < stride; x++) {
-      const a = x >= bpp ? out[y * stride + x - bpp] : 0;
-      const b = y > 0 ? out[(y - 1) * stride + x] : 0;
-      const c = x >= bpp && y > 0 ? out[(y - 1) * stride + x - bpp] : 0;
-      let v = line[x];
-      if (filter === 1) v += a;
-      else if (filter === 2) v += b;
-      else if (filter === 3) v += (a + b) >> 1;
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-      } else if (filter !== 0) throw new Error(`bad PNG filter ${filter}`);
-      out[y * stride + x] = v & 255;
-    }
-  }
-  return { w, h, data: out };
-}
-
-const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
-  let c = n;
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  return c >>> 0;
-});
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 255] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
-function chunk(type, body) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(body.length);
-  const tb = Buffer.concat([Buffer.from(type, 'latin1'), body]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(tb));
-  return Buffer.concat([len, tb, crc]);
-}
-function encodePng({ w, h, data }) {
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0);
-  ihdr.writeUInt32BE(h, 4);
-  ihdr.set([8, 6, 0, 0, 0], 8); // 8-bit RGBA
-  const raw = Buffer.alloc(h * (w * 4 + 1));
-  for (let y = 0; y < h; y++) data.copy(raw, y * (w * 4 + 1) + 1, y * w * 4, (y + 1) * w * 4);
-  return Buffer.concat([PNG_SIG, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
-}
-
-function encodeIco(pngs) {
-  const header = Buffer.alloc(6);
-  header.writeUInt16LE(1, 2); // type: icon
-  header.writeUInt16LE(pngs.length, 4);
-  const entries = [];
-  let offset = 6 + 16 * pngs.length;
-  for (const { size, png } of pngs) {
-    const e = Buffer.alloc(16);
-    e[0] = size;
-    e[1] = size;
-    e.writeUInt16LE(1, 4); // planes
-    e.writeUInt16LE(32, 6); // bits per pixel
-    e.writeUInt32LE(png.length, 8);
-    e.writeUInt32LE(offset, 12);
-    offset += png.length;
-    entries.push(e);
-  }
-  return Buffer.concat([header, ...entries, ...pngs.map((p) => p.png)]);
-}
 
 // ── The picture ───────────────────────────────────────────────────────────────────────
 
@@ -130,9 +32,9 @@ const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 function samOnGrid() {
   const sprite = decodePng(readFileSync(new URL(SPRITE, root)));
   const grid = Array.from({ length: GRID * GRID }, () => null);
-  for (let y = 0; y < sprite.h; y++) {
-    for (let x = 0; x < sprite.w; x++) {
-      const i = (y * sprite.w + x) * 4;
+  for (let y = 0; y < sprite.height; y++) {
+    for (let x = 0; x < sprite.width; x++) {
+      const i = (y * sprite.width + x) * 4;
       const a = sprite.data[i + 3];
       if (a === 0) continue;
       if (a !== 255) throw new Error(`semi-transparent pixel at ${x},${y}: the icon expects hard pixel art`);
@@ -167,7 +69,7 @@ function masterRgba(grid) {
   grid.forEach((c, i) => {
     data.set([...rgb(c ?? SKY), 255], i * 4);
   });
-  return { w: GRID, h: GRID, data };
+  return { width: GRID, height: GRID, data };
 }
 
 /** Nearest-neighbour up (size ≥ GRID) or area-average down (size < GRID), still square and opaque. */
@@ -202,15 +104,15 @@ function resample(master, size) {
       data.set([...acc.map((v) => Math.round(v / wsum)), 255], o);
     }
   }
-  return { w: size, h: size, data };
+  return { width: size, height: size, data };
 }
 
 /** Cut the rounded corners at the output resolution, so the curve is smooth at every size. */
 function roundCorners(img) {
-  const r = (RADIUS / GRID) * img.w;
-  for (let y = 0; y < img.h; y++) {
-    for (let x = 0; x < img.w; x++) {
-      img.data[(y * img.w + x) * 4 + 3] = Math.round(255 * cornerCoverage(x, y, img.w, r));
+  const r = (RADIUS / GRID) * img.width;
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      img.data[(y * img.width + x) * 4 + 3] = Math.round(255 * cornerCoverage(x, y, img.width, r));
     }
   }
   return img;
@@ -249,5 +151,5 @@ const write = (path, buf) => {
 };
 
 write('public/favicon.svg', svgFor(master));
-write('public/favicon.ico', encodeIco([16, 32, 48].map((size) => ({ size, png: encodePng(roundCorners(resample(master, size))) }))));
+write('public/favicon.ico', encodeIco([16, 32, 48].map((size) => ({ size, png: encodePng(roundCorners(resample(master, size)), { indexed: false }) }))));
 write('public/apple-touch-icon.png', encodePng(resample(master, 180)));

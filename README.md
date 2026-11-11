@@ -49,6 +49,8 @@ npm run dev       # local dev server
 npm run build     # static site in dist/
 npm run preview   # serve the build
 npm run check     # type-check
+npm run icons     # favicon.svg, favicon.ico, apple-touch-icon.png from Sam's portrait
+npm run og        # og.png, the social image (needs Google Chrome)
 ```
 
 ## Where things are
