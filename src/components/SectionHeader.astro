@@ -2,10 +2,7 @@
 /**
  * SectionHeader — every section's header: the title (an h2 in Signifier, the con's own voice) and its
  * subheading, 16 px apart, centred. No eyebrows on sections. The header to its content is the section's
- * own --head-to-content.
- *
- * Motion: once, as the header scrolls into view, the title and then (60 ms later) the subheading rise 8 px
- * and fade in on the 16-bit steps. Without JS, or with reduced motion, it is simply there.
+ * own --head-to-content. It doesn't animate: it is simply there.
  */
 interface Props {
   title: string;
@@ -17,30 +14,10 @@ interface Props {
 const { title, sub, id, class: className } = Astro.props;
 ---
 
-<header class:list={['section-head', className]} data-reveal>
+<header class:list={['section-head', className]}>
   <h2 class="section-head__title" id={id}>{title}</h2>
   {sub && <p class="section-head__sub">{sub}</p>}
 </header>
-
-<script>
-  // One observer for every header on the page: each shows once, the first time it is on screen.
-  const heads = document.querySelectorAll<HTMLElement>('[data-reveal]');
-  if (heads.length && 'IntersectionObserver' in window) {
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          e.target.classList.add('is-in');
-          io.unobserve(e.target);
-        }
-      },
-      { rootMargin: '0px 0px -10% 0px' },
-    );
-    heads.forEach((h) => io.observe(h));
-  } else {
-    heads.forEach((h) => h.classList.add('is-in'));
-  }
-</script>
 
 <style>
   .section-head {
@@ -61,25 +38,5 @@ const { title, sub, id, class: className } = Astro.props;
     font: var(--type-sub);
     color: var(--text-secondary);
     text-wrap: balance;
-  }
-
-  /* Things that appear step: up 8 px into place as they fade in, on the 16-bit steps, the sub one beat behind. */
-  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
-    .section-head > * {
-      opacity: 0;
-      translate: 0 8px;
-      transition:
-        opacity var(--dur-base) var(--steps-16bit),
-        translate var(--dur-base) var(--steps-16bit);
-    }
-
-    .section-head > .section-head__sub {
-      transition-delay: 60ms;
-    }
-
-    .section-head.is-in > * {
-      opacity: 1;
-      translate: 0 0;
-    }
   }
 </style>

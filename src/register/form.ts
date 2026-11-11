@@ -33,8 +33,6 @@ export function checkEmail(value: string): string {
   return EMAIL.test(v) ? '' : MESSAGES.emailInvalid;
 }
 
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 /** What the success state needs from a valid submit. */
 export interface Registration {
   name: string;
@@ -86,7 +84,7 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
     wrap.dataset.invalid = message ? 'true' : 'false';
     const el = msg(name);
     if (!message) {
-      // clearing is instant
+      // an error appears and clears at once: no motion
       el.replaceChildren();
     } else if (el.dataset.text !== message || !was) {
       const sr = document.createElement('span');
@@ -99,8 +97,6 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
       const text = document.createElement('span');
       text.textContent = message;
       el.replaceChildren(sr, bang, text);
-      // it drops in 4 px on 2 steps as it appears (not when it only changes its words)
-      if (!was && !reduced()) el.animate([{ translate: '0 -4px' }, { translate: '0 0' }], { duration: 100, easing: 'steps(2, end)' });
     }
     el.dataset.text = message;
     const targets: HTMLInputElement[] = name === 'pass' ? radios() : [input(name)];
@@ -142,8 +138,6 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
       const [name] = firstInvalid;
       const target = name === 'pass' ? radios()[0]! : input(name);
       target.focus();
-      // one small bump of the window, 4 px each way on two beats
-      if (!reduced()) win.animate([{ translate: '4px 0' }, { translate: '4px 0', offset: 0.5 }, { translate: '-4px 0', offset: 0.5 }, { translate: '-4px 0' }], { duration: 100 });
       return;
     }
     busy = true;

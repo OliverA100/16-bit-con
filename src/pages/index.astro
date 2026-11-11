@@ -76,6 +76,13 @@ import SectionHeader from '../components/SectionHeader.astro';
     gap: max(var(--head-to-content), calc(24 * var(--sam-px, 1.5px) + 122px + var(--space-6)));
   }
 
+  /* No Sam on the window yet (the game's page before it is played, or left before he lands): the headers' own
+     gap. The room opens as play starts and stays once he has landed (is-done); both happen with the window
+     off screen, below the pinned opening, so nothing ever moves under him or the reader. */
+  :global(:root.has-game:not(.is-playing):not(.is-done)) .landing {
+    gap: var(--head-to-content);
+  }
+
   .landing__window {
     position: relative;
     width: min(100%, 36rem);
