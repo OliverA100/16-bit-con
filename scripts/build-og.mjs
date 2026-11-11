@@ -10,11 +10,8 @@
  *
  * Run with `npm run og`. Needs Google Chrome (or set CHROME to a Chromium binary).
  */
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { screenshot } from './lib/chrome.mjs';
 import { blank, decodePng, encodePng } from './lib/png.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -180,22 +177,7 @@ p { box-sizing: border-box; } /* padding-left = letter-spacing: the last letter'
 <p class="url">vega.io/16-bit-con</p>
 </body></html>`;
 
-const chrome = [process.env.CHROME, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].find((p) => p && existsSync(p));
-if (!chrome) throw new Error('Chrome not found: set CHROME to a Chrome or Chromium binary');
-const tmp = mkdtempSync(join(tmpdir(), 'og-'));
-let shot;
-try {
-  writeFileSync(join(tmp, 'og.html'), html);
-  execFileSync(chrome, [
-    '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--force-device-scale-factor=1',
-    `--window-size=${W * SCALE},${H * SCALE}`, '--virtual-time-budget=5000', `--user-data-dir=${join(tmp, 'profile')}`,
-    `--screenshot=${join(tmp, 'og.png')}`, pathToFileURL(join(tmp, 'og.html')).href,
-  ], { stdio: 'ignore' });
-  shot = decodePng(readFileSync(join(tmp, 'og.png')));
-} finally {
-  rmSync(tmp, { recursive: true, force: true });
-}
-if (shot.width !== W * SCALE || shot.height !== H * SCALE) throw new Error(`screenshot is ${shot.width}×${shot.height}`);
+const shot = screenshot(html, W * SCALE, H * SCALE);
 
 // ── Check and snap: text only on sky, its antialiasing on 32 steps from sky to ink ─────
 
