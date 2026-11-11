@@ -1,6 +1,6 @@
 /**
  * The game's sound, Web Audio only. Enter, exit and static are synthesised here; the cracks and the
- * shatter are the trimmed files in public/sounds/, played as they are.
+ * shatter are the user's files in public/sounds/, never re-encoded (two are levelled and faded here, FILE_TRIM).
  *
  * Nothing exists before unlock(), which PRESS START's click calls inside its gesture: until then every
  * call is a no-op. Every sound is a voice — its own gain into the master, which runs through a limiter —
@@ -42,8 +42,6 @@ export const params = {
   crackPitch: 0.05,
   /** The cracks' pitch, semitones (the random variation is on top). */
   crackShift: -2,
-  /** crack-1's own pitch, semitones, in place of crackShift (picked by ear: −4). */
-  crack1Shift: -4,
   shatterLevel: 0.875,
   /** The low body under the shatter's hit (off: with it the shatter stopped sounding like glass). */
   shatterBody: 0,
@@ -59,18 +57,39 @@ export const params = {
 export type SoundParams = typeof params;
 export const defaults: Readonly<SoundParams> = { ...params };
 
-const FILES = ['crack-1', 'crack-3', 'crack-4', 'shatter'] as const;
-type FileName = (typeof FILES)[number];
+export const CRACK_FILES = ['crack-4', 'crack-3', 'glass-1', 'glass-3'] as const;
+const FILES = [...CRACK_FILES, 'shatter'] as const;
+export type FileName = (typeof FILES)[number];
 /**
- * The crack file for each stage, 1–6. The new crack length per stage,
+ * What glass-1 and glass-3 need that the other files already have, done here so the files stay as they are:
+ * a gain to bring each one's loudest moment to the others' (−3.4 dBFS; theirs are −14.7 and −14.0),
+ * and a fade on the end, since both stop at 486 ms while still sounding.
+ */
+const FILE_TRIM: Partial<Record<FileName, { db: number; fade: number }>> = {
+  'glass-1': { db: 11.3, fade: 0.03 },
+  'glass-3': { db: 10.6, fade: 0.03 },
+};
+/** A crack "cut to fit": it plays this long (s, real time) and then fades over CUT_FIT_FADE, so it ends as the next auto hit lands. */
+export const CUT_FIT = 0.32;
+const CUT_FIT_FADE = 0.06;
+/**
+ * The crack for each stage, 1–6, and whether it is cut to fit. The new crack length per stage,
  * measured on the pattern (src/monitor/breakout.ts makePattern) at five impacts across the screen:
  * 3.5 % · 5.5 % · 13 % · 13.5 % · 14.5 % · 50 % (stage 6 is the last ring, the rim and the rays' ends).
- * Set by ear (2026-11-11): the start is crack-4 (one tiny tick), then crack-1 (one sharp tick) twice
- * — the one place a file repeats, by choice — then crack-3 (a run of ticks, the user's favourite) on
- * the two largest stages, 4 and 6, with crack-1 between. crack-2 was dropped (it sounded wrong on
- * stages 4 and 6) and its file deleted.
+ * Set by ear (2026-11-11), picked from six files and then ordered: crack-4 (one tiny tick) starts it,
+ * crack-3 (a run of ticks, the user's favourite) on 2 and 4, glass-1 (a dense, spreading crackle) on 3
+ * and 6, glass-3 (spaced ticks) on 5. glass-1 and glass-3 run ~0.5 s, longer than the 380 ms between
+ * auto hits, so on 3 and 5 they are cut to fit; on 6 glass-1 plays whole into the beat before the shatter.
+ * crack-1 (on 2, 3 and 5 before) and a third new file, a creak, were tried and not kept; crack-2 went earlier.
  */
-export const CRACK_FILE: readonly FileName[] = ['crack-4', 'crack-1', 'crack-1', 'crack-3', 'crack-1', 'crack-3'];
+export const CRACK_STAGES: readonly { file: FileName; cut: boolean }[] = [
+  { file: 'crack-4', cut: false },
+  { file: 'crack-3', cut: false },
+  { file: 'glass-1', cut: true },
+  { file: 'crack-3', cut: false },
+  { file: 'glass-3', cut: true },
+  { file: 'glass-1', cut: false },
+];
 /** A crack or the shatter asked for before its file has decoded plays late if it can within this long, ms. */
 const LATE_MS = 150;
 /** Two cracks in one frame: the second this much later, s. */
@@ -524,26 +543,40 @@ export function exit(ms: number, fromMs = 0, path: (tMs: number) => number = (t)
   return v;
 }
 
-/** One crack, stage 1–6: its file, its pitch ± crackPitch, later stages a touch louder. */
-export function crack(stage: number, shift?: number, file?: FileName): void {
+/**
+ * One crack, stage 1–6: its file (CRACK_STAGES, unless `file` is given), its pitch ± crackPitch, later
+ * stages a touch louder. Cut to fit: only the first CUT_FIT s, faded out (from CRACK_STAGES, unless `cut` is given).
+ */
+export function crack(stage: number, shift?: number, file?: FileName, cut?: boolean): void {
   const label = `crack ${stage}`;
   if (!ready(label)) return;
-  const name = file ?? CRACK_FILE[Math.min(5, Math.max(0, stage - 1))]!;
+  const entry = CRACK_STAGES[Math.min(5, Math.max(0, stage - 1))]!;
+  const name = file ?? entry.file;
+  cut ??= file ? false : entry.cut;
   withFile(name, label, (b) => {
     if (!ctx || !on) return;
     const at = Math.max(ctx.currentTime + 0.002, lastCrackAt + CRACK_GAP);
     lastCrackAt = at;
-    const st = shift ?? (name === 'crack-1' ? params.crack1Shift : params.crackShift);
+    const st = shift ?? params.crackShift;
     const rate = Math.pow(2, st / 12) * (1 + (Math.random() * 2 - 1) * params.crackPitch);
+    const trim = FILE_TRIM[name];
     const v = new Voice(label);
     const g = v.node(ctx.createGain());
-    g.gain.value = params.crackLevel * (0.82 + 0.036 * (stage - 1));
+    const level = params.crackLevel * (0.82 + 0.036 * (stage - 1)) * Math.pow(10, (trim?.db ?? 0) / 20);
+    const full = b.duration / rate;
+    const len = cut ? Math.min(full, CUT_FIT + CUT_FIT_FADE) : full;
+    const fade = cut ? CUT_FIT_FADE : (trim?.fade ?? 0);
+    g.gain.value = level;
+    if (fade > 0) {
+      g.gain.setValueAtTime(level, at + len - fade);
+      g.gain.linearRampToValueAtTime(0, at + len);
+    }
     const s = v.node(ctx.createBufferSource());
     s.buffer = b;
     s.playbackRate.value = rate;
     s.connect(g).connect(v.out);
-    v.source(s, at, at + b.duration / rate + 0.02);
-    log(`${label} ${name}${st ? ` ${st > 0 ? '+' : ''}${st} st` : ''} rate ${rate.toFixed(3)}`);
+    v.source(s, at, at + len + 0.02);
+    log(`${label} ${name}${st ? ` ${st > 0 ? '+' : ''}${st} st` : ''} rate ${rate.toFixed(3)}${trim ? ` +${trim.db} dB` : ''}${cut ? `, cut to ${Math.round(len * 1000)}ms` : ''}`);
   });
 }
 

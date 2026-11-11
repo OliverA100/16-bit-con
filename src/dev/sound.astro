@@ -1,12 +1,20 @@
 ---
 /**
- * /dev/sound — the game's sounds, one button each, and sliders for the numbers to tune by ear. Dev only:
- * injected by astro.config.mjs under `astro dev`, never built. It drives src/game/sound.ts itself, so
- * what plays here is what the game plays.
+ * /dev/sound — the game's sounds, the cracks stage by stage, and sliders for the numbers to tune by ear.
+ * Dev only: injected by astro.config.mjs under `astro dev`, never built. It drives src/game/sound.ts
+ * itself, so what plays here is what the game plays.
  */
 import Base from '../layouts/Base.astro';
 import Window from '../components/Window.astro';
 import Button from '../components/Button.astro';
+
+/** [file, name, what it sounds like, picked to start with] — the game's crack files. */
+const SOUNDS: [string, string, string, boolean][] = [
+  ['crack-4', 'crack-4', '— one tiny bright tick', true],
+  ['crack-3', 'crack-3', '— a short run of ticks', true],
+  ['glass-1', '#1', '— a dense, spreading crackle', true],
+  ['glass-3', '#3', '— spaced ticks, a longer crack-3', true],
+];
 ---
 
 <Base title="Sound · dev" footer={false} noindex>
@@ -17,52 +25,58 @@ import Button from '../components/Button.astro';
         <Button variant="ghost" data-play="exit">Exit</Button>
         <Button variant="ghost" data-play="shatter">Shatter</Button>
         <Button variant="ghost" data-play="static">Static</Button>
-      </div>
-      <div class="dev-sound__row">
-        <Button variant="ghost" data-play="breakout">Six cracks + shatter + static</Button>
-      </div>
-      <div class="dev-sound__row">
-        <span class="mono dev-sound__label">Shatter:</span>
-        <Button variant="ghost" data-shatter="0,0.3">As before (with low body)</Button>
-        <Button variant="ghost" data-shatter="0,0">File, original pitch</Button>
-        <Button variant="ghost" data-shatter="2,0">File +2 semitones</Button>
-        <Button variant="ghost" data-shatter="4,0">+4</Button>
-        <Button variant="ghost" data-shatter="7,0">+7</Button>
-        <Button variant="ghost" data-shatter="-2,0">−2 (the default now)</Button>
-      </div>
-      <div class="dev-sound__row">
-        {[1, 2, 3, 4, 5, 6].map((n) => <Button variant="ghost" data-crack={String(n)}>Crack {n}</Button>)}
-      </div>
-      <div class="dev-sound__row">
-        <span class="mono dev-sound__label">Cracks 1–6 in a row:</span>
-        <Button variant="ghost" data-cracks="0">Original pitch</Button>
-        <Button variant="ghost" data-cracks="2">+2 semitones</Button>
-        <Button variant="ghost" data-cracks="4">+4</Button>
-        <Button variant="ghost" data-cracks="7">+7</Button>
-        <Button variant="ghost" data-cracks="-2">−2, crack-1 too</Button>
-      </div>
-      <div class="dev-sound__row">
-        <span class="mono dev-sound__label">crack-1 (stages 2, 3 and 5) at:</span>
-        <Button variant="ghost" data-crack1="-4">−4 (the default now)</Button>
-        <Button variant="ghost" data-crack1="-2">−2</Button>
-        <Button variant="ghost" data-crack1="0">0, original</Button>
-        <Button variant="ghost" data-crack1="2">+2</Button>
-        <Button variant="ghost" data-crack1="4">+4</Button>
-      </div>
-      <div class="dev-sound__row">
-        <span class="mono dev-sound__label">Raw files (the browser's plain player, none of the game's sound code):</span>
-        {['crack-1', 'crack-3', 'crack-4', 'shatter'].map((f) => <Button variant="ghost" data-raw={f}>{f}</Button>)}
-      </div>
-      <div class="dev-sound__row">
+        <span class="dev-sound__spacer"></span>
         <Button variant="ghost" data-stop>Stop all</Button>
-        <Button variant="ghost" data-reset>Defaults</Button>
-        <Button data-copy>Copy values</Button>
-        <span class="mono dev-sound__status" data-status aria-live="polite"></span>
       </div>
-      <p class="mono dev-sound__note">Enter plays at the camera's dive, 770 ms (the glass at ~600 ms); Exit at the zoom out, 970 ms. Each click is what the game sends.</p>
     </Window>
+
+    <Window title="Cracks" class="dev-sound__win">
+      <div class="dev-sound__group">
+        <h2 class="mono dev-sound__heading">1 · Pick the sounds</h2>
+        <ul class="dev-sound__picks">
+          {
+            SOUNDS.map(([f, name, what, on]) => (
+              <li class="dev-sound__pick">
+                <Button variant="ghost" data-try={f} aria-label={`Play ${name}`}>Play</Button>
+                <label class="mono dev-sound__label dev-sound__field">
+                  <input type="checkbox" data-use={f} checked={on} />
+                  <span><strong>{name}</strong> {what}</span>
+                </label>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <div class="dev-sound__group">
+        <h2 class="mono dev-sound__heading">2 · Order them</h2>
+        <div class="dev-sound__stages" data-stages></div>
+        <div class="dev-sound__row">
+          <Button data-run>Play six cracks + shatter</Button>
+          <label class="mono dev-sound__label dev-sound__field">
+            Pace
+            <select class="mono dev-sound__select" data-pace>
+              <option value="380" selected>380 ms, auto hits</option>
+              <option value="250">250 ms, fast clicks</option>
+              <option value="600">600 ms, slow</option>
+            </select>
+          </label>
+        </div>
+        <div class="dev-sound__row">
+          <Button variant="ghost" data-now>Back to the game's order</Button>
+          <Button variant="ghost" data-copy-order>Copy picks and order</Button>
+          <span class="mono dev-sound__status" data-status aria-live="polite"></span>
+        </div>
+      </div>
+      <p class="mono dev-sound__note">#1 and #3 are raised to the others' loudness and faded where they cut off. Cut = the first 320 ms, faded out by 380 ms, the gap between auto hits.</p>
+    </Window>
+
     <Window title="Numbers" class="dev-sound__win">
       <div class="dev-sound__sliders" data-sliders></div>
+      <div class="dev-sound__row dev-sound__row--end">
+        <Button variant="ghost" data-reset>Defaults</Button>
+        <Button variant="ghost" data-copy>Copy values</Button>
+      </div>
     </Window>
   </main>
 </Base>
@@ -72,94 +86,182 @@ import Button from '../components/Button.astro';
   import { PLAY, playMs } from '../game/segments';
 
   type Key = keyof typeof sound.params;
-  /** [key, label, min, max, step, unit] */
-  const SLIDERS: [Key, string, number, number, number, string][] = [
-    ['master', 'Master volume', 0, 1, 0.01, ''],
-    ['thumpHz', 'Thump start', 40, 200, 1, 'Hz'],
-    ['thumpEnd', 'Thump end', 20, 120, 1, 'Hz'],
-    ['thumpTime', 'Thump length', 0.05, 0.8, 0.01, 's'],
-    ['thumpLevel', 'Thump level', 0, 1.5, 0.01, ''],
-    ['clickLevel', 'Click level', 0, 1, 0.01, ''],
-    ['whooshLo', 'Whoosh low', 80, 1000, 10, 'Hz'],
-    ['whooshHi', 'Whoosh high', 1000, 12000, 50, 'Hz'],
-    ['whooshQ', 'Whoosh Q', 0.3, 6, 0.1, ''],
-    ['whooshLevel', 'Enter whoosh level', 0, 1.5, 0.01, ''],
-    ['exitWhooshLevel', 'Exit whoosh level', 0, 1.5, 0.01, ''],
-    ['enterTail', 'Enter tail after landing', 0, 1.5, 0.05, 's'],
-    ['exitTail', 'Exit tail after rest', 0, 1.5, 0.05, 's'],
-    ['buzzLevel', 'Buzz level', 0, 0.6, 0.005, ''],
-    ['buzzLo', 'Buzz filter low', 60, 600, 5, 'Hz'],
-    ['buzzHi', 'Buzz filter high', 300, 5000, 50, 'Hz'],
-    ['crackLevel', 'Crack level', 0, 2, 0.01, ''],
-    ['crackPitch', 'Crack pitch ±', 0, 0.15, 0.005, ''],
-    ['crackShift', 'Crack pitch', -7, 12, 1, 'st'],
-    ['crack1Shift', 'crack-1 pitch (stages 2, 3, 5)', -7, 12, 1, 'st'],
-    ['shatterLevel', 'Shatter level', 0, 2, 0.01, ''],
-    ['shatterBody', 'Shatter low body', 0, 1.5, 0.01, ''],
-    ['shatterPitch', 'Shatter pitch', -7, 12, 1, 'st'],
-    ['staticLevel', 'Static level', 0, 1, 0.01, ''],
-    ['humLevel', 'Hum level', 0, 1.5, 0.01, ''],
-    ['crackleLevel', 'Crackle level', 0, 2, 0.01, ''],
-    ['staticHold', 'Static hold', 0, 4, 0.05, 's'],
-    ['staticFade', 'Static fade', 0.2, 6, 0.05, 's'],
+  /** [key, label, min, max, step, unit], in groups. */
+  const GROUPS: [string, [Key, string, number, number, number, string][]][] = [
+    ['All', [['master', 'Master volume', 0, 1, 0.01, '']]],
+    [
+      'Enter and exit',
+      [
+        ['thumpHz', 'Thump start', 40, 200, 1, 'Hz'],
+        ['thumpEnd', 'Thump end', 20, 120, 1, 'Hz'],
+        ['thumpTime', 'Thump length', 0.05, 0.8, 0.01, 's'],
+        ['thumpLevel', 'Thump level', 0, 1.5, 0.01, ''],
+        ['clickLevel', 'Click level', 0, 1, 0.01, ''],
+        ['whooshLo', 'Whoosh low', 80, 1000, 10, 'Hz'],
+        ['whooshHi', 'Whoosh high', 1000, 12000, 50, 'Hz'],
+        ['whooshQ', 'Whoosh Q', 0.3, 6, 0.1, ''],
+        ['whooshLevel', 'Enter whoosh level', 0, 1.5, 0.01, ''],
+        ['exitWhooshLevel', 'Exit whoosh level', 0, 1.5, 0.01, ''],
+        ['enterTail', 'Enter tail', 0, 1.5, 0.05, 's'],
+        ['exitTail', 'Exit tail', 0, 1.5, 0.05, 's'],
+        ['buzzLevel', 'Buzz level', 0, 0.6, 0.005, ''],
+        ['buzzLo', 'Buzz filter low', 60, 600, 5, 'Hz'],
+        ['buzzHi', 'Buzz filter high', 300, 5000, 50, 'Hz'],
+      ],
+    ],
+    [
+      'Cracks',
+      [
+        ['crackLevel', 'Level', 0, 2, 0.01, ''],
+        ['crackPitch', 'Pitch ± (random)', 0, 0.15, 0.005, ''],
+        ['crackShift', 'Pitch', -7, 12, 1, 'st'],
+      ],
+    ],
+    [
+      'Shatter',
+      [
+        ['shatterLevel', 'Level', 0, 2, 0.01, ''],
+        ['shatterPitch', 'Pitch', -7, 12, 1, 'st'],
+        ['shatterBody', 'Low body', 0, 1.5, 0.01, ''],
+      ],
+    ],
+    [
+      'Static',
+      [
+        ['staticLevel', 'Level', 0, 1, 0.01, ''],
+        ['humLevel', 'Hum', 0, 1.5, 0.01, ''],
+        ['crackleLevel', 'Crackle', 0, 2, 0.01, ''],
+        ['staticHold', 'Hold', 0, 4, 0.05, 's'],
+        ['staticFade', 'Fade', 0.2, 6, 0.05, 's'],
+      ],
+    ],
   ];
 
-  const box = document.querySelector<HTMLElement>('[data-sliders]')!;
   const status = document.querySelector<HTMLElement>('[data-status]')!;
+  const say = (s: string) => (status.textContent = s);
+
+  // ── Sliders ──
+  const box = document.querySelector<HTMLElement>('[data-sliders]')!;
   const inputs = new Map<Key, HTMLInputElement>();
   const fmt = (k: Key, v: number, unit: string) => (k === 'crackPitch' ? `${(v * 100).toFixed(1)} %` : `${+v.toFixed(3)}${unit ? ` ${unit}` : ''}`);
-  for (const [k, label, min, max, step, unit] of SLIDERS) {
-    const row = document.createElement('label');
-    row.className = 'dev-sound__slider';
-    const name = document.createElement('span');
-    name.textContent = label;
-    const input = document.createElement('input');
-    Object.assign(input, { type: 'range', min: String(min), max: String(max), step: String(step), value: String(sound.params[k]) });
-    const out = document.createElement('output');
-    out.className = 'mono';
-    out.textContent = fmt(k, sound.params[k], unit);
-    input.addEventListener('input', () => {
-      sound.params[k] = Number(input.value);
+  for (const [title, sliders] of GROUPS) {
+    const group = document.createElement('details');
+    group.className = 'dev-sound__fold';
+    group.open = title === 'Cracks';
+    const summary = document.createElement('summary');
+    summary.className = 'mono dev-sound__heading';
+    summary.textContent = title;
+    group.append(summary);
+    for (const [k, label, min, max, step, unit] of sliders) {
+      const row = document.createElement('label');
+      row.className = 'dev-sound__slider';
+      const name = document.createElement('span');
+      name.textContent = label;
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: String(min), max: String(max), step: String(step), value: String(sound.params[k]) });
+      const out = document.createElement('output');
+      out.className = 'mono';
       out.textContent = fmt(k, sound.params[k], unit);
-      if (k === 'master') sound.applyMaster();
-    });
-    inputs.set(k, input);
-    row.append(name, input, out);
-    box.append(row);
+      input.addEventListener('input', () => {
+        sound.params[k] = Number(input.value);
+        out.textContent = fmt(k, sound.params[k], unit);
+        if (k === 'master') sound.applyMaster();
+      });
+      inputs.set(k, input);
+      row.append(name, input, out);
+      group.append(row);
+    }
+    box.append(group);
   }
 
-  const go = (fn: () => void) => () => {
+  const go = (fn: () => void) => async () => {
     sound.unlock();
     fn();
   };
+
+  // ── Sounds ──
   const play = (name: string) => {
     if (name === 'enter') sound.enter(PLAY.dive);
     else if (name === 'exit') sound.exit(playMs(1));
     else if (name === 'shatter') sound.shatter();
     else if (name === 'static') sound.static(true);
-    else if (name === 'breakout') {
-      // the cracks at the game's fastest hits (AUTO_HIT_MS apart), then the beat and the burst
-      for (let n = 1; n <= 6; n++) setTimeout(() => sound.crack(n), (n - 1) * 380);
-      setTimeout(() => {
-        sound.shatter();
-        sound.static(true);
-      }, 5 * 380 + 300 + 380);
-    }
   };
   for (const b of document.querySelectorAll<HTMLElement>('[data-play]')) b.addEventListener('click', go(() => play(b.dataset.play!)));
-  for (const b of document.querySelectorAll<HTMLElement>('[data-shatter]')) {
-    const [pitch, body] = b.dataset.shatter!.split(',').map(Number);
-    b.addEventListener('click', go(() => sound.shatter(pitch, body)));
-  }
-  for (const b of document.querySelectorAll<HTMLElement>('[data-crack1]')) b.addEventListener('click', go(() => sound.crack(1, Number(b.dataset.crack1), 'crack-1')));
-  for (const b of document.querySelectorAll<HTMLElement>('[data-cracks]')) {
-    const shift = Number(b.dataset.cracks);
-    b.addEventListener('click', go(() => { for (let n = 1; n <= 6; n++) setTimeout(() => sound.crack(n, shift), (n - 1) * 380); }));
-  }
-  // the files exactly as they are, through an <audio> element: if these sound right and the buttons above don't, the fault is in the game's sound code
-  for (const b of document.querySelectorAll<HTMLElement>('[data-raw]')) b.addEventListener('click', () => void new Audio(`/sounds/${b.dataset.raw}.mp3`).play());
-  for (const b of document.querySelectorAll<HTMLElement>('[data-crack]')) b.addEventListener('click', go(() => sound.crack(Number(b.dataset.crack))));
   document.querySelector('[data-stop]')!.addEventListener('click', () => sound.stopAll());
+
+  // ── Cracks ──
+  const NAMES: Record<string, string> = { 'glass-1': '#1', 'glass-3': '#3' };
+  const ALL = sound.CRACK_FILES;
+  const useBoxes = [...document.querySelectorAll<HTMLInputElement>('[data-use]')];
+  const picked = () => ALL.filter((f) => useBoxes.find((b) => b.dataset.use === f)?.checked);
+  const stageBox = document.querySelector<HTMLElement>('[data-stages]')!;
+  const stages = sound.CRACK_STAGES.map((_, i) => {
+    const box = document.createElement('div');
+    box.className = 'mono dev-sound__label dev-sound__stage';
+    const sel = document.createElement('select');
+    sel.className = 'mono dev-sound__select';
+    sel.setAttribute('aria-label', `Stage ${i + 1}`);
+    const cutLabel = document.createElement('label');
+    cutLabel.className = 'dev-sound__field';
+    const cut = document.createElement('input');
+    cut.type = 'checkbox';
+    cutLabel.append(cut, 'cut to fit');
+    box.append(`Stage ${i + 1}`, sel, cutLabel);
+    stageBox.append(box);
+    return { sel, cut };
+  });
+  const stageSelects = stages.map((s) => s.sel);
+  const setGameOrder = () => {
+    stages.forEach((s, i) => (s.cut.checked = sound.CRACK_STAGES[i]!.cut));
+    fillStages(sound.CRACK_STAGES.map((s) => s.file));
+  };
+  /** Each stage offers only the picked sounds; a stage whose sound was unpicked takes the first picked one. */
+  const fillStages = (order: readonly string[] = stageSelects.map((s) => s.value)) => {
+    const use = picked();
+    stageSelects.forEach((sel, i) => {
+      const want = order[i] ?? '';
+      sel.replaceChildren(...use.map((f) => new Option(NAMES[f] ?? f, f)));
+      sel.disabled = use.length === 0;
+      if (use.length) sel.value = (use as readonly string[]).includes(want) ? want : use[0]!;
+    });
+  };
+  setGameOrder();
+  for (const b of useBoxes) b.addEventListener('change', () => fillStages());
+  const paceSel = document.querySelector<HTMLSelectElement>('[data-pace]')!;
+  const run = () => {
+    if (!picked().length) return say('Pick at least one sound.');
+    const pace = Number(paceSel.value);
+    stages.forEach(({ sel, cut }, i) => {
+      const file = sel.value as sound.FileName;
+      setTimeout(() => sound.crack(i + 1, undefined, file, cut.checked), i * pace);
+    });
+    // the beat and the burst, as the game times them
+    setTimeout(() => {
+      sound.shatter();
+      sound.static(true);
+    }, 5 * pace + 300 + pace);
+  };
+  document.querySelector('[data-run]')!.addEventListener('click', go(run));
+  document.querySelector('[data-now]')!.addEventListener('click', () => {
+    for (const b of useBoxes) b.checked = sound.CRACK_STAGES.some((s) => s.file === b.dataset.use);
+    setGameOrder();
+    say('');
+  });
+  for (const b of document.querySelectorAll<HTMLElement>('[data-try]')) b.addEventListener('click', go(() => sound.crack(4, undefined, b.dataset.try as sound.FileName)));
+  document.querySelector('[data-copy-order]')!.addEventListener('click', async () => {
+    const name = (f: string) => NAMES[f] ?? f;
+    const text =
+      `Picked: ${picked().map(name).join(', ')}. ` +
+      `Order: ${stages.map(({ sel, cut }, i) => `${i + 1} ${name(sel.value)}${cut.checked ? ' cut' : ''}`).join(', ')}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      say('Copied.');
+    } catch {
+      say(text);
+    }
+  });
+
+  // ── Numbers ──
   document.querySelector('[data-reset]')!.addEventListener('click', () => {
     Object.assign(sound.params, sound.defaults);
     for (const [k, input] of inputs) {
@@ -171,9 +273,9 @@ import Button from '../components/Button.astro';
     const json = JSON.stringify(sound.params, null, 2);
     try {
       await navigator.clipboard.writeText(json);
-      status.textContent = 'Copied.';
+      say('Values copied.');
     } catch {
-      status.textContent = 'Copy failed: values logged to the console.';
+      say('Copy failed: values logged to the console.');
     }
     console.log(json);
   });
@@ -193,18 +295,112 @@ import Button from '../components/Button.astro';
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-3);
+  }
+
+  .dev-sound__row + .dev-sound__row {
+    margin-top: var(--space-3);
+  }
+
+  .dev-sound__row--end {
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+  }
+
+  .dev-sound__spacer {
+    flex: 1;
+  }
+
+  .dev-sound__group + .dev-sound__group {
+    margin-top: var(--space-6);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--color-green-900);
+  }
+
+  .dev-sound :global(.dev-sound__heading) {
+    margin: 0 0 var(--space-3);
+    text-align: left;
+    font-size: var(--text-sm);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   .dev-sound__note,
   .dev-sound__status,
-  .dev-sound__label {
+  .dev-sound :global(.dev-sound__label) {
     font-size: var(--text-sm);
+  }
+
+  .dev-sound__picks {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, auto);
+    grid-auto-flow: column; /* ours down the left, the new ones down the right */
+    gap: var(--space-3) var(--space-6);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .dev-sound__pick {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .dev-sound__pick strong {
+    font-weight: 700;
+  }
+
+  .dev-sound__note {
+    margin: var(--space-6) 0 0;
+    opacity: 0.75;
+  }
+
+  .dev-sound__stages {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .dev-sound :global(.dev-sound__stage) {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .dev-sound__field {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .dev-sound__field input {
+    accent-color: var(--color-green-900);
+  }
+
+  .dev-sound :global(.dev-sound__select) {
+    font-size: var(--text-sm);
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-green-900);
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
   }
 
   .dev-sound__sliders {
     display: grid;
+    gap: var(--space-4);
+  }
+
+  .dev-sound :global(.dev-sound__fold) {
+    display: grid;
     gap: var(--space-2);
+  }
+
+  .dev-sound :global(.dev-sound__fold > summary) {
+    cursor: pointer;
+    margin: 0;
   }
 
   .dev-sound :global(.dev-sound__slider) {
@@ -220,7 +416,23 @@ import Button from '../components/Button.astro';
     accent-color: var(--color-green-900);
   }
 
+  @media (max-width: 760px) {
+    .dev-sound__stages {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
   @media (max-width: 640px) {
+    .dev-sound__picks {
+      grid-template-columns: 1fr;
+      grid-template-rows: none;
+      grid-auto-flow: row;
+    }
+
+    .dev-sound__stages {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
     .dev-sound :global(.dev-sound__slider) {
       grid-template-columns: 1fr 5rem;
     }

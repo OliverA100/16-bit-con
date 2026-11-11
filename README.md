@@ -40,7 +40,7 @@ The brief's three sessions are Oct 3, with their copy as given. The Oct 4 and Oc
 - GSAP ScrollTrigger pins the world and drives the timeline
 - Canvas 2D for the world at an integer pixel scale; the night's recoloured art is built in a Web Worker, so scrolling never stalls
 - three.js 0.187 for the monitor and the breakout, loaded after the page and only when WebGL 2 is available
-- Web Audio for the sound: the dive, the zoom out and the static are synthesised in code; the cracks and the shatter are short recordings (about 27 KB), fetched only once the game starts
+- Web Audio for the sound: the dive, the zoom out and the static are synthesised in code; the cracks and the shatter are short recordings (about 50 KB), fetched only once the game starts
 
 ## Run it
 
@@ -56,7 +56,7 @@ npm run icons     # favicon.svg, favicon.ico, apple-touch-icon.png from the word
 npm run og        # og.png, the social image (needs Google Chrome)
 ```
 
-Under `npm run dev`, `/dev/sound` plays each sound and has sliders for its numbers. It is never part of the build.
+Under `npm run dev`, `/dev/sound` plays each sound, picks the crack sounds and sets their order stage by stage, and has sliders for its numbers. It is never part of the build.
 
 ## Where things are
 
