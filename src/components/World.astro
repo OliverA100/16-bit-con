@@ -226,6 +226,12 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     text-align: center;
   }
 
+  /* After the breakout the opening is sky too: its page-colour backgrounds clear, so the page's clouds
+     (src/game/sky.ts, behind everything) drift behind the wordmark and the broken monitor. */
+  :global(:root.is-done) :is(.hero, .hero__stage) {
+    background: transparent;
+  }
+
   .hero__stage {
     position: relative;
     z-index: 1;

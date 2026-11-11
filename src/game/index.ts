@@ -48,7 +48,7 @@ import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type 
 import type { Frame as WorldFrame, Rect } from './world';
 import type { BreakoutState, Hero } from '../monitor/hero';
 import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
-import { drawCell, idleOnPerch, queryPerch } from './landing';
+import { drawCell, idleOnPerch, queryPerch, withSmile } from './landing';
 import { createRegisterDialog, focusRegister } from './register-dialog';
 import { typeOut } from './typing';
 import { GL_ATTRIBUTES } from '../monitor/spec';
@@ -818,7 +818,23 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   /** Where the page took Sam over, on screen: the top of his jump out of the monitor. */
   let flightFrom: { x: number; y: number } | null = null;
   let perchFrame = '';
-  if (perch) idleOnPerch(perch, assets.sam.idle, () => perch.root.classList.contains('is-landed'));
+  // on the Register window he smiles (his idle with a grin; in the game he keeps his own face)
+  const perchIdle = withSmile(assets.sam.idle);
+  if (perch) idleOnPerch(perch, perchIdle, () => perch.root.classList.contains('is-landed') && !perch.root.classList.contains('is-away'));
+  // Back on the Register window from the page, he says something new: an invitation, typed out as before (the
+  // full line for screen readers too).
+  const RETURN_LINE = "Come say hi at Booth\u00A0630. I'll save you a seat."; // the booth's number kept with it
+  perch?.root.addEventListener('returned', () => {
+    if (!landingTyped) return;
+    landingLine = RETURN_LINE;
+    const spoken = landingTyped.parentElement?.querySelector('.sr-only');
+    if (spoken) spoken.textContent = RETURN_LINE;
+    typeOut(landingTyped, landingLine, 0);
+    landingShown = -1;
+    landingSince = clockNow();
+  });
+  /** Sam out on the page after the landing (src/game/journey.ts): loaded on his first landing, never before. */
+  let journey: Promise<{ debug(): unknown } | null> | null = null;
   const updatePerch = (q: number) => {
     if (!perch) return;
     const landed = mode === 'done' && !landing;
@@ -828,6 +844,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       perchFrame = '';
       if (landed) {
         perch.root.dispatchEvent(new Event('landed'));
+        journey ??= import('./journey')
+          .then((m) => m.startJourney({ perch, sheets: assets.sam, perchIdle, paused: () => paused || root.classList.contains('is-paused') || !!regDialog?.open }))
+          .catch((err) => {
+            console.error('[journey] Sam stays on the Register window', err);
+            return null;
+          });
         // Agent Sam's line on the Register window types out as his lines in the game do
         if (landingTyped) {
           landingLine = landingTyped.textContent ?? '';
@@ -1782,6 +1804,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         return { overrideUntil: scrollOverrideUntil, expectedY, lastInputAt, active: input.active, dir: input.dir };
       },
       level,
+      /** Dev only: the game closes as if Sam had just landed (PRESS START, then the pin's last step). */
+      landNow: () => {
+        if (mode === 'default') enterPlay();
+        if (mode === 'play') landNow();
+      },
+      /** Dev only: Sam's state out on the page. */
+      journey: async () => (await journey)?.debug() ?? null,
     };
   }
 }

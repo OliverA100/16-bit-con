@@ -22,8 +22,8 @@ import RegisterForm from '../components/RegisterForm.astro';
           <!-- Typed out like his lines in the game once he lands (src/game/typing.ts: the whole line keeps its
                layout while it types); whole for screen readers, on the static page and without JS. -->
           <p class="mono landing__line">
-            <span aria-hidden="true" data-landing-typed>Made it. Find me at Booth 630.</span>
-            <span class="sr-only">Made it. Find me at Booth 630.</span>
+            <span aria-hidden="true" data-landing-typed>Made it. Find me at Booth&nbsp;630.</span>
+            <span class="sr-only">Made it. Find me at Booth&nbsp;630.</span>
           </p>
         </Window>
       </div>
@@ -124,6 +124,17 @@ import RegisterForm from '../components/RegisterForm.astro';
   }
 
   :global(:root.has-game) .landing__perch:not(.is-landed) .landing__bubble {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  /* Out on the page (src/game/journey.ts): another canvas carries him, so this one hides at once and the
+     bubble goes as it came; back on the window, both return. */
+  :global(:root.has-game) .landing__perch.is-away .landing__sam {
+    visibility: hidden;
+  }
+
+  :global(:root.has-game) .landing__perch.is-away .landing__bubble {
     opacity: 0;
     transform: translateY(-8px);
   }
