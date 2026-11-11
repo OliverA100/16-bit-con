@@ -1,190 +1,187 @@
 ---
 /**
- * RegisterForm — the CTA. A real <form> with labels, required fields and inline errors.
- * Client-side validation only: nothing is sent or stored. On a valid submit the window
- * swaps to a one-line confirmation. The Player 1 bonus line stays hidden until the world
- * reports all 12 coins collected (src/game/index.ts).
+ * RegisterForm — the CTA. A real <form> with labels and inline errors (src/register/form.ts). Client-side
+ * only: nothing is sent or stored. On a valid submit the window swaps to its success state. The Player 1
+ * bonus line stays hidden until the world reports all 12 coins collected (src/game/index.ts).
+ *
+ * In the page the section's own header ("Grab your pass") introduces the window; over the game the window
+ * moves into a <dialog> (src/game/register-dialog.ts), where its own head says it instead.
  */
 import Window from './Window.astro';
 import Button from './Button.astro';
+import Ticket from './Ticket.astro';
 
-const tickets = [
+const passes = [
   { value: 'sat', label: 'Saturday', meta: 'Oct 3' },
   { value: 'sun', label: 'Sunday', meta: 'Oct 4' },
   { value: 'mon', label: 'Monday', meta: 'Oct 5' },
-  { value: 'all', label: '3-day pass', meta: 'Oct 3–5' },
+  { value: 'all', label: 'All 3 days', meta: 'Oct 3–5' },
 ];
 ---
 
-<Window as="section" title="Register" id="register" class="register" aria-labelledby="register-heading" tabindex="-1" closable titleAlign="center">
-  <h3 id="register-heading" class="register__heading">Player 1, enter your details</h3>
+<Window as="section" title="Register" id="register" class="register" tabindex="-1" closable titleAlign="center">
+  <!-- Only in the dialog: the section's header isn't on screen there. -->
+  <div class="register__dialog-head">
+    <h2 class="register__dialog-title">Grab your pass</h2>
+    <p class="t-small register__dialog-line">Free · limited spots · Oct 3–5 · Javits Center, New York</p>
+  </div>
 
   <form id="register-form" class="register__form" novalidate>
     <div class="field" data-field="name">
-      <label for="reg-name">Player name</label>
-      <input id="reg-name" name="name" type="text" autocomplete="name" minlength="2" required aria-describedby="reg-name-error" />
-      <p class="field__error" id="reg-name-error" aria-live="polite"></p>
+      <label class="field__label" for="reg-name">Player name</label>
+      <input
+        class="field__input"
+        id="reg-name"
+        name="name"
+        type="text"
+        autocomplete="name"
+        maxlength="80"
+        placeholder="Sam the Mole"
+        aria-describedby="reg-name-error"
+      />
+      <p class="field__msg" id="reg-name-error" aria-live="polite"></p>
     </div>
 
     <div class="field" data-field="email">
-      <label for="reg-email">Email</label>
-      <input id="reg-email" name="email" type="email" autocomplete="email" inputmode="email" required aria-describedby="reg-email-error" />
-      <p class="field__error" id="reg-email-error" aria-live="polite"></p>
+      <label class="field__label" for="reg-email">Email</label>
+      <input
+        class="field__input"
+        id="reg-email"
+        name="email"
+        type="email"
+        autocomplete="email"
+        inputmode="email"
+        spellcheck="false"
+        autocapitalize="off"
+        placeholder="you@example.com"
+        aria-describedby="reg-email-error"
+      />
+      <p class="field__msg" id="reg-email-error" aria-live="polite"></p>
     </div>
 
-    <fieldset class="field register__tickets" data-field="ticket" aria-describedby="reg-ticket-error">
-      <legend>Ticket type</legend>
-      <div class="register__options" role="presentation">
+    <fieldset class="field register__passes" data-field="pass" aria-describedby="reg-pass-error">
+      <legend>Pass</legend>
+      <div class="register__options">
         {
-          tickets.map((t) => (
+          passes.map((t) => (
             <label class="option ui-button">
-              <input type="radio" name="ticket" value={t.value} required />
+              <input type="radio" name="pass" value={t.value} />
               <span class="option__label">{t.label}</span>
               <span class="option__meta">{t.meta}</span>
             </label>
           ))
         }
       </div>
-      <p class="field__error" id="reg-ticket-error" aria-live="polite"></p>
+      <p class="field__msg" id="reg-pass-error" aria-live="polite"></p>
     </fieldset>
 
+    <label class="check">
+      <input class="check__input" type="checkbox" name="news" />
+      <span class="check__box" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges">
+          <path d="M3 8h2v2H3zM5 10h2v2H5zM7 8h2v2H7zM9 6h2v2H9zM11 4h2v2h-2z" />
+        </svg>
+      </span>
+      <span class="t-small check__label">Email me news and offers from 16-Bit Con and Vega.</span>
+    </label>
+
     <div class="register__actions">
-      <Button type="submit">Register now</Button>
+      <Button type="submit" size="page" class="register__submit" data-register-submit>
+        <span class="register__submit-text">Register now</span>
+        <span class="register__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </Button>
     </div>
   </form>
 
-  <div id="register-done" class="register__done" hidden tabindex="-1">
-    <p class="register__gg">GG. See you at Booth 630.</p>
-    <p class="mono register__ticket" id="register-ticket"></p>
-    <p class="eyebrow register__bonus" id="register-bonus" hidden>Player 1 bonus · promo code 16BIT-GG</p>
-    <div class="register__again">
-      <Button id="register-again" variant="ghost">Register another player</Button>
+  <!-- The success state: the form's own rhythm, its heading where the first label was (src/register/success.ts). -->
+  <div id="register-done" class="register__done" hidden>
+    <h3 class="register__gg" id="register-gg" tabindex="-1">GG, Player 1.</h3>
+    <p class="t-body register__saved">Your free pass is saved. Come say hi at Booth 630.</p>
+    <Ticket class="register__ticket" />
+    <p class="t-ui register__bonus" id="register-bonus" hidden>Player 1 bonus · promo code 16BIT-GG</p>
+    <div class="register__actions register__done-actions">
+      <Button size="page" data-register-ics>Add to calendar</Button>
+      <Button size="page" variant="ghost" data-register-again>Register another player</Button>
     </div>
   </div>
 </Window>
 
 <script>
-  const form = document.getElementById('register-form') as HTMLFormElement | null;
-  const done = document.getElementById('register-done') as HTMLDivElement | null;
-  const title = document.getElementById('register-title');
-  const heading = document.getElementById('register-heading');
+  import { initRegisterForm } from '../register/form';
+  import { initSuccess } from '../register/success';
 
-  if (form && done) {
-    const field = (name: string) => form.querySelector<HTMLElement>(`[data-field="${name}"]`)!;
-    const errorEl = (name: string) => field(name).querySelector<HTMLElement>('.field__error')!;
-
-    const validators: Record<string, () => string> = {
-      name: () => {
-        const v = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
-        return v.length >= 2 ? '' : 'Player name needs 2+ characters.';
-      },
-      email: () => {
-        const v = (form.elements.namedItem('email') as HTMLInputElement).value.trim();
-        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? '' : 'Enter a valid email, like sam@vega.io.';
-      },
-      ticket: () => (form.querySelector<HTMLInputElement>('input[name="ticket"]:checked') ? '' : 'Pick a ticket.'),
-    };
-
-    const show = (name: string, message: string) => {
-      const wrap = field(name);
-      wrap.dataset.invalid = message ? 'true' : 'false';
-      errorEl(name).textContent = message ? `! ${message}` : '';
-      wrap.querySelectorAll('input').forEach((input) => input.setAttribute('aria-invalid', message ? 'true' : 'false'));
-    };
-
-    const validate = (name: string) => {
-      const message = validators[name]!();
-      show(name, message);
-      return !message;
-    };
-
-    // Re-validate a field once it has been flagged, so errors clear as the player types; check a
-    // field when the player leaves it with something in it, and the ticket as soon as one is picked.
-    for (const name of Object.keys(validators)) {
-      field(name).addEventListener('input', () => {
-        if (field(name).dataset.invalid === 'true') validate(name);
-      });
-    }
-    for (const name of ['name', 'email']) {
-      const input = form.elements.namedItem(name) as HTMLInputElement;
-      input.addEventListener('blur', () => {
-        if (input.value.trim() !== '') validate(name);
-      });
-    }
-    field('ticket').addEventListener('change', () => validate('ticket'));
-
-    const ticketLine = document.getElementById('register-ticket');
-    const again = document.getElementById('register-again');
-    again?.addEventListener('click', () => {
-      form.reset();
-      for (const name of Object.keys(validators)) show(name, '');
-      done.hidden = true;
-      form.hidden = false;
-      if (heading) heading.hidden = false;
-      if (title) title.textContent = 'Register';
-      (form.elements.namedItem('name') as HTMLInputElement).focus();
-    });
-
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const results = Object.keys(validators).map((name) => [name, validate(name)] as const);
-      const firstInvalid = results.find(([, ok]) => !ok);
-      if (firstInvalid) {
-        field(firstInvalid[0]).querySelector<HTMLInputElement>('input')?.focus();
-        return;
-      }
-      const picked = form.querySelector<HTMLInputElement>('input[name="ticket"]:checked')!.closest('.option')!;
-      const label = picked.querySelector('.option__label')?.textContent ?? '';
-      const meta = picked.querySelector('.option__meta')?.textContent ?? '';
-      if (ticketLine) ticketLine.textContent = `Ticket: ${label} · ${meta}`;
-      form.hidden = true;
-      if (heading) heading.hidden = true;
-      done.hidden = false;
-      if (title) title.textContent = 'Registered · GG';
-      done.focus();
-    });
-  }
+  let success: ReturnType<typeof initSuccess> = null;
+  const formApi = initRegisterForm({ onRegistered: (r) => success?.show(r) });
+  success = initSuccess(formApi);
 </script>
 
 <style>
+  /* The page's own window: 24 px body padding (16 on phones). */
+  .register {
+    --window-body-pad: var(--window-pad-page);
+  }
+
   /* "Register now" focuses the window after scrolling it into view; it is a target, not a control. */
   .register:focus {
     outline: none;
   }
 
-  .register__heading {
-    margin-bottom: var(--space-4);
+  /* ── The dialog's head: in the page the section header says it, so here it shows only in the dialog ── */
+  .register__dialog-head {
+    display: none;
+    gap: var(--rhythm-label);
+    margin-bottom: var(--rhythm-block);
     text-align: left;
-    font-family: var(--font-body);
-    font-weight: 500;
-    font-size: var(--text-lg);
-    line-height: var(--leading-title);
   }
 
-  .register__form {
+  :global(dialog) .register__dialog-head {
     display: grid;
-    gap: var(--space-4);
   }
 
-  .register__tickets {
+  :global(dialog) .register:has(.register__done:not([hidden])) .register__dialog-head {
+    display: none;
+  }
+
+  /* The window-heading size in Signifier: the con's own heading, as the section's */
+  .register__dialog-title {
+    font: var(--type-window-heading);
+    font-family: var(--font-display);
+    text-align: left;
+  }
+
+  .register__dialog-line {
+    color: var(--text-secondary);
+  }
+
+  /* ── The form: one rhythm — 20 px between blocks (each field keeps its message line), 24 px above the button ── */
+  .register__form {
+    container: register-form / inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: var(--rhythm-block);
+  }
+
+  /* The email's longest message ("Enter a valid email address, like name@example.com.") needs 420 px on one
+     line. Where the form is narrower (phones), that field keeps two lines for it, so it still never moves. */
+  @container register-form (max-width: 419px) {
+    [data-field='email'] .field__msg {
+      min-height: calc(2 * var(--leading-ui));
+    }
+  }
+
+  .register__passes {
+    min-width: 0;
     margin: 0;
     padding: 0;
     border: 0;
   }
 
-  /* A legend isn't a grid item, so it takes the label-to-field gap and left edge by hand. */
-  .register__tickets > legend {
-    margin-bottom: var(--space-1);
-    padding: 0;
-  }
-
-  /* Each ticket is a ghost `.ui-button` (global.css): the lift on hover and keyboard focus, the
-     picked one inverted to Green 900. Four in a row, or 2 × 2 on phones; the gap leaves room for
-     the lift. */
+  /* Each pass is a ghost `.ui-button` (global.css): the lift on hover and keyboard focus, the picked one
+     filled Green 900. Four in a row, or 2 × 2 on phones; the gap leaves room for the lift. */
   .register__options {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-3);
+    gap: var(--control-gap);
   }
 
   @media (max-width: 40rem) {
@@ -197,6 +194,7 @@ const tickets = [
     display: grid;
     justify-items: center;
     align-content: center;
+    padding: var(--space-2) var(--space-2);
     text-align: center;
   }
 
@@ -208,44 +206,157 @@ const tickets = [
     opacity: 0;
   }
 
-  .register__tickets[data-invalid='true'] .option {
-    --ui-button-ring: inset 0 0 0 2px var(--outline);
+  /* No pass chosen on submit: a 1 px Yellow 600 ring on each card */
+  .register__passes[data-invalid='true'] .option {
+    --ui-button-ring: inset 0 0 0 1px var(--error);
   }
 
+  /* ── The checkbox: a square 16 px box, 1 px ink; checked, filled in the ink with a Cloud White pixel tick ── */
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    width: fit-content;
+    cursor: pointer;
+  }
+
+  .check__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    opacity: 0;
+  }
+
+  .check__box {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    background: var(--surface-raised);
+    box-shadow: inset 0 0 0 1px var(--outline);
+  }
+
+  .check__box svg {
+    display: block;
+    fill: var(--surface-card);
+    visibility: hidden;
+  }
+
+  .check__input:checked + .check__box {
+    background: var(--outline);
+  }
+
+  .check__input:checked + .check__box svg {
+    visibility: visible;
+  }
+
+  .check__input:focus-visible + .check__box {
+    outline: 2px solid var(--outline);
+    outline-offset: 2px;
+    box-shadow:
+      inset 0 0 0 1px var(--outline),
+      0 0 0 6px var(--focus-ring);
+  }
+
+  .check__label {
+    color: var(--text-secondary);
+  }
+
+  /* ── The button row: left-aligned, 24 px under the last block; full width on phones ── */
   .register__actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-3) var(--space-4);
-    padding-top: var(--space-2);
-    border-top: var(--border);
+    gap: var(--control-gap);
+    margin-top: calc(var(--rhythm-actions) - var(--rhythm-block));
   }
 
+  @media (max-width: 40rem) {
+    .register__actions > :global(.btn) {
+      flex: 1 1 100%;
+    }
+  }
+
+  /* "Registering" with three pixel dots blinking in turn, on the 16-bit beat */
+  .register__dots {
+    display: none;
+    gap: 3px;
+    align-items: flex-end;
+    height: 12px;
+    margin-left: calc(-1 * var(--space-1));
+  }
+
+  .register__dots i {
+    width: 3px;
+    height: 3px;
+    background: currentColor;
+    animation: register-dot 600ms steps(1, end) infinite;
+  }
+
+  .register__dots i:nth-child(2) {
+    animation-delay: 150ms;
+  }
+
+  .register__dots i:nth-child(3) {
+    animation-delay: 300ms;
+  }
+
+  @keyframes register-dot {
+    0%,
+    49% {
+      opacity: 1;
+    }
+
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  :global(.register__submit[aria-disabled='true']) {
+    cursor: progress;
+  }
+
+  :global(.register__submit[aria-disabled='true']) .register__dots {
+    display: inline-flex;
+  }
+
+  /* ── The success state: the heading, 8 px, the line, 20 px, the ticket, (20 px, the bonus,) 24 px, the buttons ── */
   .register__done {
-    display: grid;
-    gap: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    text-align: left;
   }
 
-  /* Focus lands here only so screen readers read the confirmation; it is not a control. */
-  .register__done:focus,
-  .register__done:focus-visible {
+  /* Focus lands on the heading so screen readers read the confirmation; it is not a control. */
+  .register__gg:focus,
+  .register__gg:focus-visible {
     outline: none;
     box-shadow: none;
   }
 
-  .register__ticket {
-    font-size: var(--text-sm);
-  }
-
-  .register__again {
-    margin-top: var(--space-2);
-    padding-top: var(--space-3);
-    border-top: var(--border);
-  }
-
+  /* The window-heading role in Mondwest: the game is the one saying GG */
   .register__gg {
-    font-family: var(--font-pixel);
-    font-size: var(--text-2xl);
-    line-height: var(--leading-tight);
+    font: var(--type-window-heading);
+    text-align: left;
   }
+
+  .register__saved {
+    margin-top: var(--rhythm-label);
+    color: var(--text-secondary);
+  }
+
+  .register__done > :global(.register__ticket) {
+    margin-top: var(--rhythm-block);
+  }
+
+  .register__bonus {
+    margin-top: var(--rhythm-block);
+  }
+
+  .register__done-actions {
+    margin-top: var(--rhythm-actions);
+  }
+
 </style>

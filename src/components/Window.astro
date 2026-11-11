@@ -10,8 +10,9 @@
  * vega.io's notepad.exe. `bare`: the frame without a title bar, as vega.io's own nav.
  * The title sits left on a full window and centred on a compact one; `titleAlign` overrides it (the
  * Register window keeps a centred title).
- * `closable`: inside a <dialog> the third square becomes a real close button (the same square with an
- * X in it, `data-window-close`); anywhere else it is the plain square and the button is not rendered visible.
+ * `closable`: inside a <dialog> the three squares give way to one close button (`data-window-close`): the
+ * same pixel square filled in the close red, no icon, like Vega's notepad.exe; anywhere else the squares stay and the
+ * button is not shown.
  */
 type Tag = 'div' | 'section' | 'article' | 'nav' | 'aside' | 'header' | 'footer' | 'form';
 
@@ -65,9 +66,8 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
       <div class="window__bar">
         <span class="window__title" id={titleId}>{title}</span>
         <span class="window__squares" aria-hidden="true">
-          {Array.from({ length: squares }, (_, i) => (
+          {Array.from({ length: squares }, () => (
             <svg
-              class:list={{ 'window__square--last': closable && i === squares - 1 }}
               viewBox="0 0 24 24"
               width="18"
               height="18"
@@ -81,8 +81,7 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
           closable && (
             <button type="button" class="window__close" aria-label="Close" data-window-close>
               <svg viewBox="0 0 24 24" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true">
-                <path d="M20 22H4V20H20V22ZM4 20H2V4H4V20ZM22 20H20V4H22V20ZM20 4H4V2H20V4Z" />
-                <path d="M7 7H9V9H7ZM9 9H11V11H9ZM11 11H13V13H11ZM13 13H15V15H13ZM15 15H17V17H15ZM15 7H17V9H15ZM13 9H15V11H13ZM9 13H11V15H9ZM7 15H9V17H7Z" />
+                <path d="M4 2H20V4H22V20H20V22H4V20H2V4H4Z" />
               </svg>
             </button>
           )
@@ -151,36 +150,36 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
     fill: currentColor;
   }
 
-  /* The close button stands in the third square's place, only inside a dialog. */
+  /* The close button: only inside a dialog, where it replaces the three squares. A 24 px hit area round the
+     squares' own pixel square (its corner pixels cut), filled in the close red (Vega's notepad.exe); the
+     page's own focus ring shows on it. */
   .window__close {
     grid-column: 3;
     grid-row: 1;
     justify-self: end;
     display: none;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    /* the 24 px hit area round an 18 px square: the square sits exactly where the third square did */
+    margin: -2px -3px -2px 0;
     padding: 0;
     background: none;
     border: 0;
-    color: inherit;
     cursor: pointer;
   }
 
   .window__close svg {
     display: block;
-    fill: currentColor;
-  }
-
-  .window__close:hover,
-  .window__close:focus-visible {
-    background: var(--accent);
-    outline: none;
+    fill: var(--color-close);
   }
 
   :global(dialog) .window__close {
-    display: block;
+    display: grid;
   }
 
-  :global(dialog) .window__square--last {
-    visibility: hidden;
+  :global(dialog) .window__squares {
+    display: none;
   }
 
   /* Padding through a property, so the body rule stays one class deep and a page's own

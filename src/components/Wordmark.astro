@@ -8,7 +8,7 @@
  * beside it, so an h1 made of it still has real text.
  */
 interface Props {
-  size?: 'hero' | 'nav' | 'og';
+  size?: 'hero' | 'nav' | 'og' | 'ticket';
   as?: 'h1' | 'span' | 'div';
   id?: string;
   class?: string;
@@ -68,5 +68,10 @@ const { size = 'hero', as: Tag = 'span', id, class: className, daisy = true } = 
 
   .wm--og {
     --wm-w: 60rem;
+  }
+
+  /* On the ticket: about 20 px tall with the daisy */
+  .wm--ticket {
+    --wm-w: 129px;
   }
 </style>

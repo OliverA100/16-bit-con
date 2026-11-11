@@ -20,13 +20,39 @@ export function createRegisterDialog(hooks: { onOpen(): void; onClose(): void })
   let marker: Comment | null = null;
   let opener: HTMLElement | null = null;
 
-  win.querySelector<HTMLButtonElement>('[data-window-close]')?.addEventListener('click', () => dialog.close());
-  // a click on the backdrop (the dialog box itself, outside the Window) closes it too
+  /** Close with its 150 ms step out (at once with reduced motion); Esc, the close square and a click outside all come here. */
+  let closing = false;
+  const close = () => {
+    if (!dialog.open || closing) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      dialog.close();
+      return;
+    }
+    closing = true;
+    dialog.classList.add('is-closing');
+    const finish = () => {
+      if (!closing) return;
+      closing = false;
+      dialog.classList.remove('is-closing');
+      dialog.close();
+    };
+    dialog.addEventListener('animationend', finish, { once: true });
+    window.setTimeout(finish, 400);
+  };
+  win.querySelector<HTMLButtonElement>('[data-window-close]')?.addEventListener('click', close);
+  // Esc: the same step out (a second Esc while it runs closes it at once, as the browser decides)
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    close();
+  });
+  // a click outside the Window (on the dialog box or its clear backdrop) closes it too
   dialog.addEventListener('click', (e) => {
-    if (e.target === dialog) dialog.close();
+    if (e.target === dialog) close();
   });
 
   dialog.addEventListener('close', () => {
+    closing = false;
+    dialog.classList.remove('is-closing');
     if (marker) {
       marker.replaceWith(win);
       marker = null;
@@ -57,9 +83,9 @@ export function createRegisterDialog(hooks: { onOpen(): void; onClose(): void })
   };
 }
 
-/** Focus the form's first field, or its confirmation when the player has already registered. */
+/** Focus the form's first field, or its "GG" heading when the player has already registered. */
 export function focusRegister(): void {
   const done = document.getElementById('register-done');
-  const first = document.getElementById('reg-name');
-  (done && !done.hidden ? done : first)?.focus({ preventScroll: true });
+  const target = done && !done.hidden ? document.getElementById('register-gg') : document.getElementById('reg-name');
+  target?.focus({ preventScroll: true });
 }

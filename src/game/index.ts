@@ -39,7 +39,7 @@ import { loadCity, loadLevel1 } from './assets';
 import { Level1 } from './world';
 import { skyAt } from './stages';
 import { GROUND_BAND, PLAZA_TIME } from '../data/layers';
-import { levelLabel, railStops, samLines, type SamLine } from '../data/guide';
+import { GG_LINE, levelLabel, railStops, samLines, type SamLine } from '../data/guide';
 import { sprites } from '../data/sprites.manifest';
 import { loadImage } from './sprites';
 import { remap, SAM_BRAND_MAP } from './palette';
@@ -851,14 +851,26 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // Back on the Register window from the page, he says something new: an invitation, typed out as before (the
   // full line for screen readers too).
   const RETURN_LINE = "Come say hi at Booth\u00A0630. I'll save you a seat."; // the booth's number kept with it
-  perch?.root.addEventListener('returned', () => {
+  /** Agent Sam types a new line on the Register window (the full line for screen readers too). */
+  const sayOnPerch = (line: string) => {
     if (!landingTyped) return;
-    landingLine = RETURN_LINE;
+    landingLine = line;
     const spoken = landingTyped.parentElement?.querySelector('.sr-only');
-    if (spoken) spoken.textContent = RETURN_LINE;
+    if (spoken) spoken.textContent = line;
     typeOut(landingTyped, landingLine, 0);
     landingShown = -1;
     landingSince = clockNow();
+  };
+  /** Once someone registers, his next line is GG: now if he's on the window, else when he lands or comes back. */
+  let nextLine: string | null = null;
+  perch?.root.addEventListener('returned', () => {
+    sayOnPerch(nextLine ?? RETURN_LINE);
+    nextLine = null;
+  });
+  document.getElementById('register')?.addEventListener('register:done', () => {
+    const here = perch && perch.root.classList.contains('is-landed') && !perch.root.classList.contains('is-away');
+    if (here) sayOnPerch(GG_LINE);
+    else nextLine = GG_LINE;
   });
   /** Sam out on the page after the landing (src/game/journey.ts): loaded on his first landing, never before. */
   let journey: Promise<{ debug(): unknown } | null> | null = null;
@@ -879,9 +891,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           });
         // Agent Sam's line on the Register window types out as his lines in the game do
         if (landingTyped) {
-          landingLine = landingTyped.textContent ?? '';
-          typeOut(landingTyped, landingLine, 0);
-          landingSince = clockNow();
+          if (nextLine) {
+            sayOnPerch(nextLine);
+            nextLine = null;
+          } else {
+            landingLine = landingTyped.textContent ?? '';
+            typeOut(landingTyped, landingLine, 0);
+            landingSince = clockNow();
+          }
         }
       }
     }

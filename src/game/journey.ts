@@ -633,6 +633,8 @@ export async function startJourney(o: JourneyOptions): Promise<{ debug(): unknow
     perchHop = requestAnimationFrame(hop);
   };
   perch.canvas.addEventListener('click', () => perchHops([CLICK_HOP]));
+  // someone registered: he jumps once on the window, fist up (perchHops does nothing while he's away)
+  document.getElementById('register')?.addEventListener('register:done', () => perchHops([CLICK_HOP]));
 
   // the rest of the page comes alive with him: clouds drifting in, and now and then a dog visiting him in the field
   startSky(o.paused).catch((err) => console.error('[sky]', err));

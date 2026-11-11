@@ -163,8 +163,35 @@ import SectionHeader from '../components/SectionHeader.astro';
     padding: 0 var(--space-1) var(--space-1) 0;
   }
 
+  /* No backdrop: the game shows through untouched. It is still a modal (focus trapped, the page inert). */
   .register-dialog::backdrop {
-    background: color-mix(in srgb, var(--color-green-900) 45%, transparent);
+    background: transparent;
+  }
+
+  /* Things that appear step: the window drops 12 px into place as it fades in (4 steps, 200 ms); it goes
+     back up and out in 150 ms (3 steps). */
+  @media (prefers-reduced-motion: no-preference) {
+    .register-dialog[open] {
+      animation: register-dialog-in var(--dur-base) var(--steps-16bit);
+    }
+
+    .register-dialog.is-closing {
+      animation: register-dialog-out calc(3 * var(--beat)) var(--steps-3) forwards;
+    }
+  }
+
+  @keyframes register-dialog-in {
+    from {
+      opacity: 0;
+      translate: 0 -12px;
+    }
+  }
+
+  @keyframes register-dialog-out {
+    to {
+      opacity: 0;
+      translate: 0 -12px;
+    }
   }
 
   /* The page holds still under the dialog and while the camera zooms out of the game. (Through the

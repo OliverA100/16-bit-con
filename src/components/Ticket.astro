@@ -1,0 +1,286 @@
+---
+/**
+ * Ticket — the player's pass, shown in the Register window once they have registered. Two parts side by
+ * side: the main part (the wordmark, "Admit one", the pass, its dates and place, the player) and a 132 px
+ * stub (hosted by Vega, a barcode drawn from the pass's code, the code), parted by a tear line with a round
+ * notch cut out of the paper where it meets each edge. A strip of Vega's own sprites lives in the main part,
+ * at 1 CSS px per art px, playing only while the ticket is on screen (src/register/ticket.ts).
+ *
+ * Green 900 paper, Daisy White ink, a Yellow 400 hairline. On a narrow ticket (phones) the stub moves under
+ * the main part and the tear line turns horizontal. For screen readers it is one image with a short
+ * summary; the cast and the barcode are decoration.
+ */
+import Wordmark from './Wordmark.astro';
+import { PASSES, describeTicket, type PassId } from '../register/ticket-data';
+
+interface Props {
+  pass?: PassId;
+  player?: string;
+  code?: string;
+  class?: string;
+  [key: string]: unknown;
+}
+
+const { pass = 'all', player = 'Oliver', code = '16B-7Q2K', class: className, ...rest } = Astro.props;
+const p = PASSES[pass];
+---
+
+<div class:list={['ticket-wrap', className]} {...rest}>
+  <div
+    class="ticket"
+    data-ticket
+    data-pass={pass}
+    data-player={player}
+    data-code={code}
+    role="img"
+    aria-label={describeTicket(pass, player, code)}
+  >
+    <div class="ticket__main">
+      <div class="ticket__scene" data-ticket-scene><canvas></canvas></div>
+      <div class="ticket__top">
+        <Wordmark size="ticket" class="ticket__wm" />
+        <span class="ticket__admit">Admit one</span>
+      </div>
+      <p class="ticket__pass" data-ticket-pass>{p.label}</p>
+      <p class="ticket__when" data-ticket-when>{p.dates} · Javits Center, New York</p>
+      <p class="ticket__player-k">Player</p>
+      <p class="ticket__player" data-ticket-player>{player}</p>
+    </div>
+    <div class="ticket__tear"></div>
+    <div class="ticket__stub">
+      <div class="ticket__host">
+        <span class="ticket__hosted">Hosted by</span>
+        <img class="ticket__vega ticket__vega--light" src="/sprites/ui/vega-logo-light.svg" alt="" width="487" height="158" />
+      </div>
+      <div class="ticket__code-block">
+        <svg class="ticket__barcode" data-ticket-barcode viewBox="0 0 96 32" width="96" height="32" shape-rendering="crispEdges"></svg>
+        <span class="ticket__code" data-ticket-code>{code}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* The ticket measures its own width: narrower than this, the stub goes under the main part. */
+  .ticket-wrap {
+    container: ticket / inline-size;
+  }
+
+  /* ── The paper and its inks ── */
+  .ticket {
+    --paper: var(--ticket-paper);
+    --ink: var(--ticket-ink);
+    --ink-2: var(--ticket-ink-2);
+    --frame: var(--ticket-frame);
+    --tear-dot: var(--color-cloud-white);
+    /* geometry: the stub's width, the notch's radius, the frame's inset */
+    --stub-w: 132px;
+    --notch: 11px;
+    --inset: 8px;
+    --tear-x: calc(100% - var(--stub-w));
+    --tear-y: 0px;
+
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--stub-w);
+    height: 268px;
+    background: var(--paper);
+    color: var(--ink);
+    /* a clean round notch where the tear line meets each edge: the window shows through */
+    --notch-a: radial-gradient(circle var(--notch) at var(--tear-x) var(--tear-y), #0000 calc(var(--notch) - 0.5px), #000 var(--notch));
+    --notch-b: radial-gradient(circle var(--notch) at var(--tear-x) 100%, #0000 calc(var(--notch) - 0.5px), #000 var(--notch));
+    -webkit-mask: var(--notch-a), var(--notch-b);
+    -webkit-mask-composite: source-in;
+    mask: var(--notch-a), var(--notch-b);
+    mask-composite: intersect;
+    user-select: none;
+  }
+
+  /* the hairline frame, inset 8 px round both parts (the notches cut through it) */
+  .ticket::after {
+    content: '';
+    position: absolute;
+    inset: var(--inset);
+    z-index: 3;
+    border: 1px solid var(--frame);
+    pointer-events: none;
+  }
+
+  /* ── The main part ── */
+  .ticket__main {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--space-6);
+  }
+
+  .ticket__main > :not(.ticket__scene) {
+    position: relative;
+    z-index: 2;
+  }
+
+  .ticket__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .ticket__top :global(.wm) {
+    color: currentColor;
+  }
+
+  .ticket__admit {
+    font: 400 12px / 16px var(--font-mono);
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+
+  /* The pass name: the game is saying it, so Mondwest */
+  .ticket__pass {
+    margin-top: var(--space-3);
+    font: 400 40px / 44px var(--font-pixel);
+    text-wrap: nowrap;
+  }
+
+  .ticket__when {
+    margin-top: var(--space-1);
+    font: 400 13px / 20px var(--font-mono);
+    color: var(--ink-2);
+  }
+
+  .ticket__player-k {
+    margin-top: var(--space-3);
+    font: 400 11px / 16px var(--font-mono);
+    color: var(--ink-2);
+  }
+
+  .ticket__player {
+    overflow: hidden;
+    font: 400 13px / 20px var(--font-mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The cast's box: its bottom on the hairline's top edge, clear of the tear line; the canvas sits on its
+     bottom (src/register/ticket.ts sizes it to whole device px per art px). */
+  .ticket__scene {
+    position: absolute;
+    right: 6px;
+    bottom: calc(var(--inset) + 1px);
+    left: calc(var(--inset) + 1px);
+    z-index: 1;
+    height: 64px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .ticket__scene canvas {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    image-rendering: pixelated;
+  }
+
+  /* ── The tear line: a column of small dots, 2 px every 7 px ── */
+  .ticket__tear {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--tear-x) - 1px);
+    z-index: 4;
+    width: 2px;
+    background: repeating-linear-gradient(to bottom, var(--tear-dot) 0 2px, transparent 2px 7px);
+  }
+
+  /* ── The stub ── */
+  .ticket__stub {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: var(--space-5);
+    text-align: center;
+  }
+
+  .ticket__host {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+  }
+
+  .ticket__hosted {
+    font: 400 12px / 16px var(--font-mono);
+    color: var(--ink-2);
+  }
+
+  .ticket__vega {
+    width: 84px;
+    height: auto;
+  }
+
+  .ticket__code-block {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+  }
+
+  .ticket__barcode {
+    display: block;
+    fill: var(--ink);
+  }
+
+  .ticket__code {
+    font: 400 11px / 16px var(--font-mono);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Narrow (phones): the stub under the main part, the tear line and its notches across ── */
+  @container ticket (max-width: 459px) {
+    .ticket {
+      --main-h: 252px;
+      --tear-x: 0px;
+      --tear-y: var(--main-h);
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: var(--main-h) auto;
+      height: auto;
+      --notch-a: radial-gradient(circle var(--notch) at 0 var(--main-h), #0000 calc(var(--notch) - 0.5px), #000 var(--notch));
+      --notch-b: radial-gradient(circle var(--notch) at 100% var(--main-h), #0000 calc(var(--notch) - 0.5px), #000 var(--notch));
+    }
+
+    .ticket__main {
+      padding: var(--space-5);
+    }
+
+    /* the cast stands on the tear line here */
+    .ticket__scene {
+      bottom: 1px;
+    }
+
+    .ticket__tear {
+      top: calc(var(--main-h) - 1px);
+      right: 0;
+      bottom: auto;
+      left: 0;
+      width: auto;
+      height: 2px;
+      background: repeating-linear-gradient(to right, var(--tear-dot) 0 2px, transparent 2px 7px);
+    }
+
+    .ticket__stub {
+      grid-template-columns: auto auto;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-5) var(--space-6) var(--space-6);
+    }
+
+    .ticket__host {
+      justify-items: start;
+    }
+
+    .ticket__code-block {
+      justify-items: end;
+    }
+  }
+</style>

@@ -44,3 +44,6 @@ export const samLines: SamLine[] = [
   { from: 0.66, to: 0.72, text: 'Sun’s down, lights on. After party’s at 6. Follow the neon.' },
   { from: 0.97, to: 1.01, text: 'Wait. This is just the game. The real one’s out there.' },
 ];
+
+/** Agent Sam's line on the Register window once someone has registered (the booth's number kept with it). */
+export const GG_LINE = 'GG! Saved you a spot at Booth\u00A0630.';
