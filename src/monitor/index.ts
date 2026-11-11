@@ -7,9 +7,8 @@
  *
  * Shadows: one shadow-casting light, high above and a little in front, from the key light's side, adds
  * no light of its own (the plastic's shading is the key's, swept against the reference) and casts one
- * soft shadow (VSM, a 512² map blurred wide, its camera fitted tight round the monitor, the only caster:
- * the controller and the cable lie on the floor, grounded by baked contact darkening) onto a
- * ShadowMaterial floor: short, back and to the right as in the
+ * soft shadow (VSM, a 512² map blurred wide, its camera fitted tight round the monitor, the controller
+ * and the cable, the only casters) onto a ShadowMaterial floor: short, back and to the right as in the
  * reference, so it stays inside a phone's width (anything behind the monitor lands right of it on the
  * page). The map is redrawn only when asked (renderer.shadowMap.needsUpdate): nothing moves but the
  * monitor's turn, so the hero redraws it while the monitor turns, and never in the dive.
@@ -172,6 +171,12 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
   renderer.setRenderTarget(null);
   yield compiled.finally(() => roomTarget.dispose());
   const env = pmrem.fromScene(room, 0.04).texture;
+  // …and the same room unblurred, for the glass alone: blurred, even a perfectly smooth pane can only show
+  // soft blobs — the look of glossy plastic. Sharp, it shows the room's lights as crisp reflections. Its
+  // furniture (a few boxes on the floor) is taken out first: sharp, the curved glass bent one into a grey
+  // dome across the bottom of the screen.
+  room.children.filter((o) => (o as { isInstancedMesh?: boolean }).isInstancedMesh).forEach((o) => room.remove(o));
+  const sharpEnv = pmrem.fromScene(room, 0).texture;
   pmrem.dispose();
   room.dispose();
   // A dim room for the plastic, so the clearcoat carries highlights rather than a white sheen and the
@@ -198,7 +203,8 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
   const parts = buildMonitor(
     {
       plastic: color('--color-florets-yellow').lerp(color('--color-yellow-500'), 0.35),
-      bevel: color('--color-yellow-500'),
+      // the recess walls round the screen: the casing's own yellow (an orange edge read as a separate part)
+      bevel: color('--color-florets-yellow').lerp(color('--color-yellow-500'), 0.35),
       slot: color('--color-grey-700'),
       button: color('--color-daisy-white'),
       shadow: color('--color-outline-black'),
@@ -249,13 +255,13 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
     cam.far = -lo.z + 3;
     cam.updateProjectionMatrix();
   }
-  // The glass gets the room directly: a material on scene.environment has its envMapIntensity
-  // overwritten by scene.environmentIntensity, and the pane needs a much stronger reflection.
-  parts.materials.glass.envMap = env;
+  // The glass gets the room directly — the sharp one: a material on scene.environment has its
+  // envMapIntensity overwritten by scene.environmentIntensity, and the pane needs a much stronger reflection.
+  parts.materials.glass.envMap = sharpEnv;
   parts.materials.glass.envMapIntensity = 2.2;
-  parts.materials.glass.roughness = 0.22;
-  // turned so the room's bright panel lands as a soft sheet in the glass's upper left, as in the reference image
-  parts.materials.glass.envMapRotation.set(0.45, 5.2, 0);
+  // smooth, as glass is: the room's lights show in it as crisp reflections, bent by its bulge
+  parts.materials.glass.roughness = 0.02;
+  parts.materials.glass.envMapRotation.set(0.45, 5.3, 0);
   yield;
 
   const camera = new PerspectiveCamera(FOV, 1, 0.02, 40);
@@ -463,6 +469,7 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
         for (const m of mats) m.dispose();
       });
       env.dispose();
+      sharpEnv.dispose();
       renderer.dispose();
     },
   };

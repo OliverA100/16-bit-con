@@ -233,7 +233,8 @@ void main() {
   // Power: the raster opens vertically from the line; outside it (and outside the barrel) is the tube.
   float open = 1.0 - smoothstep(uOpen * 0.5 - e.y, uOpen * 0.5 + e.y, abs(vUv.y - 0.5));
   float lit = raster * open * uOn;
-  vec3 tube = uTube * (1.0 + 0.35 * (1.0 - length(c) * 1.4));
+  // the off tube: dark and nearly even (a strong centre glow read as a plastic dome)
+  vec3 tube = uTube * (1.0 + 0.1 * (1.0 - length(c) * 1.4));
   col = mix(tube, col, lit);
   // The power-on line: a hard core with a soft halo, grown out from the centre to uLineW of the width.
   float ly = abs(vUv.y - 0.5);

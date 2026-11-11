@@ -700,10 +700,8 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
     color: colors.shadow,
     map: contactTexture(rect, [
       // the body's underside, just above the floor: a darkening within its footprint, leaning to the side
-      // away from the light (none spills onto the lit left), and a dense band along the right side's foot,
-      // where the cast shadow begins
+      // away from the light (none spills onto the lit left)
       { x: 0.04, z: -DEPTH / 2 - 0.02, rx: 0.44, rz: 0.52, stops: [[0, 0.24], [0.78, 0.18], [1, 0]] },
-      { x: W / 2 - F.step * 2, z: -DEPTH / 2 - 0.04, rx: 0.07, rz: 0.5, stops: [[0, 0.34], [0.6, 0.2], [1, 0]] },
       foot(-ft.x, -ft.zFront),
       foot(ft.x, -ft.zFront),
       foot(-backX, -ft.zBack),
@@ -727,10 +725,8 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   const contact = new Mesh(contactGeo, contactMat);
   contact.renderOrder = -1;
 
-  // The shadow: only the monitor's outer shapes cast, only the floor takes it. The controller and the cable
-  // lie on the floor and are grounded by the contact darkening: cast too, inside the monitor's soft shadow
-  // so near the floor, they made VSM light a pale halo round them (its light bleeding).
-  const casters = [frame, casing, front, step, back, ...feet];
+  // The shadow: only the outer shapes cast (the monitor, the controller, the cable), only the floor takes it.
+  const casters = [frame, casing, front, step, back, ...feet, ...remote.meshes];
   for (const m of casters) m.castShadow = true;
 
   const body = new Group();

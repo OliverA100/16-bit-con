@@ -35,8 +35,16 @@ import { DIMS, type Slot } from './spec';
  * wait; the line faint then bright, thin then thick (fractions of the screen height).
  */
 export const POWER = { grow: 170, brighten: 40, open: 170, ready: 70, faint: 0.45, bright: 1.6, thin: 0.0025, thick: 0.007 } as const;
-/** The turn toward the pointer, degrees, and its ease (a time constant of 130 ms settles in ~400 ms). */
-const PARALLAX = { yaw: 8, pitch: 4, tau: 0.13 } as const;
+/**
+ * The turn toward the pointer, degrees, and how it chases the pointer: slow and heavy, like the reference
+ * site's monitor. Two damped follows in a row, each frame-rate independent (x += (to − x)(1 − e^(−dt/τ))):
+ * the aim eases toward the pointer (`lead`, s), and the turn follows the aim (`tau`, s) — so it eases in
+ * and out, with no overshoot. Measured against the reference (a jump across the page, 2026-11-10): its
+ * monitor swings about ±11° to our ±8°, so our time constants are its fit (0.08 s and 0.32 s) scaled by
+ * 8 / 11, for the same speed in degrees a second over our smaller range. `maxDt` keeps a long frame (a
+ * tab switch) from jolting it.
+ */
+const PARALLAX = { yaw: 8, pitch: 4, lead: 0.06, tau: 0.24, maxDt: 1 / 30 } as const;
 /** Touch screens: a slow idle sway instead, degrees and seconds per cycle. */
 const SWAY = { yaw: 2, pitch: 1, yawPeriod: 7, pitchPeriod: 9.5 } as const;
 /** Hovering PRESS START brightens the screen 10 %. */
@@ -216,6 +224,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   const shadowTurn = new Quaternion(0, 0, 0, 0);
   let target = { yaw: 0, pitch: 0 };
   let turn = { yaw: 0, pitch: 0 };
+  /** The aim: the pointer's target, eased (the first of the two follows). */
+  let aim = { yaw: 0, pitch: 0 };
   let hoverTarget = 1;
   let hoverB = 1;
   /**
@@ -352,7 +362,8 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       } else texture.needsUpdate = true;
     },
     pointer(nx, ny = 0) {
-      target = nx === null ? { yaw: 0, pitch: 0 } : { yaw: PARALLAX.yaw * nx, pitch: PARALLAX.pitch * ny };
+      // with reduced motion the monitor does not follow the pointer at all
+      target = nx === null || still.matches ? { yaw: 0, pitch: 0 } : { yaw: PARALLAX.yaw * nx, pitch: PARALLAX.pitch * ny };
     },
     sway(on) {
       swaying = on;
@@ -388,13 +399,20 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, (now - last) / 1000));
       last = now;
 
-      // ── The turn: toward the pointer, or the idle sway — settling to nothing as the camera dives ──
-      if (swaying) {
+      // ── The turn: chasing the pointer on a critically damped spring (or, on touch screens, the idle sway as
+      //    it is) — and once the dive starts, easing to the dive's starting pose (square), never snapping ──
+      if (swaying && !still.matches) {
         const s = now / 1000;
-        target = { yaw: SWAY.yaw * Math.sin((2 * Math.PI * s) / SWAY.yawPeriod), pitch: SWAY.pitch * Math.sin((2 * Math.PI * s) / SWAY.pitchPeriod) };
+        turn = { yaw: SWAY.yaw * Math.sin((2 * Math.PI * s) / SWAY.yawPeriod), pitch: SWAY.pitch * Math.sin((2 * Math.PI * s) / SWAY.pitchPeriod) };
+        aim = { ...turn };
+      } else {
+        const to = p > 0 || still.matches ? { yaw: 0, pitch: 0 } : target;
+        const sdt = Math.min(PARALLAX.maxDt, dt);
+        const k1 = 1 - Math.exp(-sdt / PARALLAX.lead);
+        const k2 = 1 - Math.exp(-sdt / PARALLAX.tau);
+        aim = { yaw: aim.yaw + (to.yaw - aim.yaw) * k1, pitch: aim.pitch + (to.pitch - aim.pitch) * k1 };
+        turn = { yaw: turn.yaw + (aim.yaw - turn.yaw) * k2, pitch: turn.pitch + (aim.pitch - turn.pitch) * k2 };
       }
-      const a = 1 - Math.exp(-dt / PARALLAX.tau);
-      turn = { yaw: turn.yaw + (target.yaw - turn.yaw) * a, pitch: turn.pitch + (target.pitch - turn.pitch) * a };
       const settle = 1 - smooth(p, ENTER.parallaxOut);
       qYaw.setFromAxisAngle(Y, turn.yaw * settle * DEG);
       qPitch.setFromAxisAngle(right, turn.pitch * settle * DEG);
