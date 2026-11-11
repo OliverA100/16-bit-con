@@ -47,11 +47,12 @@ import { ScreenFrame } from './screen-frame';
 import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
 import type { BreakoutState, Hero } from '../monitor/hero';
-import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, clamp01, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
+import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, PLAY, clamp01, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
 import { drawCell, idleOnPerch, queryPerch, withSmile } from './landing';
 import { createRegisterDialog, focusRegister } from './register-dialog';
 import { typeOut } from './typing';
 import { GL_ATTRIBUTES } from '../monitor/spec';
+import * as sound from './sound';
 
 const W = 6000;
 /** The whole run: the field, the city, the night and the dawn at the Javits plaza, the game's last level (world x 0–6000). */
@@ -453,6 +454,23 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let scrollOverrideUntil = 0;
   /** A tap or click on the monitor's screen during the cracks (its DOM hit target). */
   let pendingHit = false;
+  /**
+   * The enter or exit sound and the play it follows (playing, zoom or breakPlay). It starts on the frame the
+   * play's clock starts (t0), `lag` ms into itself: that frame's time is from before the click's handler ran
+   * (making the AudioContext there can take ~100 ms), so the sound starts where the picture already is. A
+   * play that ends lets its sound ring out (cueDone); one that goes early cuts it with a fast fade.
+   */
+  let cue: { voice: sound.Voice; owner: object } | null = null;
+  const cueFor = (owner: object, voice: sound.Voice | null) => {
+    cue?.voice.stop();
+    cue = voice ? { voice, owner } : null;
+  };
+  const cueDone = (owner: object) => {
+    if (cue?.owner === owner) cue = null;
+  };
+  const frameLag = (now: number) => (vclock ? 0 : Math.min(200, Math.max(0, performance.now() - now)));
+  /** When, in a dive from the top, the camera passes the glass: the picture nearly fills the view (the monitor finds it per viewport). */
+  const glassMs = () => playMs(hero3d ? hero3d.flatP + ENTER.flatten.lead : ENTER.fillBy);
   /** The pin, created by PRESS START (never on load), so the page is only as long as its content until then. */
   const createPin = () =>
     ScrollTrigger.create({
@@ -561,6 +579,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   };
   // PRESS START: by default it opens the game (enterPlay, below); in the game, at the monitor, it plays the dive again.
   d?.startButton.addEventListener('click', () => {
+    // the sound's context is made here, inside the click: browsers allow sound only after a gesture
+    sound.unlock();
     if (mode === 'default') enterPlay();
     else if (mode === 'play' && !paused && !zoom) start();
   });
@@ -778,7 +798,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let samBillboard = '';
   const breakState = (q: number, now: number): BreakoutState => {
     // the glass on its own clock from the burst (Sam may leave before it settles); from q where there is no burst clock
-    if (q > BREAKOUT.shatter[0] && glassT0 === null && finale) glassT0 = now;
+    if (q > BREAKOUT.shatter[0] && glassT0 === null && finale) {
+      glassT0 = now;
+      sound.shatter();
+      sound.static();
+    }
+    // each crack stage as it first shows on this glass, from a hit or a scroll alike
+    if (mode === 'play') while (crackHeard < Math.min(CRACK_STAGES, crackStage(q))) sound.crack(++crackHeard);
     const shatter =
       glassT0 !== null
         ? clamp01((now - glassT0) / GLASS_MS)
@@ -953,6 +979,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     atGlassSince = -Infinity;
     wheelFreshAt = -Infinity;
     lastCrackSeen = crackStage(allowQ);
+    crackHeard = lastCrackSeen;
     glassT0 = null;
     gatePushAt = -Infinity;
     saved = null;
@@ -1039,6 +1066,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   };
   /** The crack stage last seen, so a crack the scroll makes gets Sam's hop, as a hit does. */
   let lastCrackSeen = 0;
+  /** The highest crack stage heard on this glass: each new one cracks once, however the page goes back and forth. */
+  let crackHeard = 0;
   /** The picture's breakout progress last frame: the picture, too, goes through the breakout no faster than the cap. */
   let lastPicQ = 0;
   /** The breakout's speed limit at progress q, per ms: the pull-back at the dive's pace, then a crack per CRACK_MIN_MS. */
@@ -1238,6 +1267,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // ── Register over the game: the dialog pauses it, and the plays pick up where they were ──
   const regDialog = createRegisterDialog({
     onOpen: () => {
+      sound.hold('dialog', true);
       paused = true;
       pausedAt = clockNow();
       input.enabled = false;
@@ -1251,6 +1281,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       lastInputAt = clockNow();
       paused = false;
       input.enabled = mode === 'play';
+      sound.hold('dialog', false);
     },
   });
   /**
@@ -1278,6 +1309,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     });
   }
   o.exit?.addEventListener('click', () => exitPlay('start'));
+  // Sound on/off (the HUD, play mode only): remembered; off silences everything at once.
+  const soundButton = section.querySelector<HTMLButtonElement>('[data-sound]');
+  if (soundButton) {
+    soundButton.setAttribute('aria-pressed', String(sound.enabled()));
+    soundButton.addEventListener('click', () => {
+      sound.setEnabled(!sound.enabled());
+      soundButton.setAttribute('aria-pressed', String(sound.enabled()));
+    });
+  }
   // The nav's wordmark (a link home) in the game: the same as Exit game, zooming out to the monitor.
   // While the page zooms out or plays the finale it does nothing, as Register now does then.
   document.querySelector<HTMLAnchorElement>('.nav__brand')?.addEventListener('click', (e) => {
@@ -1321,13 +1361,20 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const live = mode === 'play' && !paused && !zoom;
     // PRESS START playing the enter segment: the page scrolls on, the visual follows it exactly.
     if (playing && live) {
-      if (playing.t0 < 0) playing.t0 = now;
+      if (playing.t0 < 0) {
+        playing.t0 = now;
+        // the sound is the camera's move (PLAY.dive), not the world's fade-in after it
+        cueFor(playing, sound.enter(PLAY.dive, playing.from + frameLag(now), glassMs()));
+      }
       const pp = playP(playing.from + now - playing.t0);
       const y = pp >= 1 ? playing.y1 : pinTop() + pp * DE;
       window.scrollTo({ top: y, behavior: 'instant' });
       expectedY = window.scrollY;
       timeline.drive((y - pinTop() - DE) / pxPerWorld, 0, 'auto');
-      if (pp >= 1) playing = null;
+      if (pp >= 1) {
+        cueDone(playing);
+        playing = null;
+      }
     }
 
     // ── The breakout, after the run (src/game/segments.ts BREAKOUT): q from the page, its plays, the hits ──
@@ -1335,7 +1382,17 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const yOfQ = (qq: number) => pinTop() + DE + DW + qq * DB;
     const xOfQ = (qq: number) => (T_MAX + (qq * DB) / DW) * W;
     if (breakPlay && live) {
-      if (breakPlay.t0 < 0) breakPlay.t0 = now;
+      if (breakPlay.t0 < 0) {
+        breakPlay.t0 = now;
+        // the pull-back (not the finale): out to the monitor sounds like an exit, back into the game like a dive
+        if (!breakPlay.keys) {
+          const lag = frameLag(now);
+          const { q0, q1, ms } = breakPlay;
+          // (the pull-back moves q at an even pace; the monitor shows enter progress 1 − q / pullBack's end)
+          const heroPOf = (tMs: number) => 1 - clamp01((q0 + ((q1 - q0) * tMs) / Math.max(1, ms)) / BREAKOUT.pullBack[1]);
+          cueFor(breakPlay, q1 > q0 ? sound.exit(ms, lag, heroPOf) : sound.enter(ms, lag));
+        }
+      }
       const el = now - breakPlay.t0;
       const k = Math.min(1, el / Math.max(1, breakPlay.ms));
       let qq = breakPlay.q0 + (breakPlay.q1 - breakPlay.q0) * k;
@@ -1355,6 +1412,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       timeline.drive(xOfQ(qq), 0, 'auto');
       allowQ = Math.max(allowQ, Math.min(qq, BREAKOUT.shatter[0]));
       if (k >= 1) {
+        cueDone(breakPlay);
         breakPlay = null;
         // the top of Sam's jump: the page lets the monitor go and follows him down to the Register window
         if (finale) releaseToLanding(now);
@@ -1565,7 +1623,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     let zoomEnded = false;
     let heroP = inBreakout ? 1 - clamp01(q / BREAKOUT.pullBack[1]) : p;
     if (zoom) {
-      if (zoom.t0 < 0) zoom.t0 = now;
+      if (zoom.t0 < 0) {
+        zoom.t0 = now;
+        const lag = frameLag(now);
+        cueFor(zoom, zoom.p1 > zoom.p0 ? sound.enter(Math.min(PLAY.dive, playMs(zoom.p1)), lag, glassMs()) : sound.exit(playMs(zoom.p0), lag));
+      }
       const dir = zoom.p1 >= zoom.p0 ? 1 : -1;
       const zp = playP(playMs(zoom.p0) + dir * (now - zoom.t0));
       heroP = dir > 0 ? Math.min(zp, zoom.p1) : Math.max(zp, zoom.p1);
@@ -1731,8 +1793,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // A zoom has reached its end: the game goes on (resume), or the page takes over (exit).
     if (zoomEnded && zoom) {
       const then = zoom.done;
+      cueDone(zoom);
       zoom = null;
       then();
+    }
+    // The play a sound follows has gone early (a scroll cancelled it, the skip link cut the zoom out): a fast fade.
+    if (cue && cue.owner !== playing && cue.owner !== zoom && cue.owner !== breakPlay) {
+      cue.voice.stop();
+      cue = null;
     }
     stepLanding(now);
     // Sam on the page, wherever the page is (below the pin the world no longer draws).

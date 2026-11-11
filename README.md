@@ -27,6 +27,7 @@ The brief's three sessions are Oct 3, with their copy as given. The Oct 4 and Oc
 - In the game, scroll, or hold → to run and Space to jump. The run can be scrolled as fast as you like; the breakout can't be skipped. Past the plaza the scroll pulls the camera back out to the monitor at the dive's pace and stops at the glass. A click or a tap on the monitor ("Help Sam · Hit the screen"), or Space, cracks it at once. Scrolling cracks it too, at most a crack every 150 ms, but only a scroll of the player's: a new swipe or wheel turn, never the momentum that carried the page there. On touch screens a new touch at the glass makes the next swipe count. It never cracks by itself. Six hits crack it and the seventh starts the finale: the glass bursts, Sam leaps out and the page follows him down onto the form, at its own pace with scrolling held.
 - On phones, the d-pad and the A button drive the world.
 - Exit game in the HUD, or Esc, closes the game: the camera zooms back out of the screen to the monitor, which then shows the game frozen where you left it. START dives back in and resumes from that spot (in memory only, so a reload starts over). The skip link closes the game at once.
+- The game has sound: a whoosh and an electric buzz as the camera dives in and zooms out, a crack per stage, the glass breaking and the broken tube's static. Nothing plays before START. The speaker button next to Exit game turns it off, and the browser remembers that. The sound is silent while the tab is hidden and under the registration dialog.
 - "Register now" centres the registration form on the page; in the game it opens the form in a dialog over the paused game, and Esc or its close button closes only the dialog.
 - After Sam lands, the hero is as it was on load, with the glass broken and no Start button. There is no replay.
 - With reduced motion, the page is static with the monitor powered on and no START: the game is never offered. Without WebGL, the opening is a poster and START still runs the canvas world.
@@ -38,6 +39,7 @@ The brief's three sessions are Oct 3, with their copy as given. The Oct 4 and Oc
 - GSAP ScrollTrigger pins the world and drives the timeline
 - Canvas 2D for the world at an integer pixel scale; the night's recoloured art is built in a Web Worker, so scrolling never stalls
 - three.js 0.187 for the monitor and the breakout, loaded after the page and only when WebGL 2 is available
+- Web Audio for the sound: the dive, the zoom out and the static are synthesised in code; the cracks and the shatter are short recordings (about 27 KB), fetched only once the game starts
 
 ## Run it
 
@@ -53,6 +55,8 @@ npm run icons     # favicon.svg, favicon.ico, apple-touch-icon.png from the word
 npm run og        # og.png, the social image (needs Google Chrome)
 ```
 
+Under `npm run dev`, `/dev/sound` plays each sound and has sliders for its numbers. It is never part of the build.
+
 ## Where things are
 
 | Path | What |
@@ -60,9 +64,11 @@ npm run og        # og.png, the social image (needs Google Chrome)
 | `src/pages/index.astro` | The page: the world, the registration form and the schedule |
 | `src/components/` | Window, Button, Nav, ScheduleDrawer, RegisterForm, Wordmark, World |
 | `src/schedule/` | The schedule drawer's behaviour, the scene runner and the nine folder scenes |
-| `src/game/` | The canvas world: timeline, stages, Sam, input, night palettes and their worker, the plaza and the landing |
+| `src/game/` | The canvas world: timeline, stages, Sam, input, night palettes and their worker, the plaza and the landing; `sound.ts` for the game's sound |
 | `src/monitor/` | The three.js monitor: model, CRT shader, poster and breakout |
 | `src/data/` | World keyframes, the sprite manifest, sessions, the progress rail and Agent Sam's lines |
+| `public/sounds/` | The crack and shatter recordings, used as they are |
+| `src/dev/` | The sound tuning page (dev only) |
 | `public/sprites/` | Vega's art, untouched; `SOURCES.md` lists where each file comes from and the new art drawn for this page |
 
 ## Performance and accessibility

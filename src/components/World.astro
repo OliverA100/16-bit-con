@@ -111,6 +111,13 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       <span class="mono" data-hud-coins>00/12</span>
       <span class="mono world__clock" data-hud-clock>07:00 AM</span>
       <span class="mono world__level" data-hud-level>LVL 1</span>
+      <Button variant="ghost" class="world__sound" data-sound aria-label="Sound" aria-pressed="true">
+        <svg class="world__sound-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path d="M2 6h3l4-3v10l-4-3H2z" />
+          <path class="world__sound-waves" d="M11.5 6.5a2 2 0 0 1 0 3M13.5 4.5a5 5 0 0 1 0 7" />
+          <path class="world__sound-x" d="M11.5 6.5l3 3M14.5 6.5l-3 3" />
+        </svg>
+      </Button>
       <Button variant="ghost" class="world__exit" data-exit>Exit game</Button>
     </p>
   </Window>
@@ -730,6 +737,29 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     font-size: var(--text-sm);
   }
 
+  /* Sound on/off: a square ghost button at Exit game's height, the rail's outline icon in it — a speaker
+     with its waves, or with an × when off. */
+  .world__hud :global(.world__sound) {
+    flex: none;
+    min-height: 0;
+    margin-left: var(--space-1);
+    padding: var(--space-1);
+  }
+
+  .world__sound-icon {
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+  }
+
+  :global(.world__sound[aria-pressed='false']) .world__sound-waves,
+  :global(.world__sound[aria-pressed='true']) .world__sound-x {
+    display: none;
+  }
+
   .world__hud-row {
     display: flex;
     align-items: center;
@@ -748,6 +778,31 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .world__clock {
     padding-left: var(--space-2);
     border-left: var(--border);
+  }
+
+  /* Phones show LVL too (the rail is hidden there): the row, the body and Exit game are tighter, so with
+     the sound button the HUD keeps a 16 px margin on a 375 px screen. */
+  @media (max-width: 48rem) {
+    .world__hud-row {
+      gap: var(--space-1);
+    }
+
+    .world__clock,
+    .world__level {
+      padding-left: var(--space-1);
+    }
+
+    .world__hud :global(:is(.world__sound, .world__exit)) {
+      margin-left: 0;
+    }
+
+    .world__hud :global(.window__body) {
+      padding-inline: var(--space-2);
+    }
+
+    .world__hud :global(.world__exit) {
+      padding-inline: var(--space-1);
+    }
   }
 
   .world__hint {
