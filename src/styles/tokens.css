@@ -38,15 +38,24 @@
   --color-blue-700: #2189E5;
   --color-blue-900: #0072D6;
 
-  /* Semantic aliases */
+  /* One token outside the brand palette: the close red from Vega's own game UI (vega.io's notepad.exe).
+     Its only job is the Register dialog's close square. */
+  --color-close: #C74842;
+
+  /* Semantic aliases: colour by role, nothing else.
+     Green 900: all text and lines, and selected things (filled). Grey 700: secondary text. Grey 500:
+     placeholders and resting field borders only. Yellow 400: the primary button. Yellow 600: form errors only.
+     Sky: art only. */
   --surface: var(--color-daisy-white);
   --surface-raised: var(--color-cloud-white);
   --surface-dark: var(--color-green-900);
   --surface-card: var(--color-cloud-white); /* window bodies and UI buttons (the guidelines' white) */
   /* Green 900 is the ink: all body text, all frame lines, all icons default to it. */
   --text: var(--color-green-900);
-  --text-muted: var(--color-green-900);
-  --text-subtle: var(--color-grey-500);
+  --text-secondary: var(--color-grey-700);
+  --text-placeholder: var(--color-grey-500);
+  --field-border: var(--color-grey-500);
+  --error: var(--color-yellow-600);
   --text-on-dark: var(--color-daisy-white);
   --text-on-dark-accent: var(--color-green-100);
   --wordmark: var(--color-green-900); /* the 16-Bit Con wordmark, in the page's ink */
@@ -54,12 +63,18 @@
   --outline: var(--color-green-900);
   --focus-ring: var(--color-yellow-400);
   --sky: var(--color-sky-blue);
+  /* The ticket: Green 900 paper, Daisy White ink (secondary at ~66 %), a Yellow 400 hairline frame at ~55 %. */
+  --ticket-paper: var(--color-green-900);
+  --ticket-ink: var(--color-daisy-white);
+  --ticket-ink-2: color-mix(in srgb, var(--color-daisy-white) 66%, var(--color-green-900));
+  --ticket-frame: color-mix(in srgb, var(--color-yellow-400) 55%, transparent);
 
   /* Grid: 4 px base for spacing and borders */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
@@ -69,6 +84,14 @@
      own room under its tagline plus --space-24), a quarter of the screen's height. svh, so a phone's toolbar
      showing or hiding never moves the page. */
   --section-gap: clamp(7rem, 25svh, 14rem);
+  /* Section headers: 16 px between eyebrow, title and subheading; 48 px from the header to its content. */
+  --head-gap: var(--space-4);
+  --head-to-content: var(--space-12);
+  /* Inside a page window, one rhythm: 8 px from a label (or window heading) to what it introduces, 20 px
+     between blocks, 24 px above the button row. */
+  --rhythm-label: var(--space-2);
+  --rhythm-block: var(--space-5);
+  --rhythm-actions: var(--space-6);
 
   /* Frame lines at vega.io's scale: 1 px Green 900, no radius, hard offset shadow. */
   --border: 1px solid var(--outline);
@@ -78,27 +101,43 @@
   --window-bar-pad: 6px 8px;
   --window-pad: 20px;                 /* body padding, as vega.io's cards */
   --window-pad-compact: 12px 16px;    /* body padding, one-square frame */
+  --window-pad-page: 24px;            /* body padding of the page's own windows: Register, its dialog, the 404 */
 
-  /* Type */
+  /* Type: one set of roles, nothing else. Two headline fonts, per Vega's guidelines, and each heading is
+     entirely one of them: Signifier (--font-display) is the con's own voice (section titles, h1/h2 by default);
+     PP Mondwest (--font-pixel), the same face pixelated, is anything the game says (the 404's title, headings
+     in game windows, the pass name on the ticket). Geist for reading, Geist Mono for UI. No ALL CAPS anywhere.
+     Each role is a `font` shorthand; the .t-* classes in global.css apply them. */
   --font-display: 'Signifier', 'Iowan Old Style', Georgia, serif;
-  --font-pixel: 'PP Mondwest', 'Signifier', Georgia, serif; /* 8-bit spice, mixed in */
+  --font-pixel: 'PP Mondwest', 'Signifier', Georgia, serif;
   --font-body: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Section title (h2): 48/52 at 1440 px down to 36/40 at 390 px, on one line of 1em + 4 px */
+  --title-size: clamp(36px, 31.5px + 1.143vw, 48px);
+  /* Page title (the 404's h1): 72 px at 1440 px down to 44 px at 390 px */
+  --page-title-size: clamp(44px, 33.6px + 2.667vw, 72px);
+  --type-title: 400 var(--title-size) / calc(var(--title-size) + 4px) var(--font-display);
+  --type-page-title: 400 var(--page-title-size) / calc(var(--page-title-size) + 4px) var(--font-display);
+  --type-window-heading: 400 28px / 32px var(--font-pixel); /* a heading in a game window (the success "GG") */
+  --type-eyebrow: 400 14px / 20px var(--font-mono);
+  --type-lead: 400 20px / 30px var(--font-body);
+  --type-sub: 400 18px / 28px var(--font-body);
+  --type-ui: 400 13px / 20px var(--font-mono);
+  --type-body: 400 16px / 24px var(--font-body);
+  --type-small: 400 14px / 20px var(--font-body);
+  --sub-max: 34rem;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.25rem;
   --text-xl: 1.5rem;
   --text-2xl: 2rem;
-  --text-3xl: 2.75rem;
-  --text-display: clamp(3.5rem, 13vw, 9.5rem);
   --leading-tight: 1.05;
   --leading-snug: 1.3;
   --leading-normal: 1.5;
-  --tracking-mono: 0.04em;
   /* UI type at vega.io's scale (measured on vega.io/careers at 1440 px) */
-  --text-ui: 13px;          /* Geist Mono: window titles, buttons, ticket and rail labels */
-  --leading-ui: 20px;       /* its line, and the line of 14 px body copy in cards */
+  --text-ui: 13px;          /* Geist Mono: window titles, buttons, labels */
+  --leading-ui: 20px;       /* its line, and the line of 14 px small copy */
   --leading-title: 25px;    /* 20 px card headings */
 
   /* Layout */
@@ -111,8 +150,12 @@
   --px: 2;
 
   /* Motion: one base duration, and steps() where things should feel 16-bit */
-  --dur-base: 200ms;
+  /* One rule: things that appear step (a step every --beat), things you push glide (--ease-lift). */
+  --beat: 50ms;
+  --dur-base: 200ms;                /* 4 beats */
   --steps-16bit: steps(4, end);
+  --steps-2: steps(2, end);         /* 100 ms: an error dropping in, a failed submit's bump */
+  --steps-3: steps(3, end);         /* 150 ms: the dialog closing */
 
   /* The Schedule's drawer of folders: Vega's folder frame in the site's frame line (1 px Green 900), and
      the stepped motion it uses as a folder rises or settles. */
@@ -128,9 +171,21 @@
 
   /* Controls at vega.io's scale: one button size, and the lift every button, ticket and rail stop
      makes on hover and keyboard focus (onto a hard shadow the same size as the lift). */
-  --control-h: 32px;
+  --control-h: 32px;          /* HUD and compact buttons */
+  --control-h-page: 40px;     /* form fields and the page's own buttons */
+  --control-gap: 12px;
   --control-pad: 6px 12px;
   --lift: 3px;
   --dur-lift: 150ms;
   --ease-lift: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Phones: the reading roles a step down, and tighter page windows and headers. */
+@media (max-width: 40rem) {
+  :root {
+    --type-lead: 400 18px / 28px var(--font-body);
+    --type-sub: 400 16px / 24px var(--font-body);
+    --head-to-content: var(--space-8);
+    --window-pad-page: 16px;
+  }
 }

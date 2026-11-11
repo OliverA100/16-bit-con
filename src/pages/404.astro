@@ -15,12 +15,12 @@ import Button from '../components/Button.astro';
       <canvas class="lost__canvas" data-lost-canvas></canvas>
     </div>
     <div class="lost__text container" data-lost-text>
-      <p class="eyebrow lost__eyebrow">Error 404 · Level not found</p>
+      <p class="t-eyebrow lost__eyebrow">Error 404 · Level not found</p>
       <h1 class="lost__title" id="lost-title">This level doesn’t exist.</h1>
-      <p class="lost__line">The page you’re looking for isn’t on the map. Sam checked.</p>
+      <p class="t-lead lost__line">The page you’re looking for isn’t on the map. Sam checked.</p>
       <div class="lost__actions" data-lost-actions>
-        <Button href="/">Back to the start</Button>
-        <Button href="/#schedule" variant="ghost">See the schedule</Button>
+        <Button href="/" size="page">Back to the start</Button>
+        <Button href="/#schedule" variant="ghost" size="page">See the schedule</Button>
       </div>
     </div>
   </section>
@@ -78,24 +78,21 @@ import Button from '../components/Button.astro';
     text-align: center;
   }
 
+  /* The header roles: eyebrow, page title and lead, --head-gap apart; the buttons --head-to-content below. */
   .lost__eyebrow {
-    font-size: var(--text-sm);
-    letter-spacing: 0.2em;
     color: inherit;
   }
 
+  /* The page title role, in Mondwest: the game is the one saying it */
   .lost__title {
-    margin-top: var(--space-3);
+    margin-top: var(--head-gap);
+    font: var(--type-page-title);
     font-family: var(--font-pixel);
-    font-size: clamp(2.75rem, 6vw, 6rem);
-    line-height: 1;
-    letter-spacing: 0;
     color: inherit;
   }
 
   .lost__line {
-    margin-top: var(--space-8);
-    font-size: var(--text-lg);
+    margin-top: var(--head-gap);
     color: inherit;
   }
 
@@ -103,7 +100,7 @@ import Button from '../components/Button.astro';
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: var(--space-4);
-    margin-top: var(--space-8);
+    gap: var(--control-gap);
+    margin-top: var(--head-to-content);
   }
 </style>

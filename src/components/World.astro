@@ -94,15 +94,15 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   <!-- Live-only overlays -->
   <Window title="Level 1 · 10:00 AM" class="world__session" data-session="1" aria-live="polite">
     <p class="world__session-title">{level1.title}</p>
-    <p class="eyebrow">{level1.place}</p>
+    <p class="t-ui">{level1.place}</p>
   </Window>
   <Window title="Level 2 · 2:00 PM" class="world__session" data-session="2" aria-live="polite">
     <p class="world__session-title">{level2.title}</p>
-    <p class="eyebrow">{level2.place}</p>
+    <p class="t-ui">{level2.place}</p>
   </Window>
   <Window title="Level 3 · 6:00 PM" class="world__session" data-session="3" aria-live="polite">
     <p class="world__session-title">{level3.title}</p>
-    <p class="eyebrow">{level3.place}</p>
+    <p class="t-ui">{level3.place}</p>
   </Window>
 
   <Window size="compact" title="Player 1" class="world__hud" aria-label="Coins, time and level">
@@ -110,7 +110,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       <span class="world__coin pixel" aria-hidden="true"></span>
       <span class="mono" data-hud-coins>00/12</span>
       <span class="mono world__clock" data-hud-clock>07:00 AM</span>
-      <span class="mono world__level" data-hud-level>LVL 1</span>
+      <span class="mono world__level" data-hud-level>Level 1</span>
       <Button variant="ghost" class="world__sound" data-sound aria-label="Sound" aria-pressed="true">
         <svg class="world__sound-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
           <path d="M2 6h3l4-3v10l-4-3H2z" />
@@ -145,7 +145,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     </div>
   </Window>
 
-  <p class="eyebrow world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
+  <p class="t-ui world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
 
   <Window size="compact" title="Help Sam · 0/7" class="world__prompt" aria-live="polite">
     <!-- Click or tap the monitor to hit its glass (Space hits it too: said to screen readers). -->
@@ -272,20 +272,25 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .hero__eyebrow,
   .hero__tagline {
-    color: var(--text-muted);
+    color: var(--text);
   }
 
+  /* On a phone the facts line runs to two lines: balanced, so the break falls after the dates */
+  .hero__eyebrow {
+    text-wrap: balance;
+  }
+
+  /* the lead role: 20/30, 18/28 on phones (tokens.css) */
   .hero__tagline {
     position: relative;
     z-index: 2;
     max-width: 34rem;
-    font-size: var(--text-lg);
+    font: var(--type-lead);
   }
 
   @media (max-width: 40rem) {
     .hero__tagline {
       max-width: 20rem;
-      font-size: var(--text-base);
     }
   }
 
@@ -602,7 +607,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   .rail__stop[data-state='next'] {
-    color: var(--text-subtle);
+    color: var(--text-secondary);
   }
 
   .world__level {
@@ -708,9 +713,9 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     text-align: left;
   }
 
+  /* The session's name in its window: a heading the game says, so Mondwest (the window-heading role) */
   .world__session-title {
-    font-weight: 600;
-    line-height: var(--leading-snug);
+    font: var(--type-window-heading);
   }
 
   .world__hud {

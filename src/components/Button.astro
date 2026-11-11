@@ -4,23 +4,26 @@
  * keyboard focus) as a link or a button.
  *   primary — Florets Yellow, no edge (the call to action)
  *   ghost   — Cloud White with the 1 px inset ring
+ * `size="page"`: 40 px tall, for the page's own buttons; 32 px (the default) in the HUD and compact windows.
  * Renders an <a> when `href` is given, otherwise a <button>.
  */
 interface Props {
   href?: string;
   type?: 'button' | 'submit' | 'reset';
   variant?: 'primary' | 'ghost';
+  /** `page`: 40 px, the page's own buttons (Register, the 404); the default 32 px is for the HUD and compact windows. */
+  size?: 'compact' | 'page';
   class?: string;
   [key: string]: unknown;
 }
 
-const { href, type = 'button', variant = 'primary', class: className, ...rest } = Astro.props;
+const { href, type = 'button', variant = 'primary', size = 'compact', class: className, ...rest } = Astro.props;
 
 const Element = href ? 'a' : 'button';
 ---
 
 <Element
-  class:list={['btn', 'ui-button', `btn--${variant}`, className]}
+  class:list={['btn', 'ui-button', `btn--${variant}`, { 'btn--page': size === 'page' }, className]}
   href={href}
   type={href ? undefined : type}
   {...rest}
@@ -36,6 +39,11 @@ const Element = href ? 'a' : 'button';
     gap: var(--space-2);
     text-decoration: none;
     white-space: nowrap;
+  }
+
+  .btn--page {
+    min-height: var(--control-h-page);
+    padding-inline: var(--space-4);
   }
 
   .btn--primary {

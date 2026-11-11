@@ -95,13 +95,13 @@ const {
         <div class="site-footer__text container">
           <!-- The host: Vega's own logo, wordmark and daisy together, as Vega draws it. -->
           <p class="site-footer__host">
-            <span class="eyebrow">Hosted by</span>
+            <span class="t-ui">Hosted by</span>
             <a href="https://vega.io" class="site-footer__vega">
               <img src="/sprites/ui/vega-logo.svg" alt="Vega" width="487" height="158" loading="lazy" decoding="async" />
             </a>
           </p>
-          <p class="eyebrow">
-            16-Bit Con · Oct 3–5, 2026 · Javits Center, New York · Find Vega at Booth 630 ·{' '}
+          <p class="t-ui site-footer__info">
+            16-Bit Con · Oct 3–5, 2026 · Javits Center, New York · Booth 630 ·{' '}
             <a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a>
           </p>
         </div>
@@ -191,6 +191,16 @@ const {
     align-items: center;
     gap: var(--space-3);
     margin: 0;
+  }
+
+  /* The info line in Grey 700, its link in the ink, underlined. */
+  .site-footer__info {
+    color: var(--text-secondary);
+  }
+
+  .site-footer__info a {
+    color: var(--text);
+    text-decoration: underline;
   }
 
   /* About as tall as vega.io's own nav logo; width from the file's aspect. */

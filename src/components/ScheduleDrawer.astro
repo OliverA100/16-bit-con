@@ -21,7 +21,7 @@ const panels = days.map(({ day, sessions }) => {
   const openIndex = sessions.findIndex((s) => s.id === OPEN);
   return {
     id,
-    label: day.toUpperCase(),
+    label: day,
     long: day.replace('Oct', 'October'),
     selected: openIndex >= 0,
     openIndex,
@@ -386,10 +386,6 @@ const plate = 'Files · Oct 3–5';
     padding-inline: calc(var(--slant) + var(--day-room));
   }
 
-  .daytab .tab__label {
-    letter-spacing: var(--tracking-mono);
-  }
-
   .daytab[aria-selected='true'] {
     height: calc(var(--tab-h) + var(--line-w));
   }
@@ -484,10 +480,6 @@ const plate = 'Files · Oct 3–5';
     line-height: var(--leading-ui);
   }
 
-  .folder__place {
-    text-transform: uppercase;
-  }
-
   .folder__title {
     font-family: var(--font-body);
     font-weight: 700;
@@ -568,8 +560,6 @@ const plate = 'Files · Oct 3–5';
     color: var(--text);
     font-size: var(--text-ui);
     line-height: var(--leading-ui);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     white-space: nowrap;
   }
 

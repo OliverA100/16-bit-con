@@ -4,6 +4,7 @@ import Window from '../components/Window.astro';
 import World from '../components/World.astro';
 import ScheduleDrawer from '../components/ScheduleDrawer.astro';
 import RegisterForm from '../components/RegisterForm.astro';
+import SectionHeader from '../components/SectionHeader.astro';
 ---
 
 <Base>
@@ -14,7 +15,11 @@ import RegisterForm from '../components/RegisterForm.astro';
     section follows the hero as on any page; the game scrolls down to it with him as he falls.
   -->
   <section class="section container landing" aria-labelledby="landing-title">
-    <h2 class="sr-only" id="landing-title">Register for 16-Bit Con</h2>
+    <SectionHeader
+      id="landing-title"
+      title="Grab your pass"
+      sub="Free to attend, but spots are limited. Pick a day or all three at the Javits Center, October 3–5, then come find us at Booth 630."
+    />
     <div class="landing__window">
       <div class="landing__perch" data-landing>
         <canvas class="landing__sam pixel" width="60" height="60" aria-hidden="true" data-landing-sam></canvas>
@@ -35,8 +40,7 @@ import RegisterForm from '../components/RegisterForm.astro';
   <dialog class="register-dialog" aria-labelledby="register-title" data-register-dialog></dialog>
 
   <section class="section container" id="schedule" aria-labelledby="schedule-title">
-    <h2 id="schedule-title">Schedule</h2>
-    <p class="section__lede">Nine sessions. Three days. Zero save states.</p>
+    <SectionHeader id="schedule-title" title="Schedule" sub="Nine sessions. Three days. Zero save states." />
     <ScheduleDrawer />
   </section>
 </Base>
@@ -45,21 +49,17 @@ import RegisterForm from '../components/RegisterForm.astro';
 <style>
   /* ── Sections ── */
   /* One rhythm between sections (--section-gap); the last keeps room under it so that, with the footer's
-     own --space-12, the page ends on the same gap. Inside a section the closer --space-6 groups its parts. */
+     own --space-12, the page ends on the same gap. Inside a section, its header (SectionHeader) stands
+     --head-to-content above what it introduces. */
   .section {
     display: grid;
-    gap: var(--space-6);
+    gap: var(--head-to-content);
     justify-items: center;
     padding-top: var(--section-gap);
   }
 
   .section:last-of-type {
     padding-bottom: calc(var(--section-gap) - var(--space-12));
-  }
-
-  .section__lede {
-    color: var(--text-muted);
-    text-align: center;
   }
 
   /* ── The landing: the Register window with Sam on its title bar (--sam-px: CSS px per art px, whole
@@ -70,6 +70,10 @@ import RegisterForm from '../components/RegisterForm.astro';
     position: relative;
     z-index: 2;
     padding-top: var(--space-24);
+    /* From the subheading to the window: room for Agent Sam's bubble over Sam, at its tallest line (three
+       lines of 21 px, its 33 px bar, 12 px padding above and below and its 1 px frame: 122 px) standing
+       24 art px up, and 24 px clear of the subheading; never less than the headers' own gap. */
+    gap: max(var(--head-to-content), calc(24 * var(--sam-px, 1.5px) + 122px + var(--space-6)));
   }
 
   .landing__window {

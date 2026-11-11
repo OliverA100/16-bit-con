@@ -25,10 +25,10 @@ export const railStops: RailStop[] = [
 
 /** The level shown in the HUD on phones, where the rail is hidden. */
 export function levelLabel(t: number): string {
-  if (t < 0.34) return 'LVL 1';
-  if (t < 0.62) return 'LVL 2';
-  if (t < 0.84) return 'LVL 3';
-  return 'LVL 4';
+  if (t < 0.34) return 'Level 1';
+  if (t < 0.62) return 'Level 2';
+  if (t < 0.84) return 'Level 3';
+  return 'Level 4';
 }
 
 export interface SamLine {

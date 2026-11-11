@@ -66,25 +66,21 @@ a {
 h1,
 h2,
 h3 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  line-height: var(--leading-tight);
   color: var(--text);
   text-align: center;
   text-wrap: balance;
 }
 
 h1 {
-  font-size: var(--text-display);
-  letter-spacing: -0.01em;
+  font: var(--type-page-title);
 }
 
 h2 {
-  font-size: var(--text-3xl);
+  font: var(--type-title);
 }
 
 h3 {
-  font-size: var(--text-xl);
+  font: var(--type-window-heading);
 }
 
 p {
@@ -135,8 +131,6 @@ p {
   font-size: var(--text-ui);
   font-weight: 400;
   line-height: var(--leading-ui);
-  letter-spacing: normal;
-  text-transform: none;
   cursor: pointer;
   user-select: none;
   transition:
@@ -189,18 +183,51 @@ p {
   outline-offset: 2px;
 }
 
-/* Utilities */
-.mono,
+/* Type roles (tokens.css): one class per role. Sentence case everywhere; no tracking. */
+.t-title {
+  font: var(--type-title);
+}
+
+.t-page-title {
+  font: var(--type-page-title);
+}
+
+.t-window-heading {
+  font: var(--type-window-heading);
+}
+
+.t-eyebrow,
 .eyebrow {
-  font-family: var(--font-mono);
-  letter-spacing: var(--tracking-mono);
+  font: var(--type-eyebrow);
   font-variant-numeric: tabular-nums;
 }
 
-.eyebrow {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  color: var(--text-muted);
+.t-lead {
+  font: var(--type-lead);
+}
+
+.t-sub {
+  font: var(--type-sub);
+  color: var(--text-secondary);
+}
+
+.t-ui {
+  font: var(--type-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.t-body {
+  font: var(--type-body);
+}
+
+.t-small {
+  font: var(--type-small);
+}
+
+/* Utilities */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .pixel {
@@ -240,7 +267,7 @@ p {
   padding-top: calc(var(--nav-h) + var(--space-8));
 }
 
-/* Form controls: Daisy White fields, 1 px Green 900 border, no radius, 4 px grid */
+/* Form controls: Cloud White fields, 1 px frame, no radius, 4 px grid */
 .field {
   display: grid;
   gap: var(--space-1);
@@ -249,11 +276,8 @@ p {
 
 .field > label,
 .field > legend {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-mono);
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font: var(--type-ui);
+  color: var(--text);
 }
 
 .field input[type='text'],
@@ -266,9 +290,6 @@ p {
   border-radius: 0;
 }
 
-/* Focus, GitHub-style: the field's own 1 px border thickens to 2 px Green 900 (an inset 1 px on top),
-   with no outer ring and no yellow. A text field always counts as keyboard focus, so the page-wide
-   ring above is too loud here. No hover change, so a 2 px border only ever means "typing here". */
 .field input[type='text']:focus-visible,
 .field input[type='email']:focus-visible {
   outline: none;
@@ -283,9 +304,7 @@ p {
 
 .field__error {
   min-height: 1.25em;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-mono);
+  font: var(--type-ui);
   color: var(--text);
 }
 
@@ -302,9 +321,7 @@ p {
   background: var(--accent);
   border: var(--border);
   box-shadow: var(--shadow-hard-sm);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  text-transform: uppercase;
+  font: var(--type-ui);
   text-decoration: none;
   transform: translateY(calc(-100% - var(--space-4)));
 }
