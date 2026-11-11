@@ -163,6 +163,8 @@ const plate = 'Files · Oct 3–5';
     --dur-fade: 250ms; /* the open folder's text, in as it rises, out as it sinks */
 
     position: relative;
+    /* over the page's beanstalk (z 1, src/game/stalk.ts): its leaves may reach behind the drawer */
+    z-index: 2;
     display: flex;
     flex-direction: column;
     width: min(100%, 64rem);
@@ -402,28 +404,33 @@ const plate = 'Files · Oct 3–5';
     background: var(--folder-ink);
   }
 
-  /* An unselected day tab lifts as the site's buttons do: up and left by --lift onto a hard Green 900
-     shadow (a drop-shadow, so it follows the tab's slants; the tab is a clip-path shape). The selected
-     tab stays put, as a selected button does. Its hit area reaches back over the gap it leaves. */
+  /* An unselected day tab lifts onto a hard Green 900 shadow with the weight of a button's (3 px of ink: a
+     drop-shadow, so it follows the tab's slants; the tab is a clip-path shape). Under its foot the shadow
+     joins the card's 1 px line, so it drops 2 px; on the right slant (22 across, 37 down) an offset (x, y)
+     shows (37x − 22y) / 43 thick, so x = 4 gives ~2.4 px beside the slant's 1 px line. The selected tab stays
+     put, as a selected button does. Its hit area reaches back over the gap it leaves. */
   .daytab {
+    --tab-lift-x: 4px;
+    --tab-lift-y: 2px;
+
     transition:
       translate var(--dur-lift) var(--ease-lift),
       filter var(--dur-lift) var(--ease-lift);
   }
 
   .daytab[aria-selected='false']:focus-visible {
-    translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
-    filter: drop-shadow(var(--lift) var(--lift) 0 var(--folder-ink));
+    translate: calc(-1 * var(--tab-lift-x)) calc(-1 * var(--tab-lift-y));
+    filter: drop-shadow(var(--tab-lift-x) var(--tab-lift-y) 0 var(--folder-ink));
   }
 
   @media (hover: hover) {
     .daytab[aria-selected='false']:hover {
-      translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
-      filter: drop-shadow(var(--lift) var(--lift) 0 var(--folder-ink));
+      translate: calc(-1 * var(--tab-lift-x)) calc(-1 * var(--tab-lift-y));
+      filter: drop-shadow(var(--tab-lift-x) var(--tab-lift-y) 0 var(--folder-ink));
     }
 
     .daytab[aria-selected='false']:hover::after {
-      inset: 0 calc(-1 * var(--lift)) calc(-6px - var(--lift)) 0;
+      inset: 0 calc(-1 * var(--tab-lift-x)) calc(-6px - var(--tab-lift-y)) 0;
     }
   }
 
