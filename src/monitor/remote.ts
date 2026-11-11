@@ -51,7 +51,7 @@ export const REMOTE = {
   /**
    * Where it lies (x, z), its turn (radians about y; its top edge toward the monitor) and its scale.
    * Searched at 320, 390, 768, 1024 and 1440 px wide for the largest controller whose box, through the
-   * parallax turn (the touch sway on phones), stays inside the page and clear of the tagline below,
+   * parallax turn, stays inside the page and clear of the tagline below,
    * its footprint clear of the monitor's.
    */
   at: [0.5, 0.2] as const,

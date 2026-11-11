@@ -66,7 +66,7 @@ export const AUTO_HIT_MS = 380;
 export const ENTER = {
   /** The eyebrow, the wordmark, the tagline and PRESS START go. */
   copyOut: [0, 0.12],
-  /** The parallax turn and the touch sway settle to nothing. */
+  /** The parallax turn settles to nothing. */
   parallaxOut: [0, 0.3],
   /** The camera, from rest to the native pose along the reference's dive (DIVE; it lands at the end and holds). */
   camera: [0, 0.55],

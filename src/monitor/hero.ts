@@ -45,8 +45,6 @@ export const POWER = { grow: 170, brighten: 40, open: 170, ready: 70, faint: 0.4
  * tab switch) from jolting it.
  */
 const PARALLAX = { yaw: 8, pitch: 4, lead: 0.06, tau: 0.24, maxDt: 1 / 30 } as const;
-/** Touch screens: a slow idle sway instead, degrees and seconds per cycle. */
-const SWAY = { yaw: 2, pitch: 1, yawPeriod: 7, pitchPeriod: 9.5 } as const;
 /** Hovering PRESS START brightens the screen 10 %. */
 const HOVER = { bright: 1.1, tau: 0.06 } as const;
 /** The power-on's whole length, ms. */
@@ -102,8 +100,6 @@ export interface Hero {
   frameChanged(resized: boolean): void;
   /** Where the pointer is, −1…1 from the slot's centre across the viewport; null when it left. */
   pointer(nx: number | null, ny?: number): void;
-  /** Touch screens sway instead of following a pointer. */
-  sway(on: boolean): void;
   hover(on: boolean): void;
   /** Power the tube on, or switch it off (it squashes into a line that shrinks to a point). */
   powerOn(now: number): void;
@@ -219,7 +215,6 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   const qYaw = new Quaternion();
   const qPitch = new Quaternion();
   const Y = new Vector3(0, 1, 0);
-  let swaying = false;
   /** The turn the shadow was last drawn for: it is redrawn only when the monitor has turned since. */
   const shadowTurn = new Quaternion(0, 0, 0, 0);
   let target = { yaw: 0, pitch: 0 };
@@ -365,9 +360,6 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       // with reduced motion the monitor does not follow the pointer at all
       target = nx === null || still.matches ? { yaw: 0, pitch: 0 } : { yaw: PARALLAX.yaw * nx, pitch: PARALLAX.pitch * ny };
     },
-    sway(on) {
-      swaying = on;
-    },
     hover(on) {
       hoverTarget = on ? HOVER.bright : 1;
     },
@@ -399,13 +391,10 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, (now - last) / 1000));
       last = now;
 
-      // ── The turn: chasing the pointer on a critically damped spring (or, on touch screens, the idle sway as
-      //    it is) — and once the dive starts, easing to the dive's starting pose (square), never snapping ──
-      if (swaying && !still.matches) {
-        const s = now / 1000;
-        turn = { yaw: SWAY.yaw * Math.sin((2 * Math.PI * s) / SWAY.yawPeriod), pitch: SWAY.pitch * Math.sin((2 * Math.PI * s) / SWAY.pitchPeriod) };
-        aim = { ...turn };
-      } else {
+      // ── The turn: chasing the pointer on a critically damped spring — and once the dive starts, easing to
+      //    the dive's starting pose (square), never snapping. Only a mouse turns it: on a touch screen the
+      //    monitor holds still. ──
+      {
         const to = p > 0 || still.matches ? { yaw: 0, pitch: 0 } : target;
         const sdt = Math.min(PARALLAX.maxDt, dt);
         const k1 = 1 - Math.exp(-sdt / PARALLAX.lead);

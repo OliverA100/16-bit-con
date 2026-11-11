@@ -423,9 +423,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     height: 100%;
   }
 
+  /* The live world's height is held by the page (--world-h, src/game/index.ts viewH): a phone's toolbar
+     showing or hiding mid-scroll never resizes it, so the 3D under PRESS START never stretches. */
   .world--live {
     height: 100vh;
-    height: 100dvh;
+    height: var(--world-h, 100dvh);
     min-height: 0;
   }
 
@@ -492,9 +494,9 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   /* ── Touch surfaces: the canvas and the controls are game input — never text
-        to select, never the start of a scroll, zoom or long-press menu. Overlay windows allow
-        panning; the session copy stays selectable; the Arrival section below the pin is a
-        normal page. ── */
+        to select or a long-press menu. The controls never start a scroll or a zoom; the canvas
+        scrolls vertically (that is how a phone plays). Overlay windows allow panning; the
+        session copy stays selectable; the Arrival section below the pin is a normal page. ── */
   .world__canvas,
   .world__touch,
   .world__hud,
@@ -513,10 +515,14 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     -webkit-user-select: text;
   }
 
-  .world--live .world__canvas,
   .world__dpad-arm,
   .world__a {
     touch-action: none;
+  }
+
+  /* A vertical swipe on the world scrolls the page (the scroll runs the game); a tap hops (src/game/input.ts). */
+  .world--live .world__canvas {
+    touch-action: pan-y;
   }
 
   .world__session,

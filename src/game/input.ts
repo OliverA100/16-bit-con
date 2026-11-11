@@ -1,10 +1,15 @@
 /**
  * Inputs: arrow keys / WASD, the on-screen d-pad, and the jump button (Space / ↑ / W, the A
- * button, a touch on the world). Jump reports press and hold separately so its height can follow
+ * button, a tap on the world). Jump reports press and hold separately so its height can follow
  * the hold. Touch controls are real buttons driven by pointer events with preventDefault, so a
- * hold never starts a scroll, a selection or the long-press menu. The world only listens while
- * it is on screen and never steals keys from form controls.
+ * hold never starts a scroll, a selection or the long-press menu. The world itself is not one: a
+ * swipe on it scrolls the page (which runs the game), and only a tap — a touch that neither moved
+ * nor lingered — hops. The world only listens while it is on screen and never steals keys from
+ * form controls.
  */
+
+/** A touch on the world is a tap (a hop) when it ends within this many CSS px and ms of where it began. */
+const TAP = { slop: 10, ms: 300 } as const;
 export class Input {
   private keys = new Set<string>();
   private jumpKeys = new Set<string>();
@@ -21,8 +26,8 @@ export class Input {
     window.addEventListener('keydown', this.onKey, { passive: false });
     window.addEventListener('keyup', this.onKey);
     window.addEventListener('blur', () => this.reset());
-    // A finger or pen on the world jumps (tap = hop, hold = full); the mouse is left to scroll.
-    this.bindJumpSurface(canvas, (e) => e.pointerType !== 'mouse');
+    // A finger or pen tapping the world hops; a swipe scrolls. The mouse is left to scroll.
+    this.bindTapSurface(canvas);
   }
 
   /** −1, 0 or 1. Keyboard wins over the d-pad when both are held. */
@@ -86,10 +91,30 @@ export class Input {
     this.bindJumpSurface(a);
   }
 
-  private bindJumpSurface(el: HTMLElement, accept: (e: PointerEvent) => boolean = () => true): void {
+  /**
+   * A tap on `el` queues a hop (no hold, so the shortest jump). Nothing on the way down is prevented:
+   * the browser decides whether the touch is a scroll (it cancels the pointer then), so a swipe never jumps.
+   */
+  private bindTapSurface(el: HTMLElement): void {
+    let down: { id: number; x: number; y: number; t: number } | null = null;
+    el.addEventListener('pointerdown', (e) => {
+      down = this.enabled && e.pointerType !== 'mouse' ? { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp } : null;
+    });
+    el.addEventListener('pointerup', (e) => {
+      const d = down;
+      down = null;
+      if (!d || d.id !== e.pointerId || !this.enabled) return;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP.slop || e.timeStamp - d.t > TAP.ms) return;
+      this.pressQueued = true;
+    });
+    el.addEventListener('pointercancel', () => (down = null));
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  private bindJumpSurface(el: HTMLElement): void {
     let held = false;
     const down = (e: PointerEvent) => {
-      if (!this.enabled || !accept(e)) return;
+      if (!this.enabled) return;
       e.preventDefault();
       capture(el, e.pointerId);
       if (held) return;

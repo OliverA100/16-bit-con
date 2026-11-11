@@ -293,7 +293,18 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // The layout width (without a classic scrollbar), so the canvas world's buffer maps 1:1 onto device
   // pixels under its CSS box — and onto the 3D's buffer at the handover.
   const viewW = () => document.documentElement.clientWidth || window.innerWidth;
-  let vp = worldBuffer(viewW(), window.innerHeight);
+  /**
+   * The section's height, CSS px: the viewport's at load, and again on a resize — except a height-only
+   * one on a touch screen (the address bar showing or hiding mid-scroll, a keyboard opening). With 100dvh
+   * the hero grew and shrank with the toolbar as the page scrolled, stretching the 3D canvas under
+   * PRESS START (placed in px) until the resize event came, so START drifted off the screen. Held, the
+   * hero, the canvas world and the 3D keep one size, and nothing moves under the user's thumb.
+   */
+  const isTouch = () => navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+  let heldH = window.innerHeight;
+  const viewH = () => heldH;
+  section.style.setProperty('--world-h', `${heldH}px`);
+  let vp = worldBuffer(viewW(), viewH());
   let F = vp.bh - GROUND_BAND;
   let sx = Math.round(0.3 * vp.bw);
   let viewport: Rect = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
@@ -301,7 +312,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const screen = new ScreenFrame();
 
   const fit = () => {
-    vp = worldBuffer(viewW(), window.innerHeight);
+    vp = worldBuffer(viewW(), viewH());
     F = vp.bh - GROUND_BAND;
     sx = Math.round(0.3 * vp.bw);
     viewport = { x0: 0, y0: 0, x1: vp.bw, y1: vp.bh };
@@ -329,11 +340,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // Dev only: ?hero=poster holds the poster (the swap check), ?hero=static is the no-3D opening.
   const devHero = import.meta.env.DEV ? new URLSearchParams(location.search).get('hero') : null;
   let wantBreakout = !!o.hero && 'WebGL2RenderingContext' in window && devHero !== 'static' && devHero !== 'poster';
-  let { DE, DW, DB, D } = scrollLengths(window.innerHeight, wantBreakout);
+  let { DE, DW, DB, D } = scrollLengths(viewH(), wantBreakout);
   const timeline = new Timeline(W, T_MAX + DB / DW, -DE / DW);
   /** The lengths for this viewport, and the timeline's ends with them. */
   const syncLengths = () => {
-    ({ DE, DW, DB, D } = scrollLengths(window.innerHeight, wantBreakout));
+    ({ DE, DW, DB, D } = scrollLengths(viewH(), wantBreakout));
     timeline.tMin = -DE / DW;
     timeline.tMax = T_MAX + DB / DW;
     setLandingVars();
@@ -480,15 +491,16 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     () => {
       const w = viewW();
       // A height-only resize on a touch screen (the keyboard opening on the Register form, the address
-      // bar) keeps the pin, its lengths and the landing's place: re-measuring them would move the page
-      // under the user's thumb. The canvas still fits the new height.
-      const touch = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
-      const heightOnly = w === lastViewW && touch;
+      // bar) changes nothing: the section, the pin, its lengths and the landing's place keep the held
+      // height (viewH) — re-measuring them would move the page under the user's thumb.
+      const heightOnly = w === lastViewW && isTouch();
       lastViewW = w;
+      if (heightOnly) return;
+      heldH = window.innerHeight;
+      section.style.setProperty('--world-h', `${heldH}px`);
       fit();
-      if (trigger) {
-        if (!heightOnly) ScrollTrigger.refresh();
-      } else if (!heightOnly) {
+      if (trigger) ScrollTrigger.refresh();
+      else {
         // no pin: the lengths only place the landing (after it) and the timeline's resting end
         syncLengths();
         timeline.jumpTo(mode === 'done' ? timeline.tMax : saved ? tlOf(saved) : timeline.tMin);
@@ -653,7 +665,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
             if (heroMode === 'static') return h.dispose();
             hero3d = h;
             layoutHero();
-            h.sway(!window.matchMedia('(hover: hover) and (pointer: fine)').matches);
             heroMode = '3d'; // the loop draws the screen and the first frame, then swaps it in for the poster
           })
           .catch((err: unknown) => {
