@@ -49,6 +49,7 @@
   --text-subtle: var(--color-grey-500);
   --text-on-dark: var(--color-daisy-white);
   --text-on-dark-accent: var(--color-green-100);
+  --wordmark: var(--color-green-900); /* the 16-Bit Con wordmark, in the page's ink */
   --accent: var(--color-yellow-400);
   --outline: var(--color-green-900);
   --focus-ring: var(--color-yellow-400);

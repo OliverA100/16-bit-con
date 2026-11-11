@@ -62,7 +62,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   </div>
   <script is:inline>
     // The poster, painted into its canvas as soon as it decodes (canvas pixels are never an LCP
-    // candidate, so the wordmark stays the LCP element). Screen off while the 3D loads; screen on
+    // candidate, so the LCP element stays the opening's text). Screen off while the 3D loads; screen on
     // wherever there will be no 3D. Mirrors shouldRunWorld() in src/game/index.ts, plus WebGL 2.
     // The <script> below this section removes .has-game again if the world does not run after all.
     (function () {
@@ -233,9 +233,10 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   /* The wordmark fills a phone's width and fits the height too, so the copy and the monitor share
-     a short screen — and it stays the largest text, the LCP element, at every size. */
+     a short screen. Its letters are as tall as the Geist caps it replaced (clamp(3rem, min(15.5vw,
+     13vh), 8rem) at 0.726 em), and it is never wider than the copy column (.wm's max-width). */
   .hero__copy :global(.wm--hero) {
-    font-size: clamp(3rem, min(15.5vw, 13vh), 8rem);
+    --wm-w: clamp(16.5rem, min(85vw, 71vh), 44rem);
   }
 
   .hero__eyebrow,

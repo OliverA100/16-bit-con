@@ -189,10 +189,11 @@ function whenIdleAfterLoad(cb: () => void): void {
 }
 
 /**
- * Once the wordmark has painted: its largest-contentful-paint entry where the browser reports one,
- * else the fonts in and two frames painted with them — and never later than 1.5 s.
+ * Once the opening has painted: a largest-contentful-paint entry for an element in it where the
+ * browser reports one (its text: the wordmark is inline SVG paths, which are never an LCP
+ * candidate), else the fonts in and two frames painted with them — and never later than 1.5 s.
  */
-function afterOpeningPaint(h1: Element | null): Promise<void> {
+function afterOpeningPaint(opening: Element | null): Promise<void> {
   return new Promise((resolve) => {
     let done = false;
     const finish = () => {
@@ -201,9 +202,13 @@ function afterOpeningPaint(h1: Element | null): Promise<void> {
       resolve();
     };
     window.setTimeout(finish, 1500);
-    if (h1 && PerformanceObserver.supportedEntryTypes?.includes('largest-contentful-paint')) {
+    if (opening && PerformanceObserver.supportedEntryTypes?.includes('largest-contentful-paint')) {
       const po = new PerformanceObserver((list) => {
-        if (!list.getEntries().some((e) => (e as LargestContentfulPaint).element === h1)) return;
+        const inOpening = (e: PerformanceEntry) => {
+          const el = (e as LargestContentfulPaint).element;
+          return !!el && opening.contains(el);
+        };
+        if (!list.getEntries().some(inOpening)) return;
         po.disconnect();
         requestAnimationFrame(finish);
       });
@@ -272,9 +277,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   ScrollTrigger.config({ ignoreMobileResize: true, autoRefreshEvents: 'visibilitychange,DOMContentLoaded,load' });
 
   // The opening is a whole page while the world loads (the monitor is its loading state), so no
-  // loading window covers it — and the world's ~1 MB of art waits until the wordmark (the LCP
-  // element) has painted, so the opening's text never queues behind it.
-  await afterOpeningPaint(section.querySelector('#hero-title'));
+  // loading window covers it — and the world's ~1 MB of art waits until the opening's LCP element
+  // has painted, so the opening's text never queues behind it.
+  await afterOpeningPaint(section.querySelector('[data-stage]'));
   const assets = await loadLevel1((done, total) => {
     if (o.loadingText) o.loadingText.textContent = `LOADING… ${Math.round((done / total) * 100)}%`;
   });

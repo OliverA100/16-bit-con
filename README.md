@@ -28,6 +28,7 @@ Inside the game one timeline drives everything, so scrolling up plays it backwar
 ## Stack
 
 - Astro 7 with static output, TypeScript in strict mode, and plain CSS; every brand colour is a token in `src/styles/tokens.css`
+- A custom 16-Bit Con wordmark, drawn in the construction of Vega's own (slant, stem and bar weights, corners and daisy), inlined as SVG in `Wordmark.astro` in the page's Green 900 ink
 - GSAP ScrollTrigger pins the world and drives the timeline
 - Canvas 2D for the world at an integer pixel scale; the night's recoloured art is built in a Web Worker, so scrolling never stalls
 - three.js 0.187 for the monitor and the breakout, loaded after the page and only when WebGL 2 is available
@@ -57,7 +58,7 @@ npm run check     # type-check
 
 ## Performance and accessibility
 
-- The `h1` is the largest contentful paint; the world's art and the 3D load after it.
+- The opening paints in one go with no image request: the wordmark is inline SVG, so the largest contentful paint is the hero's text (its tagline), and the world's art and the 3D load after it.
 - Measured during the build: 60 fps through the zoom and the breakout with the CPU throttled 4×, no long tasks or layout shifts, and Lighthouse 100 on mobile and desktop.
 - All the event information lives in the DOM sections and is reachable without playing; the canvases are `aria-hidden`. By default nothing in the game (HUD, rail, d-pad, Exit game) is in the tab order.
 - The pin is created only when the game starts and removed when it ends, with the scroll adjusted in the same frame, so neither adds a layout shift.
@@ -66,6 +67,7 @@ npm run check     # type-check
 ## Assets and licences
 
 - Sprites and logos are Vega's, from vega.io and its careers game. New pixel art drawn for this page is listed under NEW in `public/sprites/SOURCES.md`.
+- The 16-Bit Con wordmark is custom, drawn for this page after Vega's wordmark.
 - Geist and Geist Mono: SIL Open Font License.
 - PP Mondwest: Pangram Pangram, free for personal use.
 - Signifier: a Klim Type Foundry test font, for internal and pitch use only. Replace it with a licensed copy before any public launch.
