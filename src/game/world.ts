@@ -140,7 +140,6 @@ const CUMULUS: Seed[] = [
 const FIELD_TREES = [600, 900, 1250, 1600, 1900];
 /** Mid-layer trees in that layer's own space (u). */
 const MID_TREES = [260, 1000, 1760];
-const TINY_DAISIES = [560, 760, 1100, 1420, 1700];
 /** The street, world x, through Level 3 and into the dawn; the plaza has its own trees and planters (src/game/plaza.ts). */
 const STREET_TREES = [2330, 2630, 2930, 3230, 3530, 3830, 4130, 4430, 4730, 5030, 5330];
 const PLANTS = [2400, 2950, 3380, 3900, 4500, 5200];
@@ -665,7 +664,6 @@ export class Level1 {
       this.plaza.drawGround(ctx, f, plazaLook);
     }
 
-    for (const x of TINY_DAISIES) place(a.daisyTiny, 1, x, F);
     if (c) {
       // Everything on the street stands on the surface like a field prop; the fence starts on the grass.
       const base = F + STACK.near.bottom;

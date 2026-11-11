@@ -47,7 +47,6 @@ export const sprites = {
   bushes: { file: '/sprites/world/ground-bushes-strip_509x53.png', w: 509, h: 53, period: 509, parallax: 1, scale: 'world' },
   tree: { file: '/sprites/props/tree-1.png', w: 58, h: 81, scale: 'world', note: 'rows 65–80 are a white planter: cropped at load in the field, kept for the street trees after the gate' },
   daisyRow: { file: '/sprites/world/ground-daisy-row-strip_898x63.png', w: 898, h: 63, period: 898, parallax: 1, scale: 'world', note: 'anti-aliased export → snapped to 8 colours at load' },
-  daisyTinyA: { file: '/sprites/world/daisy-tiny-a.png', w: 18, h: 30, scale: 'world' },
   cloudA: { file: '/sprites/world/cloud-a_171x49.png', w: 171, h: 49, scale: 'world' },
   cloudB: { file: '/sprites/world/cloud-b_219x63.png', w: 219, h: 63, scale: 'world' },
   cloudD: { file: '/sprites/world/cloud-d_182x91.png', w: 182, h: 91, scale: 'world' },

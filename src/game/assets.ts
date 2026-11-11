@@ -32,7 +32,7 @@ export interface Level1Assets {
   treeField: Drawable;
   /** tree-1 as drawn, planter included: the street tree. */
   tree: Drawable;
-  /** Snapped daisy row, rows 0–54: flowers, grass tips and the grass fill — the 8 px surface below F. */
+  /** Snapped daisy row, rows 0–54, its daisies taken out at load (withoutFlowers): the grass tips and fill — the 8 px surface below F. */
   daisySurface: Drawable;
   /** Its rows 55–60: the grass's shade and outline and its four dirt rows, the top of the 12 px edge band. */
   dirtRows: Drawable;
@@ -40,7 +40,6 @@ export interface Level1Assets {
   dirt: string;
   /** The 28 px fill below the edge band: NEW dirt-fill tile (deep dirt, a darker top line, a sparse scatter). */
   dirtFill: Drawable;
-  daisyTiny: Drawable;
 }
 
 export interface CityAssets {
@@ -89,6 +88,12 @@ export const CUMULUS_LOBES: [number, number, number, number][] = [
 ];
 const TREE_PLANTER_TOP = 65;
 const DAISY_SURFACE_ROWS = 55;
+/** The strip's grass starts on this row; above it, the daisies stand (and a few small grass tufts). */
+const DAISY_GRASS_TOP = 47;
+/** A shape above the grass this big or bigger is a daisy (the smallest has 74 px; the tufts fewer than 20). */
+const DAISY_MIN_PX = 40;
+/** How far along the strip the flower-free grass is that fills in under each daisy (its daisies are all in x 0–320). */
+const DAISY_GRASS_DONOR = 449;
 const DAISY_DIRT = { top: 55, rows: 6 } as const;
 const DAISY_FILL_ROW = 60;
 const CITY_FAR_ROWS = 323;
@@ -128,7 +133,6 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     sprites.bushes,
     sprites.tree,
     sprites.daisyRow,
-    sprites.daisyTinyA,
     sprites.dirtFill,
   ];
   const total = files.length + 4;
@@ -139,7 +143,7 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     }),
     loadAll(files, onProgress, 4),
   ]);
-  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, daisyRaw, daisyTiny, dirtFill] =
+  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, daisyRaw, dirtFill] =
     imgs as [HTMLImageElement, ...HTMLImageElement[]];
   const snapped = snapToPalette(daisyRaw!, 16);
   const hillsPatched = patchTileSeam(hills!);
@@ -159,11 +163,10 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     hedge: bushes!,
     treeField: cropImage(tree!, 0, 0, tree!.width, TREE_PLANTER_TOP),
     tree: tree!,
-    daisySurface: cropImage(snapped, 0, 0, snapped.width, DAISY_SURFACE_ROWS),
+    daisySurface: cropImage(withoutFlowers(snapped), 0, 0, snapped.width, DAISY_SURFACE_ROWS),
     dirtRows: cropImage(snapped, 0, DAISY_DIRT.top, snapped.width, DAISY_DIRT.rows),
     dirt: dominantColor(snapped, 0, DAISY_FILL_ROW, snapped.width, 1),
     dirtFill: dirtFill!,
-    daisyTiny: daisyTiny!,
   };
 }
 
@@ -250,5 +253,65 @@ function withDaisy(sign: Drawable, daisy: Drawable, at: 'left' | 'above'): HTMLC
     ctx.drawImage(daisy, Math.round((c.width - daisy.width) / 2), 0);
     ctx.drawImage(sign, Math.round((c.width - sign.width) / 2), daisy.height + gap);
   }
+  return c;
+}
+
+/**
+ * The ground's surface without its daisies. Every shape standing above the grass that is a daisy's size goes
+ * (found by a fill over the rows above the grass, so a stem never pulls the grass in); the small grass tufts
+ * stay. Under each one, its stem's foot and lowest leaves run on into the grass rows, so across its width
+ * those rows take the grass from a flower-free stretch of the same strip (DAISY_GRASS_DONOR along, still
+ * inside the strip's period). Vega's file is untouched; this is made in memory from the snapped strip.
+ */
+function withoutFlowers(strip: HTMLCanvasElement): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = strip.width;
+  c.height = strip.height;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(strip, 0, 0);
+  const w = c.width;
+  const h = DAISY_GRASS_TOP;
+  const rows = DAISY_SURFACE_ROWS;
+  const im = ctx.getImageData(0, 0, w, rows);
+  const d = im.data;
+  const seen = new Uint8Array(w * h);
+  for (let y0 = 0; y0 < h; y0++)
+    for (let x0 = 0; x0 < w; x0++) {
+      const i0 = y0 * w + x0;
+      if (seen[i0] || d[i0 * 4 + 3] === 0) continue;
+      const shape: number[] = [];
+      const stack = [i0];
+      seen[i0] = 1;
+      let minX = x0;
+      let maxX = x0;
+      while (stack.length) {
+        const i = stack.pop()!;
+        shape.push(i);
+        const x = i % w;
+        const y = (i - x) / w;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            const j = ny * w + nx;
+            if (seen[j] || d[j * 4 + 3] === 0) continue;
+            seen[j] = 1;
+            stack.push(j);
+          }
+      }
+      if (shape.length < DAISY_MIN_PX) continue;
+      for (const i of shape) d[i * 4 + 3] = 0;
+      // the grass rows under it, across its width: the flower-free grass further along the strip
+      for (let y = h; y < rows; y++)
+        for (let x = minX; x <= maxX; x++) {
+          const to = (y * w + x) * 4;
+          const from = (y * w + ((x + DAISY_GRASS_DONOR) % w)) * 4;
+          for (let k = 0; k < 4; k++) d[to + k] = d[from + k]!;
+        }
+    }
+  ctx.putImageData(im, 0, 0);
   return c;
 }

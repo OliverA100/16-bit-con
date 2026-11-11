@@ -36,7 +36,6 @@ export const PLAZA = {
   signClear: 64,
   trees: [5680, 5760],
   plants: [5560],
-  daisies: [5890, 5960, 6150, 6270],
 } as const;
 /** Cypress row along the facade base, facade x; the entrance with its flags and kiosk stays open. */
 const CYPRESS = { from: 140, to: 1270, step: 22, gap: [560, 910] } as const;
@@ -64,7 +63,6 @@ interface PlazaNight {
   daisySurface: Stepper;
   dirtRows: Stepper;
   dirtFill: Stepper;
-  daisyTiny: Stepper;
   tree: Stepper;
   plant: Stepper;
   dirt: [number, number, number];
@@ -114,14 +112,13 @@ export class Plaza {
       daisySurface: new Stepper(a.daisySurface, rank([T.n9, T.n7, T.g7], [2, 1, 1])),
       dirtRows: new Stepper(a.dirtRows, rank([T.k, T.n9], [1, 1])),
       dirtFill: new Stepper(a.dirtFill, rank([T.k, T.n9], [1, 1])),
-      daisyTiny: new Stepper(a.daisyTiny, rank([T.n9, T.n7], [2, 1])),
       tree,
       plant,
       dirt: hexToRgb(a.dirt),
       dark: hexToRgb(T.k),
     };
     const n = this.night;
-    for (const s of [n.facade, n.bay, n.cypress, n.post, n.seamBack, n.daisySurface, n.dirtRows, n.dirtFill, n.daisyTiny]) s.prepare();
+    for (const s of [n.facade, n.bay, n.cypress, n.post, n.seamBack, n.daisySurface, n.dirtRows, n.dirtFill]) s.prepare();
   }
 
   /** The big sign: 16-BIT CON on an LED board, centred over the entrance high on the front cube. */
@@ -246,8 +243,6 @@ export class Plaza {
       const px = Math.round(x - camLeft);
       if (px + img.width > r.x0 && px < r.x1) ctx.drawImage(img, px, Math.round(bottom - img.height));
     };
-    const daisy = n ? n.daisyTiny.at(s) : a.daisyTiny;
-    for (const x of PLAZA.daisies) place(daisy, x, F);
     const tree = n ? n.tree.at(s) : a.tree;
     for (const x of PLAZA.trees) place(tree, x, base);
     const plant = n ? n.plant.at(s) : c.plant;
