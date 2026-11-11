@@ -41,7 +41,7 @@ export const sprites = {
 
   // ── Level 1: Vega's field ───────────────────────────────────────────────────
   cloudsStrip: { file: '/sprites/world/bg-clouds-strip_509x289.png', w: 509, h: 289, period: 509, mirrorTile: true, parallax: 0.05, scale: 'world', note: 'cloud band is rows 94–289; the horizon cumulus bank just above the hills' },
-  bigCloud: { file: '/sprites/world/big-cloud.png', w: 1160, h: 729, parallax: 0.05, scale: 'world', note: 'cumulus bank, two colours; three whole lobes are cropped at load for the mid sky' },
+  bigCloud: { file: '/sprites/world/big-cloud.png', w: 1160, h: 729, parallax: 0.05, scale: 'world', note: 'cumulus bank, two colours; three whole lobes are cropped at load for the mid sky; the first two are also Sam\'s clouds on the 404 page' },
   hillsSilhouetteLight: { file: '/sprites/world/bg-hills-silhouette-light_480x320.png', w: 480, h: 320, period: 480, parallax: 0.04, scale: 'world', note: 'one pale colour on transparent; the far range behind the hills' },
   hills: { file: '/sprites/world/bg-green-hills_509x200.png', w: 509, h: 200, period: 509, parallax: 0.1, scale: 'world', note: 'edges differ in 10 rows → seam patched at load, tiled plainly; ends at a world x and scrolls off' },
   bushes: { file: '/sprites/world/ground-bushes-strip_509x53.png', w: 509, h: 53, period: 509, parallax: 1, scale: 'world' },
@@ -51,6 +51,7 @@ export const sprites = {
   cloudA: { file: '/sprites/world/cloud-a_171x49.png', w: 171, h: 49, scale: 'world' },
   cloudB: { file: '/sprites/world/cloud-b_219x63.png', w: 219, h: 63, scale: 'world' },
   cloudD: { file: '/sprites/world/cloud-d_182x91.png', w: 182, h: 91, scale: 'world' },
+  cloudE: { file: '/sprites/world/cloud-e_138x88.png', w: 138, h: 88, scale: 'world' },
   cloudF: { file: '/sprites/world/cloud-f_69x44.png', w: 69, h: 44, scale: 'world' },
   cloudG: { file: '/sprites/world/cloud-g_94x25.png', w: 94, h: 25, scale: 'world' },
   cloudH: { file: '/sprites/world/cloud-h_63x15.png', w: 63, h: 15, scale: 'world' },

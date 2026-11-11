@@ -82,7 +82,7 @@ export interface CityAssets {
 }
 
 /** Whole lobes of big-cloud.png (x, y, w, h), chosen where each lobe's own edges end. */
-const CUMULUS_LOBES: [number, number, number, number][] = [
+export const CUMULUS_LOBES: [number, number, number, number][] = [
   [292, 0, 187, 67],
   [486, 20, 281, 61],
   [776, 80, 233, 39],

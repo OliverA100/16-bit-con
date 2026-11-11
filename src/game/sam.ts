@@ -50,6 +50,9 @@ export const SAM_HITBOX = { left: 14, right: 46, top: 15 };
  */
 export const FOOT_SINK = 5;
 
+/** The idle loop's pace in the game, frames a second. */
+export const IDLE_FPS = 8;
+
 /** World px of travel per run frame: one 4-frame cycle every 48 px, ~13 fps at full speed. */
 export const STRIDE = 12;
 /** A fast scrub never strobes the cycle faster than this. */
@@ -142,7 +145,7 @@ export class Sam {
       this.frame = Math.floor(this.odometer) % this.sheets.run.frames;
     } else {
       this.mode = 'idle';
-      this.idleClock += dt * 8;
+      this.idleClock += dt * IDLE_FPS;
       this.frame = Math.floor(this.idleClock) % this.sheets.idle.frames;
     }
   }

@@ -1,0 +1,109 @@
+---
+/**
+ * Level not found: Sam on the right ledge of a cloud adrift in the sky, looking out at a level that never
+ * loaded, drifting off and back on another cloud. The text over the sky; behind it one canvas of Vega's
+ * clouds at the page's Sam scale (src/game/lost.ts). Without JS the sky, the text and the cloud bank
+ * (a CSS background) still show.
+ */
+import Base from '../layouts/Base.astro';
+import Button from '../components/Button.astro';
+---
+
+<Base title="Level not found — 16-Bit Con" description="This level doesn't exist. The page you're looking for isn't on the map." footer={false} noindex>
+  <section class="lost" aria-labelledby="lost-title">
+    <div class="lost__scene" aria-hidden="true" data-lost-scene>
+      <canvas class="lost__canvas" data-lost-canvas></canvas>
+    </div>
+    <div class="lost__text container" data-lost-text>
+      <p class="eyebrow lost__eyebrow">Error 404 · Level not found</p>
+      <h1 class="lost__title" id="lost-title">This level doesn’t exist.</h1>
+      <p class="lost__line">The page you’re looking for isn’t on the map. Sam checked.</p>
+      <div class="lost__actions" data-lost-actions>
+        <Button href="/">Back to the start</Button>
+        <Button href="/#schedule" variant="ghost">See the schedule</Button>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { startLost } from '../game/lost';
+
+  startLost().catch((err) => console.error('[404] the sky did not load', err));
+</script>
+
+<style>
+  /* The window whole, in flat sky; the scene's room under the buttons (Sam's cloud over the cloud bank:
+     210 art rows at Sam's scale) always there, so the section grows past the window rather than crowd it. */
+  .lost {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto minmax(calc(210 * var(--sam-px, 2px)), 1fr);
+    min-height: 100dvh;
+    background: var(--color-sky-blue);
+    color: var(--wordmark);
+  }
+
+  /* The cloud bank without JS (and until the canvas paints): Vega's strip tiled along the bottom, its first
+     cloud row (94) 105 art rows over the window's bottom, as the canvas draws it at rest. */
+  .lost__scene {
+    --a: var(--sam-px, 2px);
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background-image: url('/sprites/world/bg-clouds-strip_509x289.png');
+    background-repeat: repeat-x;
+    background-size: calc(509 * var(--a)) calc(289 * var(--a));
+    background-position: 0 calc(100% + 90 * var(--a));
+    image-rendering: pixelated;
+  }
+
+  .lost__scene[data-drawn] {
+    background-image: none;
+  }
+
+  .lost__canvas {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    image-rendering: pixelated;
+  }
+
+  .lost__text {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: center;
+    padding-top: calc(var(--nav-h) + clamp(3rem, 12vh, 7rem));
+    text-align: center;
+  }
+
+  .lost__eyebrow {
+    font-size: var(--text-sm);
+    letter-spacing: 0.2em;
+    color: inherit;
+  }
+
+  .lost__title {
+    margin-top: var(--space-3);
+    font-family: var(--font-pixel);
+    font-size: clamp(2.75rem, 6vw, 6rem);
+    line-height: 1;
+    letter-spacing: 0;
+    color: inherit;
+  }
+
+  .lost__line {
+    margin-top: var(--space-8);
+    font-size: var(--text-lg);
+    color: inherit;
+  }
+
+  .lost__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-4);
+    margin-top: var(--space-8);
+  }
+</style>

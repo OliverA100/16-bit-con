@@ -199,11 +199,12 @@ export function stateKey(...parts: number[]): number {
 
 /**
  * Draw a horizontal band of `src` (rows sy..sy+sh) repeated across [0, w) at row `dy`, shifted by
- * `offset` art px. Whole pixels only.
+ * `offset` art px. Whole art pixels, or with `k` (device px per art px) whole device pixels, so a slow
+ * drift glides as the home page's clouds do.
  */
-export function tileX(ctx: CanvasRenderingContext2D, src: Drawable, sy: number, sh: number, dy: number, w: number, offset = 0): void {
+export function tileX(ctx: CanvasRenderingContext2D, src: Drawable, sy: number, sh: number, dy: number, w: number, offset = 0, k = 1): void {
   const period = src.width;
-  let x = -wrap(Math.round(offset), period);
+  let x = -Math.round(wrap(offset, period) * k) / k;
   const y = Math.round(dy);
   while (x < w) {
     ctx.drawImage(src, 0, sy, period, sh, x, y, period, sh);

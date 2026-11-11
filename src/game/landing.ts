@@ -5,10 +5,11 @@
  */
 import { sprites } from '../data/sprites.manifest';
 import { remap, SAM_BRAND_MAP } from './palette';
+import { IDLE_FPS } from './sam';
 import { loadImage, makeStrip, type Strip } from './sprites';
 
 /** The idle loop's pace, ms a frame (as in the game). */
-const IDLE_MS = 125;
+const IDLE_MS = 1000 / IDLE_FPS;
 
 export interface Perch {
   canvas: HTMLCanvasElement;
