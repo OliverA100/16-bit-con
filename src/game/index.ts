@@ -1189,6 +1189,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     });
   }
   o.exit?.addEventListener('click', () => exitPlay('start'));
+  // The nav's wordmark (a link home) in the game: the same as Exit game, zooming out to the monitor.
+  // While the page zooms out or plays the finale it does nothing, as Register now does then.
+  document.querySelector<HTMLAnchorElement>('.nav__brand')?.addEventListener('click', (e) => {
+    const root = document.documentElement;
+    if (mode === 'play') {
+      e.preventDefault();
+      exitPlay('start');
+    } else if (root.classList.contains('is-exiting') || root.classList.contains('is-finale')) e.preventDefault();
+  });
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || mode !== 'play' || paused || exiting || regDialog?.open) return;
     e.preventDefault();
