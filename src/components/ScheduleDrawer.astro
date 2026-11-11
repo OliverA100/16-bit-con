@@ -148,10 +148,13 @@ const plate = 'Files · Oct 3–5';
     --step: calc(var(--tab-h) + 12px); /* a tab and the sliver of body under it */
     --view: 300px; /* an open folder's visible body: from its top line to the next folder's */
     --rise: calc(var(--view) - var(--step));
+    /* A folder's move in nine steps of 50 ms, eased out along cubic-bezier(0.22, 1, 0.36, 1): big steps
+       first, smaller as it settles. Each step lands on a whole pixel of --rise (252 px here, 352 px on
+       phones), so the 1 px lines stay crisp while a step is held. Recompute if --view or --step change. */
+    --ease-folder: linear(0 0%, 0 11.111%, 0.436508 11.111%, 0.436508 22.222%, 0.718254 22.222%, 0.718254 33.333%, 0.865079 33.333%, 0.865079 44.444%, 0.940476 44.444%, 0.940476 55.556%, 0.97619 55.556%, 0.97619 66.667%, 0.992063 66.667%, 0.992063 77.778%, 0.996032 77.778%, 0.996032 88.889%, 1 88.889%, 1 100%, 1 100%);
     --body-h: calc(var(--view) + var(--step));
     --gap: 12px; /* the back card's sliver above an open folder */
     --files-h: calc(3 * var(--step) + var(--tab-h));
-    --sink: calc(var(--rise) + var(--files-h) + var(--step)); /* a day's folders, down behind the front */
     --inset: var(--space-8);
     --front-h: 180px;
     /* The scene's box, standing on the ground, up to one step below the body's top line: a closed folder
@@ -182,9 +185,9 @@ const plate = 'Files · Oct 3–5';
     background: var(--surface-card);
     border: var(--line-folder);
     border-bottom: 0;
-    /* Cut at the front's top edge: the day's folders reach on under the front, and the days not shown wait
-       below it. Everything there is behind the opaque front, and clip (unlike a clip-path) also keeps it
-       out of the page's scrollable area, so the page ends where the drawer does. */
+    /* Cut at the front's top edge: the day's folders reach on under the front. Everything there is behind
+       the opaque front, and clip (unlike a clip-path) also keeps it out of the page's scrollable area, so
+       the page ends where the drawer does. */
     overflow-x: visible;
     overflow-y: clip;
   }
@@ -211,15 +214,19 @@ const plate = 'Files · Oct 3–5';
     height: var(--files-h);
   }
 
-  /* ── A day: its three folders, all days in the same place. The selected day stands in front at 0; the
-        others wait --sink down, behind the front and cut at its bottom edge, out of sight (and aria-hidden,
-        their tabs out of the tab order). Their folders' text stays findable: hidden="until-found". ── */
+  /* ── A day: its three folders, all days in the same place. The selected day stands in front; the others
+        wait faded out 8 px above it (aria-hidden, their tabs out of the tab order, not hit by the pointer).
+        A day change is the site's overlay motion (Agent Sam's window, the game's HUD): the new day comes
+        down 8 px into place as it fades in, the old one fades out going up, on the 16-bit steps. Their
+        folders' text stays findable: hidden="until-found". ── */
   .panel {
     position: absolute;
     inset: 0 0 auto; /* inside the back card's side lines, which are the folders' sides too */
     height: var(--files-h);
     translate: 0 0;
-    transition: translate var(--dur-folder) var(--ease-folder);
+    transition:
+      translate var(--dur-base) var(--steps-16bit),
+      opacity var(--dur-base) var(--steps-16bit);
   }
 
   .panel[data-state='in'] {
@@ -228,7 +235,9 @@ const plate = 'Files · Oct 3–5';
 
   .panel[data-state='out'] {
     z-index: 1;
-    translate: 0 var(--sink);
+    translate: 0 -8px;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .tab--folder .tab__label::before {
@@ -248,7 +257,24 @@ const plate = 'Files · Oct 3–5';
     z-index: calc(var(--i) + 1);
     height: calc(var(--tab-h) + var(--body-h));
     translate: 0 calc(-1 * var(--rise) * clamp(0, var(--open) - var(--i) + 1, 1));
-    transition: translate var(--dur-folder) var(--ease-folder);
+    /* the hover peek on its own channel: 1 px per 50 ms step, so it stays on whole pixels both ways */
+    transform: translateY(calc(-1 * var(--peek, 0px)));
+    transition:
+      translate var(--dur-folder) var(--ease-folder),
+      transform var(--dur-base) var(--steps-16bit);
+  }
+
+  /* Hover on a closed folder's tab: the folder peeks out of the drawer, a first bit of the lift that
+     opening it makes, on the same 50 ms beat (4 px in four 1 px steps). Its tab's hit area reaches back
+     down over the gap it leaves. Pointers that hover only; still with reduced motion. */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .card:not(.is-open):has(> .tab--folder:hover) {
+      --peek: var(--folder-peek);
+    }
+
+    .card:not(.is-open) > .tab--folder:hover::after {
+      inset: 0 0 calc(-6px - var(--folder-peek));
+    }
   }
 
   .card__body {
@@ -380,6 +406,36 @@ const plate = 'Files · Oct 3–5';
     background: var(--folder-ink);
   }
 
+  /* An unselected day tab lifts as the site's buttons do: up and left by --lift onto a hard Green 900
+     shadow (a drop-shadow, so it follows the tab's slants; the tab is a clip-path shape). The selected
+     tab stays put, as a selected button does. Its hit area reaches back over the gap it leaves. */
+  .daytab {
+    transition:
+      translate var(--dur-lift) var(--ease-lift),
+      filter var(--dur-lift) var(--ease-lift);
+  }
+
+  .daytab[aria-selected='false']:focus-visible {
+    translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
+    filter: drop-shadow(var(--lift) var(--lift) 0 var(--folder-ink));
+  }
+
+  @media (hover: hover) {
+    .daytab[aria-selected='false']:hover {
+      translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
+      filter: drop-shadow(var(--lift) var(--lift) 0 var(--folder-ink));
+    }
+
+    .daytab[aria-selected='false']:hover::after {
+      inset: 0 calc(-1 * var(--lift)) calc(-6px - var(--lift)) 0;
+    }
+  }
+
+  .daytab[aria-selected='false']:active {
+    translate: 0 0;
+    filter: none;
+  }
+
   .daytab[aria-selected='true'] .tab__label {
     color: var(--color-daisy-white);
   }
@@ -409,7 +465,7 @@ const plate = 'Files · Oct 3–5';
     position: relative;
     z-index: 1;
     opacity: 0;
-    transition: opacity var(--dur-fade) var(--ease-folder);
+    transition: opacity var(--dur-fade) var(--steps-fade);
     display: grid;
     gap: var(--space-2);
     max-width: min(38rem, 64%);
@@ -479,7 +535,7 @@ const plate = 'Files · Oct 3–5';
   }
 
   .folder__canvas[data-drawn='fade'] {
-    transition: opacity 200ms var(--ease-folder);
+    transition: opacity var(--dur-base) var(--steps-16bit);
   }
 
   /* ── The drawer front ── */
@@ -561,6 +617,7 @@ const plate = 'Files · Oct 3–5';
 
     .drawer {
       --view: 400px;
+      --ease-folder: linear(0 0%, 0 11.111%, 0.4375 11.111%, 0.4375 22.222%, 0.71875 22.222%, 0.71875 33.333%, 0.866477 33.333%, 0.866477 44.444%, 0.940341 44.444%, 0.940341 55.556%, 0.974432 55.556%, 0.974432 66.667%, 0.991477 66.667%, 0.991477 77.778%, 0.997159 77.778%, 0.997159 88.889%, 1 88.889%, 1 100%, 1 100%);
       --inset: var(--space-3);
       --front-h: 132px;
     }

@@ -115,12 +115,16 @@
   --steps-16bit: steps(4, end);
 
   /* The Schedule's drawer of folders: Vega's folder frame in the site's frame line (1 px Green 900), and
-     the one smooth motion it uses as a folder rises or settles. */
+     the stepped motion it uses as a folder rises or settles. */
   --folder-ink: var(--outline);
   --line-w: 1px;
   --line-folder: var(--line-w) solid var(--folder-ink);
   --dur-folder: 450ms;
-  --ease-folder: cubic-bezier(0.22, 1, 0.36, 1);
+  --folder-peek: 4px; /* a closed folder's lift on hover: a first bit of opening it */
+  /* The drawer moves on the site's 16-bit beat, a step every 50 ms, as a day change does (--dur-base on
+     --steps-16bit): a folder's 450 ms move is nine eased steps (the drawer's --ease-folder, landing on
+     whole pixels of its rise), its text's 250 ms fade five steps. */
+  --steps-fade: steps(5, end);
 
   /* Controls at vega.io's scale: one button size, and the lift every button, ticket and rail stop
      makes on hover and keyboard focus (onto a hard shadow the same size as the lift). */

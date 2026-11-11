@@ -11,7 +11,7 @@
  * the folder's text, starts its scene and waits for a frame (at most 150 ms; the still is normally
  * there already); a scene still being built fades in when drawn. A folder that closes keeps its frame
  * and its text is hidden again (hidden="until-found", so find-in-page reaches it and opens the folder,
- * in whichever day) once it has settled. Days not shown wait out of sight behind the front.
+ * in whichever day) once it has settled. Days not shown wait faded out in the same place.
  */
 import type { SceneId } from '../data/sessions';
 import { SceneRunner } from './runner';
@@ -55,11 +55,17 @@ const WARM_AFTER = 150;
 
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
+/** A CSS time custom property of the drawer's, in ms (`fallback` when it is missing). */
+function msOf(drawer: HTMLElement, name: string, fallback: number): number {
+  const v = getComputedStyle(drawer).getPropertyValue(name).trim();
+  const ms = v.endsWith('ms') ? parseFloat(v) : parseFloat(v) * 1000;
+  return Number.isFinite(ms) ? ms : fallback;
+}
+
+/** How long until a move has settled: the longer of a folder's move and a day change. */
 function settleMs(drawer: HTMLElement): number {
   if (reduced.matches) return 0;
-  const v = getComputedStyle(drawer).getPropertyValue('--dur-folder').trim();
-  const ms = v.endsWith('ms') ? parseFloat(v) : parseFloat(v) * 1000;
-  return (Number.isFinite(ms) ? ms : 450) + 60;
+  return Math.max(msOf(drawer, '--dur-folder', 450), msOf(drawer, '--dur-base', 200)) + 60;
 }
 
 export function bootDrawer(drawer: HTMLElement): void {
@@ -111,7 +117,7 @@ export function bootDrawer(drawer: HTMLElement): void {
       d.panel.style.setProperty('--open', String(open.day === d ? open.index : -1));
       d.tab.setAttribute('aria-selected', String(selected));
       d.tab.tabIndex = selected ? 0 : -1;
-      // A day not shown sinks out of sight behind the front: out of the accessibility tree and the tab order.
+      // A day not shown fades out of sight: out of the accessibility tree and the tab order.
       if (selected) d.panel.removeAttribute('aria-hidden');
       else d.panel.setAttribute('aria-hidden', 'true');
       for (const f of d.folders) f.tab.tabIndex = selected ? 0 : -1;

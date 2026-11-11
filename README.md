@@ -17,7 +17,7 @@ Inside the game one timeline drives everything, so scrolling up plays it backwar
 
 ## The schedule
 
-The schedule is a drawer of Vega's tabbed folders, one day at a time: index tabs across the top pick Oct 3, 4 or 5, and the day's three folders stand in the drawer, every tab showing its time and title. One folder is always open (the Opening Keynote to start): it lifts out of the drawer to show its details and its own animated scene, drawn on a canvas from Vega's sprites at one CSS pixel per art pixel, beside and below the text. Only the open folder's scene plays, and only while it is on screen; every scene is built ahead of time in idle moments, so opening a folder or switching day is one smooth motion that any click can redirect midway.
+The schedule is a drawer of Vega's tabbed folders, one day at a time: index tabs across the top pick Oct 3, 4 or 5, and the day's three folders stand in the drawer, every tab showing its time and title. One folder is always open (the Opening Keynote to start): it lifts out of the drawer to show its details and its own animated scene, drawn on a canvas from Vega's sprites at one CSS pixel per art pixel, beside and below the text. Only the open folder's scene plays, and only while it is on screen; every scene is built ahead of time in idle moments, so opening a folder or switching day starts at once and moves on the site's 16-bit beat, a step every 50 ms, which any click can redirect midway.
 
 The brief's three sessions are Oct 3, with their copy as given. The Oct 4 and Oct 5 sessions were added for this page.
 
