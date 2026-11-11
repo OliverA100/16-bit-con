@@ -727,14 +727,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
   // ── The monitor's power button: on the landing page, with the monitor at rest, a real button over the 3D
   //    one. A click switches the tube off (the power-on in reverse; PRESS START goes with the picture) and
-  //    on again (PRESS START comes back once the picture is up, as on load). ──
+  //    on again (PRESS START comes back once the picture is up, as on load). After the breakout, once Sam
+  //    has landed, it works the broken set too: its static squashes into the line like the picture. ──
   const powerButton = section.querySelector<HTMLButtonElement>('[data-power]');
   /** Switched off by the visitor: the page does not power the tube on again by itself. */
   let powerSwitchedOff = false;
   let powerPlaced = '';
   const placePower = (p: number) => {
     if (!powerButton || !hero3d) return;
-    const show = mode === 'default' && p < 0.001;
+    const show = (mode === 'default' || (mode === 'done' && !landing)) && p < 0.001;
     if (powerButton.hidden === show) powerButton.hidden = !show;
     if (!show) return;
     const box = hero3d.powerBox();
@@ -748,7 +749,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     powerButton.style.width = powerButton.style.height = `${hit}px`;
   };
   powerButton?.addEventListener('click', () => {
-    if (!hero3d || !d || mode !== 'default') return;
+    if (!hero3d || !d || mode === 'play' || landing) return;
     const now = clockNow();
     if (hero3d.poweredOn) {
       powerSwitchedOff = true;
