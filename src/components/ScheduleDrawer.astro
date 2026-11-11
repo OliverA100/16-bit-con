@@ -30,6 +30,8 @@ const panels = days.map(({ day, sessions }) => {
 });
 
 const plate = 'Files · Oct 3–5';
+/** Every day has the open folder's place up (src/schedule/drawer.ts): a day change moves no folder. */
+const openAt = panels.find((p) => p.selected)?.openIndex ?? 0;
 ---
 
 <div class="drawer" data-day="oct-3" data-open={OPEN} data-drawer>
@@ -66,7 +68,7 @@ const plate = 'Files · Oct 3–5';
             aria-labelledby={`daytab-${p.id}`}
             data-panel={p.id}
             data-state={p.selected ? 'in' : 'out'}
-            style={`--open: ${p.selected ? p.openIndex : 0};`}
+            style={`--open: ${openAt};`}
             aria-hidden={p.selected ? undefined : 'true'}
           >
             <h3 class="sr-only">{p.long}</h3>
@@ -214,20 +216,15 @@ const plate = 'Files · Oct 3–5';
     height: var(--files-h);
   }
 
-  /* ── A day: its three folders, all days in the same place. The selected day stands in front; the others
-        wait faded out 8 px above it, their first folder up (aria-hidden, their tabs out of the tab order,
-        not hit by the pointer), so a day change moves no folder (src/schedule/drawer.ts).
-        A day change is the site's overlay motion (Agent Sam's window, the game's HUD): the new day comes
-        down 8 px into place as it fades in, the old one fades out going up, on the 16-bit steps. Their
-        folders' text stays findable: hidden="until-found". ── */
+  /* ── A day: its three folders, all days in the same place, the same folder up in each. The selected day
+        stands in front; the others wait faded out (aria-hidden, their tabs out of the tab order, not hit by
+        the pointer). A day change is a crossfade on the 16-bit steps and nothing else: no folder moves, no
+        slide (src/schedule/drawer.ts). Their folders' text stays findable: hidden="until-found". ── */
   .panel {
     position: absolute;
     inset: 0 0 auto; /* inside the back card's side lines, which are the folders' sides too */
     height: var(--files-h);
-    translate: 0 0;
-    transition:
-      translate var(--dur-base) var(--steps-16bit),
-      opacity var(--dur-base) var(--steps-16bit);
+    transition: opacity var(--dur-base) var(--steps-16bit);
   }
 
   .panel[data-state='in'] {
@@ -236,7 +233,6 @@ const plate = 'Files · Oct 3–5';
 
   .panel[data-state='out'] {
     z-index: 1;
-    translate: 0 -8px;
     opacity: 0;
     pointer-events: none;
   }
