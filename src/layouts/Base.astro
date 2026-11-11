@@ -67,6 +67,8 @@ const {
           var k = Math.min(6, Math.max(2, Math.round(devH / 540)));
           if (Math.ceil(devW / k) < 240) k = Math.max(2, k - 1);
           root.style.setProperty('--px', String(k / dpr));
+          // Sam's own scale on the page (the Register window, the footer's field, the beanstalk): the same k
+          root.style.setProperty('--sam-px', k / dpr + 'px');
         }
         fit();
         window.addEventListener('resize', fit, { passive: true });
@@ -79,33 +81,98 @@ const {
     <main id="main" tabindex="-1">
       <slot />
     </main>
-    <footer class="site-footer container">
-      <!-- The host: Vega's own logo, wordmark and daisy together, as Vega draws it. -->
-      <p class="site-footer__host">
-        <span class="eyebrow">Hosted by</span>
-        <a href="https://vega.io" class="site-footer__vega">
-          <img src="/sprites/ui/vega-logo.svg" alt="Vega" width="487" height="158" loading="lazy" decoding="async" />
-        </a>
-      </p>
-      <p class="eyebrow">
-        16-Bit Con · Oct 3–5, 2026 · Javits Center, New York · Find Vega at Booth 630 ·{' '}
-        <a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a>
-      </p>
+    <footer class="site-footer">
+      <div class="site-footer__text container">
+        <!-- The host: Vega's own logo, wordmark and daisy together, as Vega draws it. -->
+        <p class="site-footer__host">
+          <span class="eyebrow">Hosted by</span>
+          <a href="https://vega.io" class="site-footer__vega">
+            <img src="/sprites/ui/vega-logo.svg" alt="Vega" width="487" height="158" loading="lazy" decoding="async" />
+          </a>
+        </p>
+        <p class="eyebrow">
+          16-Bit Con · Oct 3–5, 2026 · Javits Center, New York · Find Vega at Booth 630 ·{' '}
+          <a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a>
+        </p>
+      </div>
+      <!-- Vega's golden evening field under the text, at Sam's scale (src/game/footer.ts); Sam ends up on its path. -->
+      <div class="site-footer__scene" aria-hidden="true" data-footer-scene>
+        <canvas class="site-footer__back" data-footer-back></canvas>
+        <canvas class="site-footer__front" data-footer-front></canvas>
+        <noscript><div class="site-footer__still"></div></noscript>
+      </div>
     </footer>
   </body>
 </html>
+
+<script>
+  import { startFooter } from '../game/footer';
+
+  startFooter().catch((err) => console.error('[footer] the field did not load', err));
+</script>
 
 <style>
   main:focus {
     outline: none;
   }
 
+  /* No z-index here: the field's two canvases take part in the page's own stacking, so the beanstalk's
+     foot (src/game/stalk.ts) stands between the hills and the grass, and Sam in front of both. */
   .site-footer {
+    position: relative;
+  }
+
+  .site-footer__text {
     display: grid;
     justify-items: center;
     gap: var(--space-6);
-    padding: var(--space-12) 0 var(--space-8);
+    padding: var(--space-12) 0 var(--space-6);
     text-align: center;
+  }
+
+  /* The field whole: 230 art rows at Sam's scale — the daisies' heads, the clouds, the golden hills and all of
+     the meadow (its surface, the ground line, 45 rows over the bottom: src/game/footer.ts). The art in this
+     band only, the text's clear zone above it. */
+  .site-footer__scene {
+    position: relative;
+    height: calc(230 * var(--sam-px, 2px));
+    overflow: hidden;
+  }
+
+  .site-footer__scene canvas {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    image-rendering: pixelated;
+  }
+
+  .site-footer__back {
+    z-index: 1;
+  }
+
+  .site-footer__front {
+    z-index: 5;
+  }
+
+  /* Without JS: the same field, still, from CSS layers of the same files (the ground 185 rows down the band). */
+  .site-footer__still {
+    position: absolute;
+    inset: 0;
+    --a: var(--sam-px, 2px);
+    background-image:
+      url('/sprites/world/ground-desert-strip_509x51.png'),
+      url('/sprites/world/bg-hills-golden_509x121.png'),
+      url('/sprites/world/cloud-lg_207x130.png');
+    background-repeat: repeat-x, repeat-x, no-repeat;
+    background-size:
+      calc(509 * var(--a)) calc(51 * var(--a)),
+      calc(509 * var(--a)) calc(121 * var(--a)),
+      calc(207 * var(--a)) calc(130 * var(--a));
+    background-position:
+      0 calc(179 * var(--a)),
+      0 calc(76 * var(--a)),
+      40% 0;
+    image-rendering: pixelated;
   }
 
   .site-footer__host {
