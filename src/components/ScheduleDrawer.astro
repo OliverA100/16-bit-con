@@ -66,7 +66,7 @@ const plate = 'Files · Oct 3–5';
             aria-labelledby={`daytab-${p.id}`}
             data-panel={p.id}
             data-state={p.selected ? 'in' : 'out'}
-            style={`--open: ${p.openIndex};`}
+            style={`--open: ${p.selected ? p.openIndex : 0};`}
             aria-hidden={p.selected ? undefined : 'true'}
           >
             <h3 class="sr-only">{p.long}</h3>
@@ -215,7 +215,8 @@ const plate = 'Files · Oct 3–5';
   }
 
   /* ── A day: its three folders, all days in the same place. The selected day stands in front; the others
-        wait faded out 8 px above it (aria-hidden, their tabs out of the tab order, not hit by the pointer).
+        wait faded out 8 px above it, their first folder up (aria-hidden, their tabs out of the tab order,
+        not hit by the pointer), so a day change moves no folder (src/schedule/drawer.ts).
         A day change is the site's overlay motion (Agent Sam's window, the game's HUD): the new day comes
         down 8 px into place as it fades in, the old one fades out going up, on the 16-bit steps. Their
         folders' text stays findable: hidden="until-found". ── */

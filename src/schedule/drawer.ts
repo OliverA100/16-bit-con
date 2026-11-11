@@ -11,7 +11,9 @@
  * the folder's text, starts its scene and waits for a frame (at most 150 ms; the still is normally
  * there already); a scene still being built fades in when drawn. A folder that closes keeps its frame
  * and its text is hidden again (hidden="until-found", so find-in-page reaches it and opens the folder,
- * in whichever day) once it has settled. Days not shown wait faded out in the same place.
+ * in whichever day) once it has settled. Days not shown wait faded out in the same place, with their
+ * first folder up — the one a day tab opens — so a day change is a fade alone: the day left keeps its
+ * folders where they are until it has faded out, and the day shown arrives with its folder already up.
  */
 import type { SceneId } from '../data/sessions';
 import { SceneRunner } from './runner';
@@ -21,7 +23,7 @@ interface Timed {
   timer?: number;
 }
 
-interface Day {
+interface Day extends Timed {
   id: string;
   tab: HTMLButtonElement;
   panel: HTMLElement;
@@ -114,7 +116,12 @@ export function bootDrawer(drawer: HTMLElement): void {
     for (const d of days) {
       const selected = d === day;
       d.panel.dataset.state = selected ? 'in' : 'out';
-      d.panel.style.setProperty('--open', String(open.day === d ? open.index : -1));
+      // The shown day's open folder is up. A day left keeps its folders as they are while it fades, then
+      // waits with its first folder up, so coming back to it (a day tab opens the first) moves nothing.
+      if (selected) {
+        cancel(d);
+        d.panel.style.setProperty('--open', String(open.index));
+      } else if (d.panel.style.getPropertyValue('--open').trim() !== '0') later(d, () => d !== day && d.panel.style.setProperty('--open', '0'));
       d.tab.setAttribute('aria-selected', String(selected));
       d.tab.tabIndex = selected ? 0 : -1;
       // A day not shown fades out of sight: out of the accessibility tree and the tab order.

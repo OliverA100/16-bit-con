@@ -577,20 +577,21 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let samOnScreen: { centre: [number, number]; size: number } | null = null;
   /**
    * The breakout's prompt, centred in the room between the nav and the monitor's top (the monitor is at
-   * rest through the cracks; the HUD is hidden then).
+   * rest through the cracks; the HUD is hidden then). Placed once as it shows (and again on a resize), not
+   * every frame, in the section's own coordinates — the prompt's containing block: the nav's bottom and the
+   * monitor's top each less the section's top, read together. On iOS a touch scroll at the hold is pulled
+   * back every frame, and a viewport rect read mid-fight comes back off by the scroll; read per frame, it
+   * made the prompt jump on alternate frames while the pinned monitor held still.
    */
-  let promptTop = '';
+  let promptPlaced = false;
   const placePrompt = (el: HTMLElement) => {
-    if (!d) return;
-    const nav = document.querySelector('.nav-slot')?.getBoundingClientRect().bottom ?? 0;
-    const monitorTop = slotBox(d).y;
-    const h = el.offsetHeight;
-    const top = nav + (monitorTop - nav - h) / 2;
-    const v = `${Math.round(Math.max(nav + 8, top))}px`;
-    if (v !== promptTop) {
-      promptTop = v;
-      el.style.setProperty('--prompt-top', v);
-    }
+    if (!d || promptPlaced) return;
+    promptPlaced = true;
+    const sec = section.getBoundingClientRect().top;
+    const nav = (document.querySelector('.nav-slot')?.getBoundingClientRect().bottom ?? sec) - sec;
+    const monitorTop = d.slot.getBoundingClientRect().top - sec;
+    const top = nav + (monitorTop - nav - el.offsetHeight) / 2;
+    el.style.setProperty('--prompt-top', `${Math.round(Math.max(nav + 8, top))}px`);
   };
   /** The monitor's screen as a tap target through the cracks (the 3D canvas itself takes no pointer events). */
   const hitEl = d ? d.stage.querySelector<HTMLElement>('[data-hit]') : null;
@@ -617,6 +618,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     });
     startUV = startRect(d);
     scanStart(d, startUV, hero3d.scanLines);
+    promptPlaced = false;
     const r = d.slot.getBoundingClientRect();
     slotCentre = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     // The breakout: Sam where the run ends — at the camera's left margin, on the ground — on the screen frame.
@@ -1604,6 +1606,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           o.prompt?.classList.toggle('is-visible', prompting);
           const count = `Help Sam · ${b ? b.stage : 0}/${HITS}`;
           if (prompting && o.prompt) placePrompt(o.prompt);
+          else promptPlaced = false;
           if (o.promptTitle && o.promptTitle.textContent !== count) o.promptTitle.textContent = count;
           if (hitEl) {
             hitEl.classList.toggle('is-active', prompting);
