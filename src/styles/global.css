@@ -89,9 +89,17 @@ p {
   text-wrap: pretty;
 }
 
+/* Selected text: inverted to Green 900 with Daisy White type, as the site marks anything selected
+   (yellow is for actions). On the site's own Green 900 surfaces — a selected day tab or button, a dark
+   window — it inverts back, so a selection never vanishes into its background. */
 ::selection {
-  background: var(--accent);
-  color: var(--text);
+  background: var(--outline);
+  color: var(--text-on-dark);
+}
+
+:is(.window--dark, .daytab[aria-selected='true'], .ui-button[aria-current], .ui-button:has(input:checked)) ::selection {
+  background: var(--text-on-dark);
+  color: var(--outline);
 }
 
 /* Focus: visible, on-brand, never removed */
