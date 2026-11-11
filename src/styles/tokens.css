@@ -61,7 +61,6 @@
   --wordmark: var(--color-green-900); /* the 16-Bit Con wordmark, in the page's ink */
   --accent: var(--color-yellow-400);
   --outline: var(--color-green-900);
-  --focus-ring: var(--color-yellow-400);
   --sky: var(--color-sky-blue);
   /* The ticket: Green 900 paper, Daisy White ink (secondary at ~66 %), a Yellow 400 hairline frame at ~55 %. */
   --ticket-paper: var(--color-green-900);
@@ -128,17 +127,13 @@
   --sub-max: 34rem;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.25rem;
   --text-xl: 1.5rem;
   --text-2xl: 2rem;
-  --leading-tight: 1.05;
   --leading-snug: 1.3;
   --leading-normal: 1.5;
   /* UI type at vega.io's scale (measured on vega.io/careers at 1440 px) */
   --text-ui: 13px;          /* Geist Mono: window titles, buttons, labels */
   --leading-ui: 20px;       /* its line, and the line of 14 px small copy */
-  --leading-title: 25px;    /* 20 px card headings */
 
   /* Layout */
   --container: 72rem; /* 1152 px: one city tile period */
@@ -149,12 +144,10 @@
      Set by the inline script in Base.astro; 2 is the no-JS fallback. */
   --px: 2;
 
-  /* Motion: one base duration, and steps() where things should feel 16-bit */
-  /* One rule: things that appear step (a step every --beat), things you push glide (--ease-lift). */
+  /* Motion: things that appear step (a step every --beat), things you push glide (--ease-lift). */
   --beat: 50ms;
   --dur-base: 200ms;                /* 4 beats */
   --steps-16bit: steps(4, end);
-  --steps-2: steps(2, end);         /* 100 ms: an error dropping in, a failed submit's bump */
   --steps-3: steps(3, end);         /* 150 ms: the dialog closing */
 
   /* The Schedule's drawer of folders: Vega's folder frame in the site's frame line (1 px Green 900), and

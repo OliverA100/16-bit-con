@@ -90,10 +90,15 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
       const sr = document.createElement('span');
       sr.className = 'sr-only';
       sr.textContent = 'Error: ';
-      const bang = document.createElement('span');
-      bang.className = 'field__bang';
+      // the "!" in pixel blocks, like every icon (a 2 px bar and its dot in the 14 px square)
+      const bang = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      bang.setAttribute('class', 'field__bang');
+      bang.setAttribute('viewBox', '0 0 14 14');
+      bang.setAttribute('width', '14');
+      bang.setAttribute('height', '14');
+      bang.setAttribute('shape-rendering', 'crispEdges');
       bang.setAttribute('aria-hidden', 'true');
-      bang.textContent = '!';
+      bang.innerHTML = '<rect width="14" height="14" class="field__bang-box"/><path d="M6 3h2v5H6zM6 10h2v2H6z"/>';
       const text = document.createElement('span');
       text.textContent = message;
       el.replaceChildren(sr, bang, text);

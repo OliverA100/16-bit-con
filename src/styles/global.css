@@ -106,16 +106,50 @@ p {
   color: var(--outline);
 }
 
-/* Focus: visible, on-brand, never removed */
+/* Focus: one state everywhere — pixel corner brackets in the ink round whatever has keyboard focus, like a
+   game's selection cursor (src/ui/focus-brackets.ts places them). Text fields keep their own 2 px border.
+   Without JS (no .has-focus-brackets) a plain 2 px ink outline stands in. */
 :focus-visible {
   outline: 2px solid var(--outline);
   outline-offset: 2px;
-  box-shadow: 0 0 0 6px var(--focus-ring);
 }
 
-/* UI button — vega.io's button (measured on vega.io/careers), shared by Button.astro, the ticket
-   options and the Levels rail stops. Flat at rest; hover and keyboard focus lift it by --lift onto a
-   hard shadow the same size; pressing drops it flat. --ui-button-ring draws its edge: an inset 1 px
+:root.has-focus-brackets :focus-visible {
+  outline: none;
+}
+
+/* Four 8 px arms, 2 px thick, at the corners of a box 4 px out from the focused one (a 2 px gap, then the line). */
+.focus-brackets {
+  --c: var(--outline);
+  --arm: 8px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2147483000;
+  display: none;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--arm) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / 2px var(--arm) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--arm) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 2px var(--arm) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--arm) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 2px var(--arm) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--arm) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 2px var(--arm) no-repeat;
+}
+
+.focus-brackets.is-on {
+  display: block;
+}
+
+.focus-brackets.is-fixed {
+  position: fixed;
+}
+
+/* UI button — vega.io's button (measured on vega.io/careers), shared by Button.astro, the pass
+   cards and the Levels rail stops. Flat at rest; hover lifts it by --lift onto a hard shadow the same
+   size; pressing drops it flat. Keyboard focus shows the site's focus brackets instead. --ui-button-ring draws its edge: an inset 1 px
    ring by default, none on the primary button. Components add only their own layout and fill. */
 .ui-button {
   --ui-button-ring: inset 0 0 0 1px var(--outline);
@@ -139,12 +173,9 @@ p {
     background-color var(--dur-lift) var(--ease-lift);
 }
 
-.ui-button:hover,
-.ui-button:focus-visible,
-.ui-button:has(input:focus-visible) {
+.ui-button:hover {
   translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
   box-shadow: var(--ui-button-ring), var(--lift) var(--lift) 0 0 var(--outline);
-  outline: none;
 }
 
 .ui-button:active {
@@ -161,15 +192,14 @@ p {
   inset: 0 calc(-1 * var(--lift)) calc(-1 * var(--lift)) 0;
 }
 
-/* Selected (a checked ticket, the current rail stop): inverted to Green 900, as vega.io marks a
-   selection (yellow is for actions). It stays put — a dark lift onto a dark shadow reads as a smear —
-   and keyboard focus on it shows as a ring 2 px out. */
+/* Selected (a checked pass, the current rail stop): inverted to Green 900, as vega.io marks a
+   selection (yellow is for actions). It stays put — a dark lift onto a dark shadow reads as a smear. */
 .ui-button:is([aria-current], :has(input:checked)) {
   background: var(--outline);
   color: var(--surface-card);
 }
 
-.ui-button:is([aria-current], :has(input:checked)):is(:hover, :focus-visible, :has(input:focus-visible)) {
+.ui-button:is([aria-current], :has(input:checked)):hover {
   translate: 0 0;
   box-shadow: var(--ui-button-ring), 0 0 0 0 var(--outline);
 }
@@ -178,24 +208,8 @@ p {
   content: none;
 }
 
-.ui-button:is([aria-current]:focus-visible, :has(input:checked:focus-visible)) {
-  outline: 2px solid var(--outline);
-  outline-offset: 2px;
-}
-
-/* Type roles (tokens.css): one class per role. Sentence case everywhere; no tracking. */
-.t-title {
-  font: var(--type-title);
-}
-
-.t-page-title {
-  font: var(--type-page-title);
-}
-
-.t-window-heading {
-  font: var(--type-window-heading);
-}
-
+/* Type roles (tokens.css) as classes, for the roles markup applies directly (titles, headings and subheadings
+   take theirs in their components). Sentence case everywhere; no tracking. */
 .t-eyebrow,
 .eyebrow {
   font: var(--type-eyebrow);
@@ -204,11 +218,6 @@ p {
 
 .t-lead {
   font: var(--type-lead);
-}
-
-.t-sub {
-  font: var(--type-sub);
-  color: var(--text-secondary);
 }
 
 .t-ui {
@@ -330,37 +339,17 @@ p {
 }
 
 .field__bang {
-  display: grid;
+  display: block;
   flex: none;
-  place-items: center;
-  width: 14px;
-  height: 14px;
-  background: var(--error);
   margin-top: 3px; /* centred on the message's first 20 px line */
-  box-shadow: inset 0 0 0 1px var(--outline);
-  font: 700 11px / 1 var(--font-mono);
-  color: var(--outline);
+  fill: var(--outline);
 }
 
-.skip-link {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  z-index: 100;
-  padding: var(--space-2) var(--space-3);
-  background: var(--accent);
-  border: var(--border);
-  box-shadow: var(--shadow-hard-sm);
-  font: var(--type-ui);
-  text-decoration: none;
-  transform: translateY(calc(-100% - var(--space-4)));
-}
-
-.skip-link:focus {
-  transform: none;
-  box-shadow:
-    var(--shadow-hard-sm),
-    0 0 0 6px var(--focus-ring);
+/* the square: Yellow 600 with a 1 px ink edge (a 2 px stroke, its outer half clipped by the svg); the "!" over it */
+.field__bang-box {
+  fill: var(--error);
+  stroke: var(--outline);
+  stroke-width: 2;
 }
 
 @media (prefers-reduced-motion: reduce) {

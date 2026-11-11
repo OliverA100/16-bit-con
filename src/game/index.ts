@@ -282,7 +282,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // has painted, so the opening's text never queues behind it.
   await afterOpeningPaint(section.querySelector('[data-stage]'));
   const assets = await loadLevel1((done, total) => {
-    if (o.loadingText) o.loadingText.textContent = `LOADING… ${Math.round((done / total) * 100)}%`;
+    if (o.loadingText) o.loadingText.textContent = `Loading… ${Math.round((done / total) * 100)}%`;
   });
   const bootAt = performance.now();
 
@@ -1138,27 +1138,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   /**
    * Exit game or Esc: the spot is saved, the game's UI goes, and the camera pulls back out of the screen
    * to the monitor (the dive backwards, at its pace); then the pin goes and the page is the hero again,
-   * the monitor showing the game frozen where the player left. The skip link does it at once. Through the
-   * breakout's finale (it plays itself out in ~2.4 s) Esc does nothing; the skip link lands Sam instead.
+   * the monitor showing the game frozen where the player left. Through the breakout's finale (it plays
+   * itself out in ~2.4 s) Esc does nothing.
    */
-  const exitPlay = (focus: 'start' | 'main') => {
-    if (mode !== 'play' || regDialog?.open) return;
-    if (exiting) {
-      if (focus === 'main') {
-        zoom = null;
-        finishExit('main');
-      }
-      return;
-    }
+  const exitPlay = () => {
+    if (mode !== 'play' || regDialog?.open || exiting) return;
     const tl = timeline.t;
     const q = qAt(tl);
-    if (wantBreakout && q >= BREAKOUT.shatter[0]) {
-      if (focus === 'main') {
-        landNow();
-        document.getElementById('main')?.focus({ preventScroll: true });
-      }
-      return;
-    }
+    if (wantBreakout && q >= BREAKOUT.shatter[0]) return;
     saved = tl >= 0 ? { t: Math.min(T_MAX, tl), q } : null;
     stopPlays();
     timeline.jumpTo(tl);
@@ -1166,14 +1153,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     root.classList.add('is-exiting');
     root.classList.remove('is-playing');
     const from = lastHeroP;
-    if (focus === 'main' || from <= 0) {
+    if (from <= 0) {
       zoom = null;
-      finishExit(focus);
-    } else zoom = { p0: from, p1: 0, t0: -1, done: () => finishExit(focus) };
+      finishExit();
+    } else zoom = { p0: from, p1: 0, t0: -1, done: () => finishExit() };
   };
 
   /** The zoom out has landed on the monitor at rest: the pin goes, the page is at the top of the hero. */
-  const finishExit = (focus: 'start' | 'main') => {
+  const finishExit = () => {
     exiting = false;
     trigger?.kill(true);
     trigger = null;
@@ -1184,7 +1171,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     resetStage();
     window.scrollTo({ top: 0, behavior: 'instant' });
     expectedY = Number.NaN;
-    if (focus === 'start' && d?.start.classList.contains('is-ready')) d.startButton.focus({ preventScroll: true });
+    if (d?.start.classList.contains('is-ready')) d.startButton.focus({ preventScroll: true });
     else document.getElementById('main')?.focus({ preventScroll: true });
     announce('Game closed.');
   };
@@ -1325,7 +1312,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       openRegister(link);
     });
   }
-  o.exit?.addEventListener('click', () => exitPlay('start'));
+  o.exit?.addEventListener('click', () => exitPlay());
   // Sound on/off (the HUD, play mode only): remembered; off silences everything at once.
   const soundButton = section.querySelector<HTMLButtonElement>('[data-sound]');
   if (soundButton) {
@@ -1341,19 +1328,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const root = document.documentElement;
     if (mode === 'play') {
       e.preventDefault();
-      exitPlay('start');
+      exitPlay();
     } else if (root.classList.contains('is-exiting') || root.classList.contains('is-finale')) e.preventDefault();
   });
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || mode !== 'play' || paused || exiting || regDialog?.open) return;
     e.preventDefault();
-    exitPlay('start');
-  });
-  // The skip link in the game: out of it first, then to the content.
-  document.querySelector<HTMLAnchorElement>('.skip-link')?.addEventListener('click', (e) => {
-    if (mode !== 'play') return;
-    e.preventDefault();
-    exitPlay('main');
+    exitPlay();
   });
 
   // ── Loop ────────────────────────────────────────────────────────────────
@@ -1814,7 +1795,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       zoom = null;
       then();
     }
-    // The play a sound follows has gone early (a scroll cancelled it, the skip link cut the zoom out): a fast fade.
+    // The play a sound follows has gone early (a scroll cancelled it): a fast fade.
     if (cue && cue.owner !== playing && cue.owner !== zoom && cue.owner !== breakPlay) {
       cue.voice.stop();
       cue = null;

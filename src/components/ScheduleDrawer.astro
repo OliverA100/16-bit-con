@@ -414,11 +414,6 @@ const plate = 'Files · Oct 3–5';
       filter var(--dur-lift) var(--ease-lift);
   }
 
-  .daytab[aria-selected='false']:focus-visible {
-    translate: calc(-1 * var(--tab-lift-x)) calc(-1 * var(--tab-lift-y));
-    filter: drop-shadow(var(--tab-lift-x) var(--tab-lift-y) 0 var(--folder-ink));
-  }
-
   @media (hover: hover) {
     .daytab[aria-selected='false']:hover {
       translate: calc(-1 * var(--tab-lift-x)) calc(-1 * var(--tab-lift-y));
@@ -491,12 +486,6 @@ const plate = 'Files · Oct 3–5';
 
   .folder__title:focus {
     outline: none;
-  }
-
-  .folder__title:focus-visible {
-    outline: 2px solid var(--outline);
-    outline-offset: 2px;
-    box-shadow: none;
   }
 
   .folder__blurb {

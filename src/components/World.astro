@@ -13,15 +13,18 @@ import Wordmark from './Wordmark.astro';
 import { sessions } from '../data/sessions';
 import { railStops, type RailIcon } from '../data/guide';
 import { POSTER } from '../monitor/poster';
+import { PIXEL_ICONS, pixelPath } from '../data/pixel-icons';
 
-/** Thin outline icons for the rail, 16 × 16, 2 px strokes (brand rule: outline icons with mono labels). */
+/** The rail's icons, 16 × 16 in 2 px pixel blocks like every icon on the site (src/data/pixel-icons.ts). */
 const icons: Record<RailIcon, string> = {
-  sun: '<circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13"/>',
-  city: '<path d="M2 15V6h4v9M6 15V2h5v13M11 15V8h3v7M1 15h14"/>',
-  moon: '<path d="M11 2a6 6 0 1 0 3 8A5 5 0 0 1 11 2z"/>',
-  crt: '<rect x="1" y="2" width="14" height="10"/><path d="M4 5l2 2-2 2M6 15h4M8 12v3"/>',
-  booth: '<rect x="2" y="2" width="12" height="6"/><path d="M8 8v7M5 15h6"/>',
+  sun: pixelPath(PIXEL_ICONS.sun),
+  city: pixelPath(PIXEL_ICONS.city),
+  moon: pixelPath(PIXEL_ICONS.moon),
+  crt: pixelPath(PIXEL_ICONS.crt),
+  booth: pixelPath(PIXEL_ICONS.booth),
 };
+const soundOn = pixelPath(PIXEL_ICONS.soundOn);
+const soundOff = pixelPath(PIXEL_ICONS.soundOff);
 
 const level1 = sessions[0]!;
 const level2 = sessions[1]!;
@@ -112,10 +115,9 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       <span class="mono world__clock" data-hud-clock>07:00 AM</span>
       <span class="mono world__level" data-hud-level>Level 1</span>
       <Button variant="ghost" class="world__sound" data-sound aria-label="Sound" aria-pressed="true">
-        <svg class="world__sound-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path d="M2 6h3l4-3v10l-4-3H2z" />
-          <path class="world__sound-waves" d="M11.5 6.5a2 2 0 0 1 0 3M13.5 4.5a5 5 0 0 1 0 7" />
-          <path class="world__sound-x" d="M11.5 6.5l3 3M14.5 6.5l-3 3" />
+        <svg class="world__sound-icon" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true">
+          <path class="world__sound-waves" d={soundOn} />
+          <path class="world__sound-x" d={soundOff} />
         </svg>
       </Button>
       <Button variant="ghost" class="world__exit" data-exit>Exit game</Button>
@@ -128,7 +130,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
         railStops.map((s) => (
           <li>
             <button type="button" class="rail__stop ui-button" data-rail={s.id} data-jump={String(s.jump)} data-state="next">
-              <svg class="rail__icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" set:html={icons[s.icon]} />
+              <svg class="rail__icon" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true"><path d={icons[s.icon]} /></svg>
               <span class="rail__label">{s.label}</span>
             </button>
           </li>
@@ -181,7 +183,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   <p class="sr-only" aria-live="polite" data-world-status></p>
 
   <Window title="Loading" class="world__loading" hidden>
-    <p class="mono" data-loading-text>LOADING… 0%</p>
+    <p class="mono" data-loading-text>Loading… 0%</p>
   </Window>
 </section>
 
@@ -359,11 +361,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .hero__power[hidden] {
     display: none;
-  }
-
-  .hero__power:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
   }
 
   :global(:root.is-playing) .hero__power {
@@ -599,11 +596,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .rail__icon {
     flex: none;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: square;
-    stroke-linejoin: miter;
+    fill: currentColor;
   }
 
   .rail__stop[data-state='next'] {
@@ -753,11 +746,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .world__sound-icon {
     display: block;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: square;
-    stroke-linejoin: miter;
+    fill: currentColor;
   }
 
   :global(.world__sound[aria-pressed='false']) .world__sound-waves,

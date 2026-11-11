@@ -209,11 +209,18 @@ export function hold(reason: string, held: boolean): void {
   if (held) {
     // a dive or a zoom out can't wait for the tab: its animation jumps on meanwhile
     if (reason === 'hidden') for (const v of voices) if (v.name === 'enter' || v.name === 'exit') v.stop();
+    // the Register dialog pauses the game: what is playing ends now (the off button's fast fade), so
+    // closing it never plays the rest of a sound that belonged to the moment before
+    if (reason === 'dialog') {
+      for (const v of voices) v.stop();
+      pending.length = 0;
+    }
     setMaster();
     const c = ctx;
+    // suspend once the voices' fades (CUT, 50 ms) have run, so none is left half-faded to finish on resume
     setTimeout(() => {
       if (holds.size > 0 && c.state === 'running') void c.suspend();
-    }, 40);
+    }, 80);
   } else if (holds.size === 0) {
     void ctx.resume().then(() => setMaster());
   }

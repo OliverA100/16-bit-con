@@ -85,7 +85,6 @@ const {
     </script>
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to content</a>
     <Nav />
     <main id="main" tabindex="-1">
       <slot />
@@ -115,6 +114,12 @@ const {
     )}
   </body>
 </html>
+
+<script>
+  import { startFocusBrackets } from '../ui/focus-brackets';
+
+  startFocusBrackets();
+</script>
 
 <script>
   import { startFooter } from '../game/footer';
