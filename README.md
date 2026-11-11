@@ -15,6 +15,12 @@ By default the page reads like a normal landing page: the hero, the registration
 
 Inside the game one timeline drives everything, so scrolling up plays it backwards. When Sam lands, the game closes itself: the pin goes, the page stays exactly where it was, and Sam stays on the form for the rest of the visit. Exit game (or Esc) leaves mid-game, zooming back out to the monitor with focus on START.
 
+## The schedule
+
+The schedule is a drawer of Vega's tabbed folders, one day at a time: index tabs across the top pick Oct 3, 4 or 5, and the day's three folders stand in the drawer, every tab showing its time and title. One folder is always open (the Opening Keynote to start): it lifts out of the drawer to show its details and its own animated scene, drawn on a canvas from Vega's sprites at one CSS pixel per art pixel, beside and below the text. Only the open folder's scene plays, and only while it is on screen; every scene is built ahead of time in idle moments, so opening a folder or switching day is one smooth motion that any click can redirect midway.
+
+The brief's three sessions are Oct 3, with their copy as given. The Oct 4 and Oct 5 sessions were added for this page.
+
 ## Controls
 
 - START opens the game. Until then the keys belong to the page, so Space scrolls it.
@@ -50,17 +56,18 @@ npm run check     # type-check
 | Path | What |
 |---|---|
 | `src/pages/index.astro` | The page: the world, the registration form and the schedule |
-| `src/components/` | Window, Button, Nav, SessionCard, SceneStill, RegisterForm, Wordmark, World |
+| `src/components/` | Window, Button, Nav, ScheduleDrawer, RegisterForm, Wordmark, World |
+| `src/schedule/` | The schedule drawer's behaviour, the scene runner and the nine folder scenes |
 | `src/game/` | The canvas world: timeline, stages, Sam, input, night palettes and their worker, the plaza and the landing |
 | `src/monitor/` | The three.js monitor: model, CRT shader, poster and breakout |
-| `src/data/` | Layer recipes, the sprite manifest, sessions, the progress rail and Agent Sam's lines |
+| `src/data/` | World keyframes, the sprite manifest, sessions, the progress rail and Agent Sam's lines |
 | `public/sprites/` | Vega's art, untouched; `SOURCES.md` lists where each file comes from and the new art drawn for this page |
 
 ## Performance and accessibility
 
 - The opening paints in one go with no image request: the wordmark is inline SVG, so the largest contentful paint is the hero's text (its tagline), and the world's art and the 3D load after it.
 - Measured during the build: 60 fps through the zoom and the breakout with the CPU throttled 4×, no long tasks or layout shifts, and Lighthouse 100 on mobile and desktop.
-- All the event information lives in the DOM sections and is reachable without playing; the canvases are `aria-hidden`. By default nothing in the game (HUD, rail, d-pad, Exit game) is in the tab order.
+- All the event information lives in the DOM sections and is reachable without playing; the canvases are `aria-hidden`. Closed schedule folders use `hidden="until-found"`, so find-in-page reaches their text and opens the folder; each tab is a button with `aria-expanded` whose name starts with its visible label. By default nothing in the game (HUD, rail, d-pad, Exit game) is in the tab order.
 - The pin is created only when the game starts and removed when it ends, with the scroll adjusted in the same frame, so neither adds a layout shift.
 - Semantic HTML with real buttons and links, visible focus states in brand colours, and a skip link that also leaves the game. The registration dialog is a native modal `<dialog>` that traps focus and returns it to the link that opened it. Starting, closing and finishing the game are announced, as are Agent Sam's lines, through polite live regions.
 

@@ -46,9 +46,9 @@ matches; the files in this folder are untouched.
 - daisy-tall_118x244: a single tall daisy on its stem, leaves to the ground (the daisy of daisy-clouds-sway without its clouds)
 - bg-canyon-river_960x540: a desert canyon over a river, drawn in its bottom 103 rows only (the rest is transparent); bg-lake-hills_480x320: hills round a lake; bg-green-hills-plain_509x200: a plainer version of bg-green-hills (careers pack bg2 / bg3 / bgii, renamed)
 - cloud-lg_207x130, cloud-md_128x64, cloud-sm_110x40, cloud-xs_54x33: two-colour clouds from the careers pack
-- scene-threat-detected-night-rain_3600x1890: NIGHT PALETTE REFERENCE, do not ship as-is
+- scene-threat-detected-night-rain_3600x1890: night palette reference. The schedule's Cheat Codes folder samples it back to its own 508 × 266 pixels at load (it is a 3600/509 upscale) and uses only the landscape under its window, sky keyed out and rain lifted and re-fallen; the Vega logo and the window are not shown
 - scene-retro-computer, scene-floppy-disk, scene-grass-field-clouds-sam: style refs / crop for props
-- daisy-clouds-sway_8f, beanstalk-sway_10f: homepage hero sheets, reference only (do not reuse the daisy hero)
+- daisy-clouds-sway_8f, beanstalk-sway_10f: homepage hero sheets. The schedule's Keynote and Closing Credits folders use the daisy lifted out of its clouds at load (the clouds are never drawn), and the Repair Bench folder the swaying beanstalk, both at native size
 
 ## props/
 arcade-machine (VEGA marquee), vega-sign, vega-sign-horizontal, poster-i-want-you,

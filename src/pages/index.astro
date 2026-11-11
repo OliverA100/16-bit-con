@@ -2,9 +2,8 @@
 import Base from '../layouts/Base.astro';
 import Window from '../components/Window.astro';
 import World from '../components/World.astro';
-import SessionCard from '../components/SessionCard.astro';
+import ScheduleDrawer from '../components/ScheduleDrawer.astro';
 import RegisterForm from '../components/RegisterForm.astro';
-import { sessions } from '../data/sessions';
 ---
 
 <Base>
@@ -37,16 +36,8 @@ import { sessions } from '../data/sessions';
 
   <section class="section container" id="schedule" aria-labelledby="schedule-title">
     <h2 id="schedule-title">Schedule</h2>
-    <p class="section__lede">Three sessions. Zero save states.</p>
-    <ol class="sessions">
-      {
-        sessions.map((session) => (
-          <li>
-            <SessionCard session={session} />
-          </li>
-        ))
-      }
-    </ol>
+    <p class="section__lede">Nine sessions. Three days. Zero save states.</p>
+    <ScheduleDrawer />
   </section>
 </Base>
 
@@ -69,20 +60,6 @@ import { sessions } from '../data/sessions';
   .section__lede {
     color: var(--text-muted);
     text-align: center;
-  }
-
-  .sessions > li {
-    display: flex;
-  }
-
-  .sessions {
-    display: grid;
-    gap: var(--space-8);
-    width: 100%;
-    padding: 0;
-    list-style: none;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-    grid-auto-rows: 1fr; /* every row as tall as the tallest card: all three match at any width */
   }
 
   /* ── The landing: the Register window with Sam on its title bar (--sam-px: CSS px per art px, whole

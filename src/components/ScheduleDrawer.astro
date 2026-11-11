@@ -1,0 +1,588 @@
+---
+/**
+ * ScheduleDrawer — the schedule as a drawer of Vega's tabbed folders, one day at a time. Index tabs
+ * across the top pick the day (a tablist); the day's three folders stand in the drawer, every tab
+ * showing its time and title. One folder is always open: it lifts out of the drawer into room
+ * reserved above the folders, and plays its own pixel scene (src/schedule). Behaviour:
+ * src/schedule/drawer.ts.
+ *
+ * The folder is Vega's folder frame (public/sprites/ui/frames/folder.svg) drawn in CSS and two
+ * fixed slant pieces, so the tab's angle never changes with its label.
+ */
+import { days } from '../data/sessions';
+
+const OPEN = 'opening-keynote'; // open by default: the brief's sessions read at once
+
+type Pos = 'left' | 'middle' | 'right';
+const positions: Pos[] = ['left', 'middle', 'right'];
+
+const panels = days.map(({ day, sessions }) => {
+  const id = day.toLowerCase().replace(' ', '-');
+  const openIndex = sessions.findIndex((s) => s.id === OPEN);
+  return {
+    id,
+    label: day.toUpperCase(),
+    long: day.replace('Oct', 'October'),
+    selected: openIndex >= 0,
+    openIndex,
+    folders: sessions.map((s, i) => ({ ...s, i, pos: positions[i % 3]! })),
+  };
+});
+
+const plate = 'Session files · Oct 3–5';
+---
+
+<div class="drawer" data-day="oct-3" data-open={OPEN} data-drawer>
+  <div class="drawer__days" role="tablist" aria-label="Days" data-days>
+    {
+      panels.map((p) => (
+        <button
+          type="button"
+          role="tab"
+          class="tab daytab"
+          id={`daytab-${p.id}`}
+          aria-selected={p.selected ? 'true' : 'false'}
+          aria-controls={`panel-${p.id}`}
+          tabindex={p.selected ? 0 : -1}
+          data-daytab={p.id}
+        >
+          <span class="tab__shape" aria-hidden="true"></span>
+          <span class="tab__label mono">{p.label}</span>
+        </button>
+      ))
+    }
+  </div>
+
+  <!-- The back card the day tabs stand on: the room for an open folder, then the day's folders. -->
+  <div class="drawer__body">
+    <div class="drawer__reserve"></div>
+    <div class="drawer__files">
+      {
+        panels.map((p) => (
+          <div
+            class="panel"
+            role="tabpanel"
+            id={`panel-${p.id}`}
+            aria-labelledby={`daytab-${p.id}`}
+            data-panel={p.id}
+            data-state={p.selected ? 'in' : 'out'}
+            style={`--open: ${p.openIndex};`}
+            aria-hidden={p.selected ? undefined : 'true'}
+          >
+            <h3 class="sr-only">{p.long}</h3>
+            <ol class="panel__folders">
+              {p.folders.map((f) => {
+                const open = f.id === OPEN;
+                return (
+                  <li class:list={['card', { 'is-open': open }]} style={`--i: ${f.i};`} data-folder={f.id} data-scene={f.scene} data-index={f.i}>
+                    <button
+                      type="button"
+                      class="tab tab--folder"
+                      id={`tab-${f.id}`}
+                      data-pos={f.pos}
+                      aria-expanded={open ? 'true' : 'false'}
+                      aria-controls={`folder-${f.id}`}
+                      aria-label={`${f.time} · ${f.tab}, ${f.title}`}
+                      tabindex={p.selected ? undefined : -1}
+                      data-tab
+                    >
+                      <span class="tab__shape" aria-hidden="true"></span>
+                      <!-- The name is the visible label, then the full title (label in name, WCAG 2.5.3). The label is
+                           drawn from data-label, so find-in-page lands on the folder's own text and opens it. -->
+                      <span class="tab__label mono" data-label={`${f.time} · ${f.tab}`} />
+                    </button>
+                    <div class="card__body">
+                      <!-- The folder's scene, under its text and below the strip a closed folder shows. -->
+                      <div class="folder__scene">
+                        <canvas class="folder__canvas pixel" width="0" height="0" aria-hidden="true" data-canvas />
+                      </div>
+                      <div
+                        class="folder"
+                        id={`folder-${f.id}`}
+                        role="region"
+                        aria-labelledby={`title-${f.id}`}
+                        hidden={open ? undefined : 'until-found'}
+                        data-region
+                      >
+                        <div class="folder__text">
+                          <p class="folder__meta mono">
+                            {f.time} · <span class="folder__place">{f.place}</span>
+                          </p>
+                          <h4 class="folder__title" id={`title-${f.id}`} tabindex="-1">
+                            {f.title}
+                          </h4>
+                          <p class="folder__blurb">{f.blurb}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="drawer__front" aria-hidden="true">
+    <p class="drawer__plate mono">{plate}</p>
+    <span class="drawer__pull"></span>
+  </div>
+</div>
+
+<script>
+  import { bootDrawer } from '../schedule/drawer';
+
+  const drawer = document.querySelector<HTMLElement>('[data-drawer]');
+  if (drawer) bootDrawer(drawer);
+</script>
+
+<style>
+  /* ── Geometry. Top to bottom: the day tabs, the back card (the room an open folder lifts into, then
+        the day's three folders, each --step below the one before), the drawer front. The open folder
+        and the folders behind it lift by --rise, so its whole body shows above the folder in front,
+        whose tab and edge cut it like the ground. Nothing here changes size. ── */
+  .drawer {
+    --tab-h: 36px; /* a tab as drawn; its button reaches one line further down (it covers its body's top line) */
+    --step: calc(var(--tab-h) + 12px); /* a tab and the sliver of body under it */
+    --view: 300px; /* an open folder's visible body: from its top line to the next folder's */
+    --rise: calc(var(--view) - var(--step));
+    --body-h: calc(var(--view) + var(--step));
+    --gap: 12px; /* the back card's sliver above an open folder */
+    --files-h: calc(3 * var(--step) + var(--tab-h));
+    --sink: calc(var(--rise) + var(--files-h) + var(--step)); /* a day's folders, down behind the front */
+    --inset: var(--space-8);
+    --front-h: 180px;
+    /* The scene's box, standing on the ground, up to one step below the body's top line: a closed folder
+       shows that top step of its body, so it stays clear and no scene ever shows in a closed folder. */
+    --scene-h: calc(var(--view) - var(--step));
+    --dur-fade: 250ms; /* the open folder's text, in as it rises, out as it sinks */
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 64rem);
+  }
+
+  /* ── Day tabs: index tabs on the back card's top line; the selected one filled, opening into it ── */
+  .drawer__days {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    gap: var(--space-1);
+    height: var(--tab-h);
+    margin-inline: var(--inset);
+  }
+
+  .drawer__body {
+    position: relative;
+    z-index: 1;
+    margin-inline: var(--inset);
+    background: var(--surface-card);
+    border: var(--line-folder);
+    border-bottom: 0;
+    /* Cut at the front's top edge: the day's folders reach on under the front, and the days not shown wait
+       below it. Everything there is behind the opaque front, and clip (unlike a clip-path) also keeps it
+       out of the page's scrollable area, so the page ends where the drawer does. */
+    overflow-x: visible;
+    overflow-y: clip;
+  }
+
+  /* The back card's side lines, drawn again above everything in it: a moving folder is painted as its own
+     layer, and a browser may round that layer out by a pixel (Safari does), covering the line it sits
+     against. Above the folders, the sides are never covered, at rest or in motion. */
+  .drawer__body::after {
+    content: '';
+    position: absolute;
+    inset: 0 calc(-1 * var(--line-w)) 0;
+    z-index: 5;
+    border-inline: var(--line-folder);
+    pointer-events: none;
+  }
+
+  /* the room the open folder lifts into */
+  .drawer__reserve {
+    height: calc(var(--rise) + var(--gap));
+  }
+
+  .drawer__files {
+    position: relative;
+    height: var(--files-h);
+  }
+
+  /* ── A day: its three folders, all days in the same place. The selected day stands in front at 0; the
+        others wait --sink down, behind the front and cut at its bottom edge, out of sight (and aria-hidden,
+        their tabs out of the tab order). Their folders' text stays findable: hidden="until-found". ── */
+  .panel {
+    position: absolute;
+    inset: 0 0 auto; /* inside the back card's side lines, which are the folders' sides too */
+    height: var(--files-h);
+    translate: 0 0;
+    transition: translate var(--dur-folder) var(--ease-folder);
+  }
+
+  .panel[data-state='in'] {
+    z-index: 2;
+  }
+
+  .panel[data-state='out'] {
+    z-index: 1;
+    translate: 0 var(--sink);
+  }
+
+  .tab--folder .tab__label::before {
+    content: attr(data-label);
+  }
+
+  .panel__folders {
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    position: absolute;
+    top: calc(var(--i) * var(--step));
+    left: 0;
+    right: 0;
+    z-index: calc(var(--i) + 1);
+    height: calc(var(--tab-h) + var(--body-h));
+    translate: 0 calc(-1 * var(--rise) * clamp(0, var(--open) - var(--i) + 1, 1));
+    transition: translate var(--dur-folder) var(--ease-folder);
+  }
+
+  .card__body {
+    position: absolute;
+    top: var(--tab-h);
+    left: 0;
+    right: 0;
+    height: var(--body-h);
+    background: var(--surface-card);
+    /* Top and bottom lines only: the back card's side lines are every folder's sides. Two boxes drawing a
+       line in the same place would part by a device pixel whenever a moving folder sits at a sub-pixel
+       position; one line, drawn once by the box that never moves, cannot. */
+    border-block: var(--line-folder);
+  }
+
+
+  /* ── Tabs: one trapezoid per tab, Vega's folder tab, its outline drawn as one shape: an ink trapezoid
+        and a Cloud White one inset by one line inside it (both clip-paths), so the slants and the top
+        line meet exactly at any pixel density. The inner slant sits one line in across the slant:
+        --slant-in at its top, --slant-foot at its foot (for a --slant over the tab's height). A folder
+        tab reaches one line below its top, over its body's top line, so it opens into the body. ── */
+  .tab {
+    --slant: 22px;
+    --slant-in: 22.57px; /* 22 − 22 × 1/37 + 1.16: the inner slant's top, one line in */
+    --slant-foot: 1.16px; /* 1 × √(22² + 37²) / 37: one line, measured across the slant */
+    --tab-room: var(--space-6); /* room either side of a folder tab's label: long tabs, as in the mock */
+    --day-room: var(--space-6); /* the same for the day tabs, less where three must fit across a phone */
+
+    position: absolute;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    height: calc(var(--tab-h) + var(--line-w));
+    margin: 0;
+    padding: var(--line-w) calc(var(--slant) + var(--tab-room)) 0;
+    background: none;
+    border: 0;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  /* 44 px to touch: the hit area reaches into the tab's own sliver */
+  .tab::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 -6px;
+  }
+
+  .tab[data-pos='left'] {
+    left: 0;
+  }
+
+  .tab[data-pos='middle'] {
+    left: 50%;
+    translate: -50% 0;
+  }
+
+  .tab[data-pos='right'] {
+    right: 0;
+  }
+
+  /* The shape reaches one pixel below the tab: the outline still ends at the tab's foot, and the white
+     inside carries on over the body's top line, so no sliver of that line shows under the tab whichever
+     way a browser rounds the two. */
+  .tab__shape {
+    position: absolute;
+    inset: 0 0 -1px;
+    background: var(--folder-ink);
+    clip-path: polygon(0 calc(100% - 1px), var(--slant) 0, calc(100% - var(--slant)) 0, 100% calc(100% - 1px));
+  }
+
+  .tab__shape::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--surface-card);
+    clip-path: polygon(
+      var(--slant-foot) 100%,
+      var(--slant-in) var(--line-w),
+      calc(100% - var(--slant-in)) var(--line-w),
+      calc(100% - var(--slant-foot)) 100%
+    );
+  }
+
+  .tab__label {
+    position: relative;
+    font-size: var(--text-ui);
+    line-height: var(--leading-ui);
+    white-space: nowrap;
+  }
+
+  /* Day tabs: side by side on the back card's top line; the selected one filled, opening into the card. */
+  .daytab {
+    position: relative;
+    height: var(--tab-h);
+    padding-inline: calc(var(--slant) + var(--day-room));
+  }
+
+  .daytab .tab__label {
+    letter-spacing: var(--tracking-mono);
+  }
+
+  .daytab[aria-selected='true'] {
+    height: calc(var(--tab-h) + var(--line-w));
+  }
+
+  /* a day tab not selected stands on the back card's line, not opening into it: its shape ends at its foot */
+  .daytab[aria-selected='false'] .tab__shape {
+    inset: 0;
+    clip-path: polygon(0 100%, var(--slant) 0, calc(100% - var(--slant)) 0, 100% 100%);
+  }
+
+  .daytab[aria-selected='true'] .tab__shape::after {
+    background: var(--folder-ink);
+  }
+
+  .daytab[aria-selected='true'] .tab__label {
+    color: var(--color-daisy-white);
+  }
+
+  /* ── An open folder: its text top-left, its scene under it. The folder box is exactly the visible
+        body: it ends on the next folder's top line, which is the scene's ground. ── */
+  .folder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    height: calc(var(--view) - var(--line-w));
+    overflow: hidden;
+  }
+
+  /* hidden="until-found": the text stays in the page for find-in-page, which opens the folder
+     (beforematch). The page-wide [hidden] rule would take it out of the page altogether. */
+  .folder[hidden='until-found'] {
+    display: block !important;
+    content-visibility: hidden;
+  }
+
+  /* A folder's text shows while it is open: it fades in as the folder rises and out as it sinks, so it
+     never appears or disappears in the strip a closed folder shows (it is hidden once faded out). */
+  .folder__text {
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity var(--dur-fade) var(--ease-folder);
+    display: grid;
+    gap: var(--space-2);
+    max-width: min(38rem, 64%);
+    padding: var(--space-6) 0 0 var(--space-6);
+  }
+
+  .card.is-open .folder__text {
+    opacity: 1;
+  }
+
+  .folder__meta {
+    font-size: var(--text-ui);
+    line-height: var(--leading-ui);
+  }
+
+  .folder__place {
+    text-transform: uppercase;
+  }
+
+  .folder__title {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: var(--text-2xl);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .folder__title:focus {
+    outline: none;
+  }
+
+  .folder__title:focus-visible {
+    outline: 2px solid var(--outline);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .folder__blurb {
+    max-width: 30rem;
+  }
+
+  /* The scene's box ends on the ground: the next folder's top line (--view below this body's top line).
+     It starts one step below the body's top line, the strip a closed folder shows, so a closed folder
+     shows no scene; it keeps the frame it last showed underneath, ready for when it opens again. */
+  .folder__scene {
+    position: absolute;
+    top: calc(var(--view) - var(--line-w) - var(--scene-h));
+    left: 0;
+    right: 0;
+    height: var(--scene-h);
+    overflow: hidden;
+  }
+
+  /* The canvas is sized by src/schedule/runner.ts in whole art pixels and moved down by a transform so
+     its bottom meets the ground (its box never moves, so sizing it is never a layout shift). It fades in
+     with its first frame. */
+  .folder__canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+  }
+
+  .folder__canvas[data-drawn] {
+    opacity: 1;
+  }
+
+  .folder__canvas[data-drawn='fade'] {
+    transition: opacity 200ms var(--ease-folder);
+  }
+
+  /* ── The drawer front ── */
+  /* The label in the upper part of the front and the pull a clear step below it, with more room under
+     the pull than over the label, as on a real drawer (and the mock). */
+  .drawer__front {
+    position: relative;
+    z-index: 3;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: var(--space-8);
+    padding-bottom: var(--space-6);
+    height: var(--front-h);
+    background: var(--surface-card);
+    border: var(--line-folder);
+    box-shadow: var(--shadow-hard);
+  }
+
+  /* The drawer's label: a Daisy White nameplate screwed to the front, its frame, type and screws in the
+     ink. Quiet under the scenes; no hard shadow and no lift, so it never reads as a button. */
+  .drawer__plate {
+    position: relative;
+    padding: var(--space-3) calc(var(--space-12) + var(--space-2));
+    background: var(--color-daisy-white);
+    border: var(--line-folder);
+    color: var(--text);
+    font-size: var(--text-ui);
+    line-height: var(--leading-ui);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* a screw at each end */
+  .drawer__plate::before,
+  .drawer__plate::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    margin-top: -3.5px;
+    border: var(--line-folder);
+    border-radius: 50%;
+  }
+
+  .drawer__plate::before {
+    left: var(--space-3);
+  }
+
+  .drawer__plate::after {
+    right: var(--space-3);
+  }
+
+  .drawer__pull {
+    width: 144px;
+    height: 14px;
+    border: var(--line-folder);
+    border-radius: 999px;
+  }
+
+  /* ── Narrow: the same drawer, the open folder's text on top and its scene in a band below ── */
+  @media (max-width: 859px) {
+    .tab {
+      --day-room: var(--space-3);
+    }
+
+    .drawer {
+      --view: 400px;
+      --inset: var(--space-3);
+      --front-h: 132px;
+      --scene-h: calc(var(--view) - 236px); /* a band under the text */
+    }
+
+    .folder__text {
+      max-width: none;
+      padding: var(--space-6) var(--space-4) 0;
+    }
+
+    .folder__title {
+      font-size: var(--text-xl);
+    }
+
+    .drawer__plate {
+      padding-inline: var(--space-8);
+    }
+
+    /* on phones, label and pull close together in the middle of the front */
+    .drawer__front {
+      gap: var(--space-4);
+      padding-bottom: 0;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .tab {
+      --tab-room: var(--space-3);
+      --day-room: var(--space-2);
+      --slant: 16px;
+      --slant-in: 16.66px; /* 16 − 16 × 1/37 + 1.09 */
+      --slant-foot: 1.09px; /* 1 × √(16² + 37²) / 37 */
+    }
+
+    .tab__label {
+      font-size: var(--text-xs);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card,
+    .panel,
+    .folder__text,
+    .folder__canvas[data-drawn='fade'] {
+      transition: none;
+    }
+  }
+</style>
