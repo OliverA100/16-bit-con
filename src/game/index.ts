@@ -498,13 +498,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const frameLag = (now: number) => (vclock ? 0 : Math.min(200, Math.max(0, performance.now() - now)));
   /** When, in a dive from the top, the camera passes the glass: the picture nearly fills the view (the monitor finds it per viewport). */
   const glassMs = () => playMs(hero3d ? hero3d.flatP + ENTER.flatten.lead : ENTER.fillBy);
-  /**
-   * ?pin=scroll (a test, on any build): the pin moves the world with a transform in the page's own scroll rather
-   * than holding it with position: fixed. Safari 26 shows scrolling content behind the status bar but paints a
-   * solid strip over a fixed element there, so this is the run's scene running on up behind the clock.
-   */
-  const scrollPin = new URLSearchParams(location.search).get('pin') === 'scroll';
-  if (scrollPin) root.classList.add('pin-scroll');
   /** The pin, created by PRESS START (never on load), so the page is only as long as its content until then. */
   const createPin = () =>
     ScrollTrigger.create({
@@ -512,7 +505,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       start: 'top top',
       end: () => `+=${D}`,
       pin: true,
-      pinType: scrollPin ? 'transform' : 'fixed',
       pinSpacing: true,
       anticipatePin: 1,
       invalidateOnRefresh: true,
@@ -637,8 +629,39 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let slotCentre = { x: 0, y: 0 };
   let lastOut = -1;
   let lastFade = -1;
-  /** The sky colour behind the canvas on a touch screen (Safari's status bar tint), or none. */
+  /** The page's colour while the run fills a touch screen (the sky's, behind Safari's clock), or none. */
   let lastTint = '';
+  /**
+   * The floor strip: a thin pinned box on the screen's bottom edge, which Safari 26 extends under its bottom bar
+   * as a solid colour. On the body, not in the section: pinned, the section is the box its fixed children are placed
+   * in (measured on iOS: the strip sat on the section's bottom, not the screen's). Shown only through the run on a touch screen.
+   */
+  const floorStrip = document.createElement('div');
+  floorStrip.dataset.worldFloor = '';
+  floorStrip.setAttribute('aria-hidden', 'true');
+  floorStrip.hidden = true;
+  floorStrip.style.cssText = 'position:fixed;right:0;bottom:0;left:0;z-index:2;height:12px';
+  document.body.append(floorStrip);
+  /** The floor strip's colour, read off the canvas a few times a second. */
+  let lastFloor = '';
+  let floorReadAt = -Infinity;
+  const FLOOR_READ_MS = 400;
+  /** The ground fill's colour at the buffer's bottom row: the commonest of nine samples across it (not a speck). */
+  const floorColour = () => {
+    const y = buffer.height - 1;
+    const row = bctx.getImageData(0, y, buffer.width, 1).data;
+    const seen = new Map<number, number>();
+    let best = 0;
+    let bestN = 0;
+    for (let i = 1; i <= 9; i++) {
+      const p = Math.floor((i * buffer.width) / 10) * 4;
+      const c = (row[p]! << 16) | (row[p + 1]! << 8) | row[p + 2]!;
+      const n = (seen.get(c) ?? 0) + 1;
+      seen.set(c, n);
+      if (n > bestN) [best, bestN] = [c, n];
+    }
+    return `#${best.toString(16).padStart(6, '0')}`;
+  };
   /** Sam where the run ends, on the monitor's screen: his cell's centre (screen UV) and size (screen heights) — where the cracks start. */
   let samOnScreen: { centre: [number, number]; size: number } | null = null;
   /**
@@ -1774,13 +1797,25 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
       // The game's overlays come in at the end of the enter segment.
       const inGame = mode === 'play' && !exiting && (!d || heroP >= ENTER.overlays);
-      // While the run fills a phone's screen, the page and the section behind the canvas take the sky's
-      // colour: Safari tints its status bar from them, so the sky runs on up behind the clock.
-      const tint = inGame && touchScreen ? view.sky : '';
+      // While the run fills a phone's screen, Safari 26's bars show the world: the pinned section is hidden
+      // from Safari (World.astro), so behind the clock it shows the page as it scrolls — the sky's colour;
+      // under the bottom bar it extends the floor strip, the ground's colour read off the canvas' bottom row.
+      // (From the moment the opening has gone: the world fills the screen before the overlays come in.)
+      const bleed = touchScreen && mode === 'play' && !exiting && fade <= 0;
+      const tint = bleed ? view.sky : '';
       if (tint !== lastTint) {
         lastTint = tint;
+        section.classList.toggle('world--bleed', bleed);
         root.style.backgroundColor = tint;
-        section.style.backgroundColor = tint;
+        floorStrip.hidden = !tint;
+      }
+      if (tint && showWorld && now - floorReadAt > FLOOR_READ_MS) {
+        floorReadAt = now;
+        const floor = floorColour();
+        if (floor !== lastFloor) {
+          lastFloor = floor;
+          floorStrip.style.backgroundColor = floor;
+        }
       }
       o.hud?.classList.toggle('is-visible', inGame);
       // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.

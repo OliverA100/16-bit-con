@@ -449,21 +449,25 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     height: calc(100% + var(--world-skirt, 0px));
   }
 
-  :global(:root.is-playing) .world--live:not(.world--opening) {
+  :global(:root.is-playing) .world--live:not(.world--opening),
+  .world--bleed {
     overflow: visible;
   }
 
-  /* ?pin=scroll (src/game/index.ts): the world scrolls with the page, so Safari shows what is just above it
-     behind the status bar — the run's sky (the section's background while it plays), carried on up. */
-  :global(:root.pin-scroll.is-playing) .world--live:not(.world--opening)::before {
-    content: '';
-    position: absolute;
-    right: 0;
-    bottom: 100%;
-    left: 0;
-    height: 160px;
-    background-color: inherit;
-    pointer-events: none;
+  /* Safari 26's bars through the run on a phone. Over a pinned (fixed) box at the screen's edge it paints a
+     solid strip of that box's colour; past one it shows the page as it scrolls. So the pinned section is
+     hidden from it (its contents stay visible): behind the clock Safari shows the page, which takes the
+     sky's colour; at the bottom edge a thin pinned strip in the ground's colour gives the bottom bar the
+     ground (both src/game/index.ts). */
+  @media (pointer: coarse) {
+    .world--bleed {
+      visibility: hidden;
+    }
+
+    /* no weight of its own, so each overlay's own hiding (not .is-visible) still wins */
+    :global(:where(.world--bleed > *)) {
+      visibility: visible;
+    }
   }
 
   .world--live .hero__stage {
@@ -859,7 +863,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       pointer-events: auto;
     }
 
-    /* The controller's d-pad, flat and smooth: Green 900 (the brand's ink), its arrows in Leaf Green. */
+    /* The controller's d-pad, flat and smooth: Green 900 (the brand's ink), its arrows in Cloud White like the A's letter. */
     .world__dpad {
       position: relative;
       width: 104px;
@@ -879,7 +883,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
 
     .dpad__arrow {
-      fill: var(--color-leaf-green);
+      fill: var(--color-cloud-white);
     }
 
     /* Held: the arm's arrow lights up in Florets Yellow. */
