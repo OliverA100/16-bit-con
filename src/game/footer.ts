@@ -10,6 +10,7 @@
  */
 import { sprites } from '../data/sprites.manifest';
 import { cloudsKey, daisyFrames, drawClouds, frameAt, img, paintGoldenHills, paintMeadow, put, stateKey, sunsetArt, sunsetDaisies, SWAY_FPS, type Cloud, type View } from '../schedule/kit';
+import { reducedMotion } from '../lib/reduced-motion';
 
 /**
  * The band in art rows: the ground line (the meadow's surface) this many rows above its bottom, so the
@@ -18,7 +19,6 @@ import { cloudsKey, daisyFrames, drawClouds, frameAt, img, paintGoldenHills, pai
 export const FOOTER_GROUND_BELOW = 45;
 
 
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
 /** CSS px per art px: the page's Sam scale. */
 export function samPx(): number {
@@ -61,7 +61,7 @@ export async function startFooter(): Promise<void> {
   let visible = false;
   let raf = 0;
   let last = 0;
-  const moving = () => !reduced.matches && document.documentElement.classList.contains('has-game') && !document.documentElement.classList.contains('is-paused');
+  const moving = () => !reducedMotion.matches && document.documentElement.classList.contains('has-game') && !document.documentElement.classList.contains('is-paused');
 
   /** Fit both canvases to the band in whole art px, anchored bottom-left (as the schedule's scenes are). */
   const size = (): boolean => {
@@ -136,7 +136,7 @@ export async function startFooter(): Promise<void> {
     update();
   }).observe(scene);
   new ResizeObserver(update).observe(scene);
-  reduced.addEventListener('change', update);
+  reducedMotion.addEventListener('change', update);
   // pausing (the Register dialog) stops the drift; closing it lets it go on
   new MutationObserver(update).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
   update();

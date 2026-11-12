@@ -3,6 +3,7 @@
  * focus moves in and is trapped, the page behind is inert, no backdrop. "Let's go" and Esc close it, with the Register dialog's 150 ms step out (at once with reduced motion).
  * It opens out of the little flyer in the world: from its rect on screen, it grows to its place.
  */
+import { reducedMotion } from '../lib/reduced-motion';
 export interface FlyerDialog {
   readonly open: boolean;
   /** Open, growing from `from` (the little flyer's box on screen, CSS px), if given. */
@@ -46,7 +47,7 @@ export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void; /** 
   const close = () => {
     if (!dialog.open || closing) return;
     hooks.onClosing?.();
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (reducedMotion.matches) {
       dialog.close();
       closed();
       return;

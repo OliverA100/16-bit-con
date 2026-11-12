@@ -5,6 +5,7 @@
  * its success state, with whatever the player has typed) moves into the dialog and back again, and the
  * slot it leaves keeps its height so nothing below it moves. Esc closes the dialog only.
  */
+import { reducedMotion } from '../lib/reduced-motion';
 export interface RegisterDialog {
   readonly open: boolean;
   /** Open over the game; focus goes back to `opener` when it closes. */
@@ -37,7 +38,7 @@ export function createRegisterDialog(hooks: { onOpen(): void; onClose(): void })
   });
   const close = () => {
     if (!dialog.open || closing) return;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (reducedMotion.matches) {
       dialog.close();
       return;
     }

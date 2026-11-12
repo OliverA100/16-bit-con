@@ -9,8 +9,9 @@
  */
 import { describeTicket, PASSES, PLACE, type PassId } from './ticket-data';
 import { loadCast, type CastScene } from './ticket-cast';
+import { mulberry32 } from '../lib/math';
+import { reducedMotion } from '../lib/reduced-motion';
 
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 /** The scene's tick: the kit's ~8 fps. */
 const TICK_MS = 125;
 
@@ -30,20 +31,10 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-/** mulberry32: a small seeded random, so the same code always draws the same bars. */
-function seeded(seed: number): () => number {
-  let a = seed;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /** Bars of 1–3 px with 1–3 px gaps between guard bars (1 px, gap, 1 px at each end), filling `width`. */
 export function barcodeBars(code: string, width = 96): [number, number][] {
-  const rand = seeded(hash(code));
+  const rand = mulberry32(hash(code));
   const bars: [number, number][] = [[0, 1], [2, 1]];
   let x = 4;
   const end = width - 4;
@@ -135,13 +126,13 @@ export function mountTicket(el: HTMLElement, data?: TicketData): MountedTicket {
 
   const tick = () => {
     timer = 0;
-    if (!visible || reduced.matches || !scene) return;
+    if (!visible || reducedMotion.matches || !scene) return;
     draw((performance.now() - t0) / 1000);
     timer = window.setTimeout(tick, TICK_MS);
   };
   const still = () => draw(scene?.still ?? 0);
   const restart = () => {
-    if (reduced.matches) {
+    if (reducedMotion.matches) {
       still();
       return;
     }
@@ -150,12 +141,12 @@ export function mountTicket(el: HTMLElement, data?: TicketData): MountedTicket {
 
   const io = new IntersectionObserver((entries) => {
     visible = entries.some((e) => e.isIntersecting);
-    el.dataset.playing = String(visible && !reduced.matches);
+    el.dataset.playing = String(visible && !reducedMotion.matches);
     if (visible) restart();
   });
   const ro = new ResizeObserver(() => {
     size();
-    if (reduced.matches || !visible) still();
+    if (reducedMotion.matches || !visible) still();
     else draw((performance.now() - t0) / 1000);
   });
   if (box && canvas) {
@@ -169,14 +160,14 @@ export function mountTicket(el: HTMLElement, data?: TicketData): MountedTicket {
       })
       .catch((err) => console.error('[ticket] the scene did not load', err));
   }
-  reduced.addEventListener('change', restart);
+  reducedMotion.addEventListener('change', restart);
 
   return {
     update: set,
     destroy() {
       io.disconnect();
       ro.disconnect();
-      reduced.removeEventListener('change', restart);
+      reducedMotion.removeEventListener('change', restart);
       if (timer) clearTimeout(timer);
       timer = 0;
     },

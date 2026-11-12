@@ -45,6 +45,7 @@ import type { MonitorParts } from './build';
 import type { CrtMaterial } from './crt';
 import { REMOTE } from './remote';
 import { DIMS, OPENING_Y, scaleAt } from './spec';
+import { mulberry32 } from '../lib/math';
 
 const O = DIMS.opening;
 const ASPECT = O.w / O.h;
@@ -113,16 +114,6 @@ interface Pattern {
   rim: P2[];
 }
 
-function random(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 const inRect = (p: P2): P2 => [Math.min(ASPECT, Math.max(0, p[0])), Math.min(1, Math.max(0, p[1]))];
 
@@ -157,7 +148,7 @@ function jagged(a: P2, b: P2, rnd: () => number, amp: number = PATH.amp): P2[] {
 }
 
 function makePattern(impact: P2): Pattern {
-  const rnd = random(PATTERN.seed);
+  const rnd = mulberry32(PATTERN.seed);
   const N = PATTERN.rays;
   const L = PATTERN.rings.length; // ring levels 1–L, the rim L + 1, the edge L + 2
   const pts: P2[] = [impact];
@@ -330,7 +321,7 @@ function ribbons(p: Pattern, onGlass: (q: P2) => Vector3): BufferGeometry {
   const stage: number[] = [];
   const glow: number[] = [];
   const rim: number[] = [];
-  const rnd = random(PATTERN.seed + 7);
+  const rnd = mulberry32(PATTERN.seed + 7);
   const lift = 0.0004;
   const ribbon = (path: P2[], st: number, half: number, inRim: boolean) => {
     for (let j = 0; j < path.length - 1; j++) {
@@ -865,7 +856,7 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       parts.body.remove(sh.mesh);
     }
     shards.length = 0;
-    const rnd = random(PATTERN.seed + 1);
+    const rnd = mulberry32(PATTERN.seed + 1);
     const lerp = (r: readonly [number, number]) => r[0] + rnd() * (r[1] - r[0]);
     const sign = () => (rnd() < 0.5 ? -1 : 1);
     const spin = () => new Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();

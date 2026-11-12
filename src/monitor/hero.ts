@@ -29,6 +29,8 @@ import { DIVE, ENTER, smooth } from '../game/segments';
 import { CRT_REST, STATIC_RATE, tuneAtRest, tuneOnScreen } from './crt';
 import { createMonitorAsync, type FrameGeom, type Monitor, type Pose } from './index';
 import { DIMS, type Slot } from './spec';
+import { clamp01, lerp } from '../lib/math';
+import { reducedMotion } from '../lib/reduced-motion';
 
 /**
  * The power-on, ms: the line growing from the centre, brightening, the picture opening, PRESS START's
@@ -138,10 +140,8 @@ export interface Hero {
 }
 
 const DEG = Math.PI / 180;
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 /** The opening gathers speed a little, as the reference's band does. */
 const easeIn = (x: number) => clamp01(x) ** 1.2;
-const lerp = (a: number, b: number, e: number) => a + (b - a) * e;
 type Pt = [number, number];
 /** Is (x, y) inside the convex quadrilateral q (either winding)? */
 const inside = (q: Pt[], x: number, y: number) => {
@@ -174,7 +174,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   bevel.emissiveIntensity = 0;
   const glass = parts.materials.glass;
   // With reduced motion the broken tube's static is one frame, held.
-  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  const still = reducedMotion;
   const staticRate = () => (u.uStaticRate.value = still.matches ? 0 : STATIC_RATE);
   staticRate();
   still.addEventListener('change', staticRate);

@@ -18,6 +18,7 @@
 import { sprites } from '../data/sprites.manifest';
 import { loadImage } from './sprites';
 import { queryFooterScene, samK } from './footer';
+import { mulberry32 } from '../lib/math';
 
 /**
  * The clouds: how often each turns up (big near ones most, small far ones fewer), the wind's pace for each (art px a second: near
@@ -77,17 +78,6 @@ const pingpong = (x: number, len: number) => {
   return m <= len ? m : 2 * len - m;
 };
 
-/** A seeded random (mulberry32): the same sky after every relayout. */
-function random(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 export async function startSky(paused: () => boolean): Promise<void> {
   const scene = queryFooterScene();
@@ -129,8 +119,8 @@ export async function startSky(paused: () => boolean): Promise<void> {
     layer.style.height = `${Math.max(0, sceneBox.bottom + sy)}px`;
     for (const c of clouds) c.el.remove();
     clouds = [];
-    const rnd = random(1630);
-    const pace = random(4271);
+    const rnd = mulberry32(1630);
+    const pace = mulberry32(4271);
 
     // The opening: from the page's top (under the nav) to under its tagline, where the glass lies.
     const box = (sel: string) => {

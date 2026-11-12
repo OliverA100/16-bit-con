@@ -5,7 +5,7 @@
  * grid, the cropped tree, the cumulus lobes, the hills' seam patch, the street rows — is built here at load, in
  * memory, so Vega's files in public/sprites stay untouched and unaltered.
  */
-import { sprites } from '../data/sprites.manifest';
+import { sprites, CUMULUS_LOBES } from '../data/sprites.manifest';
 import { loadImage, makeStrip, type Drawable, type Strip } from './sprites';
 import { cropImage, patchTileSeam } from './palette';
 import { loadSamSheets, type SamSheets } from './sam';
@@ -88,12 +88,6 @@ export interface CityAssets {
   letters: Drawable;
 }
 
-/** Whole lobes of big-cloud.png (x, y, w, h), chosen where each lobe's own edges end. */
-export const CUMULUS_LOBES: [number, number, number, number][] = [
-  [292, 0, 187, 67],
-  [486, 20, 281, 61],
-  [776, 80, 233, 39],
-];
 const TREE_PLANTER_TOP = 65;
 /**
  * Vega's grass-over-rock strip is a 17/13 nearest-neighbour enlargement (four doubled rows and columns in every

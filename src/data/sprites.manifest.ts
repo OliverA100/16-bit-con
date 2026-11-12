@@ -30,13 +30,10 @@ export const sprites = {
   samRun: { file: '/sprites/sam/run.png', w: 240, h: 60, frames: 4, fw: 60, fh: 60, scale: 'world', note: 'green goggles → swapped at load' },
   samJump: { file: '/sprites/sam/sam-jump.png', w: 60, h: 60, frames: 1, fw: 60, fh: 60, scale: 'world', note: 'green goggles → swapped at load' },
   samIdle: { file: '/sprites/sam/idle.png', w: 1980, h: 60, frames: 33, fw: 60, fh: 60, scale: 'world', note: 'green goggles → swapped at load' },
-  samSide: { file: '/sprites/sam/anim-sam-side-strip_8f_60x60.png', w: 480, h: 60, frames: 8, fw: 60, fh: 60, scale: 'world' },
   samPortrait: { file: '/sprites/sam/portrait-sam.png', w: 46, h: 49, scale: 'ui', note: 'green goggles → swapped at load; Sam dialogs' },
 
   // ── UI ──────────────────────────────────────────────────────────────────────
   coin: { file: '/sprites/ui/anim-vega-coin-3f_80x24.png', w: 80, h: 24, frames: 3, fw: 24, fh: 24, pitch: 28, scale: 'ui' },
-  dpad: { file: '/sprites/ui/dpad.png', w: 52, h: 53, scale: 'ui' },
-  buttonA: { file: '/sprites/ui/a-button.png', w: 44, h: 36, scale: 'ui' },
   daisyIcon: { file: '/sprites/ui/daisy-icon-yellow_17x17.png', w: 17, h: 17, scale: 'ui' },
 
   // ── Level 1: Vega's field ───────────────────────────────────────────────────
@@ -66,9 +63,7 @@ export const sprites = {
   arcade: { file: '/sprites/props/arcade-machine.png', w: 53, h: 87, scale: 'world' },
   vegaSignHorizontal: { file: '/sprites/props/vega-sign-horizontal.png', w: 138, h: 29, scale: 'world' },
   streetFence: { file: '/sprites/props/street-fence.png', w: 144, h: 75, scale: 'world' },
-  poster: { file: '/sprites/props/poster-i-want-you.png', w: 74, h: 112, scale: 'world' },
   plantFlowers: { file: '/sprites/props/plant-flowers.png', w: 35, h: 56, scale: 'world' },
-  moleCoffee: { file: '/sprites/npc/mole-coffee.png', w: 1800, h: 60, frames: 30, fw: 60, fh: 60, scale: 'world' },
   moleTyping: { file: '/sprites/npc/mole-typing.png', w: 540, h: 60, frames: 9, fw: 60, fh: 60, scale: 'world' },
   molePizza: { file: '/sprites/npc/mole-pizza.png', w: 1260, h: 60, frames: 21, fw: 60, fh: 60, scale: 'world' },
   molePhone: { file: '/sprites/npc/mole-phone.png', w: 120, h: 60, frames: 2, fw: 60, fh: 60, scale: 'world' },
@@ -125,3 +120,10 @@ export const sprites = {
 } as const satisfies Record<string, SpriteEntry>;
 
 export type SpriteKey = keyof typeof sprites;
+
+/** Whole lobes of big-cloud.png (x, y, w, h), chosen where each lobe's own edges end. */
+export const CUMULUS_LOBES: [number, number, number, number][] = [
+  [292, 0, 187, 67],
+  [486, 20, 281, 61],
+  [776, 80, 233, 39],
+];

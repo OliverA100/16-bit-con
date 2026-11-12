@@ -14,12 +14,12 @@
  * text or the buttons; Sam is drawn last, at his cloud's offset, so nothing passes in front of him and he
  * never leaves it. It moves only while the tab is visible; with reduced motion it is one still.
  */
-import { sprites } from '../data/sprites.manifest';
+import { sprites, CUMULUS_LOBES } from '../data/sprites.manifest';
 import { frameAt, img, samStrip, stateKey, tileX, wrap, type Drawable, type Strip } from '../schedule/kit';
-import { CUMULUS_LOBES } from './assets';
 import { samK } from './footer';
 import { cropImage, patchTileSeam } from './palette';
 import { FOOT_SINK, IDLE_FPS, SAM_CELL } from './sam';
+import { reducedMotion } from '../lib/reduced-motion';
 
 /** Art rows of the cloud bank over the window's bottom (its first cloud row there), as in the mock. */
 const BANK_SHOW = 105;
@@ -273,7 +273,6 @@ export async function startLost(): Promise<void> {
     { src: f, x: 0.62, y: 0.6, speed: 4 },
   ];
 
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let layout: Layout | null = null;
   let t = 0;
   let lastKey = NaN;
@@ -404,7 +403,7 @@ export async function startLost(): Promise<void> {
     if (!('drawn' in scene.dataset)) scene.dataset.drawn = '';
   };
 
-  const moving = () => !reduced.matches && document.visibilityState === 'visible';
+  const moving = () => !reducedMotion.matches && document.visibilityState === 'visible';
 
   const tick = (now: number) => {
     raf = 0;
@@ -417,7 +416,7 @@ export async function startLost(): Promise<void> {
 
   const update = () => {
     // the still: Sam on his first cloud at rest, where the motion would bring him
-    if (reduced.matches) t = layout ? layout.legs[0]!.in : 0;
+    if (reducedMotion.matches) t = layout ? layout.legs[0]!.in : 0;
     draw();
     if (moving() && !raf) {
       last = performance.now();
@@ -435,6 +434,6 @@ export async function startLost(): Promise<void> {
   ro.observe(text);
   window.addEventListener('resize', relayout, { passive: true }); // a new --sam-px can come without a size change
   document.addEventListener('visibilitychange', update);
-  reduced.addEventListener('change', update);
+  reducedMotion.addEventListener('change', update);
   relayout();
 }

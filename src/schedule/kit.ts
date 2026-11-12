@@ -6,6 +6,7 @@
 import { loadImage, makeStrip, type Drawable, type Strip } from '../game/sprites';
 import { patchTileSeam, remap, SAM_BRAND_MAP } from '../game/palette';
 import { sprites } from '../data/sprites.manifest';
+import { wrap } from '../lib/math';
 
 export type { Drawable, Strip };
 
@@ -188,7 +189,7 @@ export const CLIMB_HANDS = 33;
 export const frameAt = (t: number, fps: number, frames: number) => Math.floor(t * fps) % frames;
 
 /** x wrapped into [0, period). */
-export const wrap = (x: number, period: number) => ((x % period) + period) % period;
+export { wrap };
 
 /** Combine whole numbers into one state key. */
 export function stateKey(...parts: number[]): number {

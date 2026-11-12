@@ -18,6 +18,7 @@ import { CLOUD_ROLES, RANGE_ROLES, Tinted } from './tint';
 import { Plaza, PLAZA, type PlazaLook } from './plaza';
 import { horizonAt } from './stages';
 import { PLAZA_TIME } from '../data/layers';
+import { clamp01, wrap } from '../lib/math';
 
 /** A rectangle in viewport art px. */
 export interface Rect {
@@ -58,7 +59,6 @@ export interface Frame {
   flyer?: { draw(ctx: CanvasRenderingContext2D, camLeft: number, F: number, sink: number, now: number): void; landed(now: number): boolean } | null;
 }
 
-const mod = (v: number, m: number) => ((v % m) + m) % m;
 
 /**
  * The walk into town, as world x — farthest things first, nearest last, no two changes on the
@@ -208,7 +208,6 @@ const LIGHTS = { far: [0.7, 0.76, 0.7], towers: [0.72, 0.78, 0.55], mid: [0.74, 
  */
 const DAWN = PLAZA_TIME === 'dawn' ? { span: 0.04, far: 0.845, javits: 0.85, towers: 0.855, mid: 0.865, near: 0.875, street: 0.885 } : null;
 const LIGHTS_OUT = { far: [0.845, 0.875], towers: [0.85, 0.88], mid: [0.855, 0.885], near: [0.86, 0.89] } as const;
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 interface NightSet {
   far: Stepper;
@@ -340,7 +339,7 @@ function alignOpening(
   let best = { phase: 0, gapL: 0, gapR: 0, score: Infinity };
   for (const [g0, g1] of gaps) {
     const phase = centreU - (g0 + g1) / 2;
-    const lead = mod(begin - phase, period);
+    const lead = wrap(begin - phase, period);
     const score = clean(lead);
     if (score < best.score) best = { phase, gapL: phase + g0, gapR: phase + g1, score };
   }
@@ -553,24 +552,24 @@ export class Level1 {
     const drift = (s: Seed, p: number) => s.u + s.drift * (now / 1000) - p * camLeft;
     // The clouds wrap over the screen frame's span in every draw, so the viewport and the monitor's
     // screen show each one in the same place.
-    const wrap = (u: number, w: number, period = span.x1 - span.x0 + w) => span.x0 + mod(u - span.x0, period) - w;
+    const around = (u: number, w: number, period = span.x1 - span.x0 + w) => span.x0 + wrap(u - span.x0, period) - w;
     const cloud = (img: Drawable, x: number, y: number) => {
       if (x < r.x1 && x + img.width > r.x0) sctx.drawImage(img, snap(x), y);
     };
     for (const s of SMALL) {
       const img = tint(a.small[s.i]!);
-      cloud(img, wrap(drift(s, STACK.small.p), img.width), Math.round(skyTop * s.yFrac));
+      cloud(img, around(drift(s, STACK.small.p), img.width), Math.round(skyTop * s.yFrac));
     }
     for (const s of MEDIUM) {
       const img = tint(a.medium[s.i]!);
-      cloud(img, wrap(drift(s, STACK.medium.p), img.width), Math.round(skyTop * s.yFrac));
+      cloud(img, around(drift(s, STACK.medium.p), img.width), Math.round(skyTop * s.yFrac));
     }
     farTiled(sctx, tint(a.silhouette), STACK.silhouette.p * camLeft, F + STACK.silhouette.bottom - a.silhouette.height, r, snap, false);
     farTiled(sctx, tint(a.cloudBank), STACK.cloudBank.p * camLeft, F + STACK.cloudBank.bottom - a.cloudBank.height, r, snap, true);
     const period = Math.max(STACK.cumulus.period, span.x1 - span.x0 + 400);
     for (const s of CUMULUS) {
       const img = tint(a.cumulus[s.i]!);
-      cloud(img, wrap(drift(s, STACK.cumulus.p), img.width, period), Math.round(skyTop * s.yFrac));
+      cloud(img, around(drift(s, STACK.cumulus.p), img.width, period), Math.round(skyTop * s.yFrac));
     }
     sctx.restore();
   }
@@ -585,7 +584,7 @@ export class Level1 {
     const w = span.x1 - span.x0;
     let key = 0;
     const add = (s: Seed, p: number, period: number) => {
-      key = (key * 31 + Math.round(mod(s.u + s.drift * (now / 1000) - p * camLeft - span.x0, period))) % 1e9;
+      key = (key * 31 + Math.round(wrap(s.u + s.drift * (now / 1000) - p * camLeft - span.x0, period))) % 1e9;
     };
     for (const s of SMALL) add(s, STACK.small.p, w + a.small[s.i]!.width);
     for (const s of MEDIUM) add(s, STACK.medium.p, w + a.medium[s.i]!.width);
@@ -637,7 +636,7 @@ export class Level1 {
 
     // ── Hills: full saturation, plain tiling, ending at a tile boundary and scrolling off ──
     const hillsEnd = edgeAt(STACK.hills.p, SEQ.hillsEnd);
-    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, r, { to: end(hillsEnd, STACK.hills.p), phase: mod(hillsEnd, a.hills.width) });
+    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, r, { to: end(hillsEnd, STACK.hills.p), phase: wrap(hillsEnd, a.hills.width) });
 
     // ── The far city and the towers scroll in on the horizon, each at its own speed; the plain in
     //    front of them hides where their art ends ──
@@ -693,7 +692,7 @@ export class Level1 {
     // ── Mid layer: bushes and trees at 0.45, ending as the mid buildings arrive ──
     const midHedgeEnd = edgeAt(STACK.midHedge.p, SEQ.midHedgeEnd);
     const midScroll = STACK.midHedge.p * camLeft;
-    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, r, { to: end(midHedgeEnd, STACK.midHedge.p), phase: mod(midHedgeEnd, a.hedge.width) });
+    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, r, { to: end(midHedgeEnd, STACK.midHedge.p), phase: wrap(midHedgeEnd, a.hedge.width) });
     for (const u of MID_TREES) if (u + a.treeField.width <= midHedgeEnd) place(a.treeField, STACK.midHedge.p, u, F + STACK.midHedge.treeBottom);
 
     if (c) {

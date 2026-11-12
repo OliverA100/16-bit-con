@@ -7,6 +7,7 @@
  */
 import { sprites } from '../../data/sprites.manifest';
 import { backdrop, frameAt, img, layer, put, skyTop, standAnim, standStill, stateKey, strip, tileX, type Drawable, type SceneModule, type View } from '../kit';
+import { mulberry32 } from '../../lib/math';
 
 const files = [
   sprites.officeWall.file,
@@ -43,16 +44,6 @@ const CHAIR = 34;
 const SEAT = 14;
 const RAISE = 5;
 
-/** A small seeded random (mulberry32): the same scatter on every load. */
-function seeded(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 const scene: SceneModule = {
   files,
@@ -139,7 +130,7 @@ const scene: SceneModule = {
       const bare = (x: number, y: number, w: number, h: number) =>
         !(x < v.clear.x && y < v.clear.y) &&
         hung.every(([d, hx, hy]) => x + w + BRICKS.clear <= hx || hx + d.width + BRICKS.clear <= x || y + h + BRICKS.clear <= hy || hy + d.height + BRICKS.clear <= y);
-      const rand = seeded(BRICKS.seed);
+      const rand = mulberry32(BRICKS.seed);
       const wallTopY = skyTop(v) + 6;
       const count = Math.round((v.w * (foot - wallTopY)) / BRICKS.per);
       const placed: [number, number][] = [];

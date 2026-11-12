@@ -27,6 +27,8 @@ import { loadStalkArt, Stalk } from './stalk';
 import { startSky } from './sky';
 import { startDog } from './dog';
 import { CLIMB_HANDS } from '../schedule/kit';
+import { clamp } from '../lib/math';
+import { reducedMotion } from '../lib/reduced-motion';
 
 /** The line he climbs toward on the stalk, as a fraction of the screen's height. */
 const LINE = 0.45;
@@ -115,17 +117,15 @@ export interface JourneyOptions {
   paused: () => boolean;
 }
 
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const pageRect = (el: Element) => {
   const r = el.getBoundingClientRect();
   return { left: r.left + window.scrollX, top: r.top + window.scrollY, right: r.right + window.scrollX, bottom: r.bottom + window.scrollY, width: r.width, height: r.height };
 };
 
-export async function startJourney(o: JourneyOptions): Promise<{ debug(): unknown } | null> {
-  if (reduced.matches) return null;
+export async function startJourney(o: JourneyOptions): Promise<void> {
+  if (reducedMotion.matches) return;
   const scene = queryFooterScene();
-  if (!scene) return null;
+  if (!scene) return;
   const [page, art] = await Promise.all([loadPageSheets(), loadStalkArt()]);
   const { perch } = o;
   const sheets = { ...o.sheets, ...page };
@@ -596,8 +596,8 @@ export async function startJourney(o: JourneyOptions): Promise<{ debug(): unknow
     }
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
   // Reduced motion switched on: the stalk goes and Sam is back on the Register window, for good.
-  reduced.addEventListener('change', () => {
-    if (!reduced.matches) return;
+  reducedMotion.addEventListener('change', () => {
+    if (!reducedMotion.matches) return;
     stalk?.destroy();
     stalk = null;
     el.remove();
@@ -649,20 +649,4 @@ export async function startJourney(o: JourneyOptions): Promise<{ debug(): unknow
     .catch((err) => console.error('[dog]', err));
 
   wake();
-
-  return {
-    debug: () => ({
-      mode,
-      zone: zone(window.scrollY),
-      s: window.scrollY,
-      y,
-      line: lineFeet(window.scrollY),
-      geo,
-      grip,
-      climbOdo,
-      grown: stalk?.grown ?? null,
-      el: el.style.transform,
-      shown: el.style.display !== 'none',
-    }),
-  };
 }

@@ -11,7 +11,8 @@
  * Silent while the tab is hidden, under the Register dialog (hold) and with sound off (the HUD's button,
  * remembered). Reduced motion and the static page never boot the game, so never get here.
  */
-import { DIVE, ENTER, PLAY, clamp01, playMs, playP } from './segments';
+import { DIVE, ENTER, PLAY, playMs, playP } from './segments';
+import { clamp01 } from '../lib/math';
 
 /** The numbers to tune by ear (/dev/sound edits them live). Levels are linear gain, times seconds. */
 export const params = {
@@ -111,7 +112,6 @@ const CRACK_GAP = 0.04;
 const CUT = 0.05;
 const STORE_KEY = '16bc-sound';
 
-const log: (...a: unknown[]) => void = import.meta.env.DEV ? (...a) => console.log('[sound]', ...a) : () => {};
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -164,7 +164,6 @@ export class Voice {
       this.out.disconnect();
       this.ended = true;
       voices.delete(this);
-      log(`${this.name} ended (live voices: ${voices.size})`);
     };
     if (s instanceof AudioBufferSourceNode && offset !== undefined) s.start(start, offset);
     else s.start(start);
@@ -182,7 +181,6 @@ export class Voice {
     g.setValueAtTime(g.value, t);
     g.linearRampToValueAtTime(0, t + fade);
     for (const n of this.nodes) if (n instanceof AudioScheduledSourceNode) n.stop(t + fade + 0.01);
-    log(`${this.name} stopped (${Math.round(fade * 1000)} ms fade)`);
   }
 }
 const voices = new Set<Voice>();
@@ -213,7 +211,6 @@ export function unlock(): void {
     crackle = makeCrackle(ctx, 3);
     document.addEventListener('visibilitychange', () => hold('hidden', document.hidden));
     if (document.hidden) hold('hidden', true);
-    log(`unlocked (${ctx.sampleRate} Hz, sound ${on ? 'on' : 'off'})`);
     load();
   }
   if (ctx.state === 'suspended' && holds.size === 0) void ctx.resume();
@@ -256,7 +253,6 @@ export function hold(reason: string, held: boolean): void {
   } else if (holds.size === 0) {
     void ctx.resume().then(() => setMaster());
   }
-  log(`hold ${reason} ${held ? 'on' : 'off'} → ${holds.size ? 'silent' : 'live'}`);
 }
 
 export function enabled(): boolean {
@@ -276,7 +272,6 @@ export function setEnabled(v: boolean): void {
     pending.length = 0;
   }
   setMaster();
-  log(`sound ${v ? 'on' : 'off'}`);
 }
 
 /** The master's level now (the tuning page moves it). */
@@ -293,14 +288,12 @@ export function stopAll(): void {
   for (const v of voices) v.stop();
 }
 
-/** Whether a sound may start now; logs why not. */
-function ready(what: string): boolean {
+/** Whether a sound may start now. */
+function ready(): boolean {
   if (!ctx || !master) {
-    log(`skipped ${what}: locked`);
     return false;
   }
   if (!on) {
-    log(`skipped ${what}: off`);
     return false;
   }
   return true;
@@ -344,12 +337,10 @@ function load(names: readonly FileName[] = FILES): void {
       .then((a) => c.decodeAudioData(a))
       .then((b) => {
         buffers.set(name, b);
-        log(`decoded ${name} (${b.duration.toFixed(3)} s)`);
         flush(name, b);
       })
-      .catch((err) => {
+      .catch(() => {
         buffers.set(name, 'failed');
-        log(`failed ${name}: ${err instanceof Error ? err.message : err} — it stays silent`);
         flush(name, null);
       });
   }
@@ -362,12 +353,8 @@ function flush(name: FileName, b: AudioBuffer | null): void {
     const p = pending[i]!;
     if (p.name !== name) continue;
     pending.splice(i, 1);
-    const late = Math.round(now - p.at);
-    if (!b) log(`${p.label} dropped: ${name} missing`);
-    else if (late <= LATE_MS && on) {
-      log(`${p.label} late +${late}ms`);
-      p.play(b);
-    } else log(`${p.label} dropped: not decoded (+${late}ms)`);
+    // (dropped when its file is missing, or decoded too late to still belong to its moment)
+    if (b && now - p.at <= LATE_MS && on) p.play(b);
   }
 }
 
@@ -376,7 +363,6 @@ function withFile(name: FileName, label: string, play: (b: AudioBuffer) => void)
   const b = buffers.get(name);
   if (b instanceof AudioBuffer) return play(b);
   if (b === 'failed' || b === undefined) {
-    log(`${label} skipped: ${name} missing`);
     return;
   }
   const entry = { name, at: performance.now(), play, label };
@@ -385,7 +371,6 @@ function withFile(name: FileName, label: string, play: (b: AudioBuffer) => void)
     const i = pending.indexOf(entry);
     if (i < 0) return;
     pending.splice(i, 1);
-    log(`${label} dropped: not decoded (+${Math.round(performance.now() - entry.at)}ms)`);
   }, LATE_MS + 1);
 }
 
@@ -502,7 +487,7 @@ function rush(
  * monitor finds when, src/monitor/hero.ts flatP), and is gone by the landing.
  */
 export function enter(ms: number, fromMs = 0, glassMs = (ms * playMs(ENTER.fillBy)) / PLAY.dive): Voice | null {
-  if (!ready('enter') || ms - fromMs < 20) return null;
+  if (!ready() || ms - fromMs < 20) return null;
   // the move is ms long; the whoosh rings on past the landing (enterTail), dying away slowly
   const T = ms / 1000 + Math.max(0, params.enterTail);
   const from = Math.max(0, fromMs) / 1000;
@@ -514,7 +499,6 @@ export function enter(ms: number, fromMs = 0, glassMs = (ms * playMs(ENTER.fillB
   // up to the glass, then a long fall that eases out (a raised cosine), never cut off
   const swell = (t: number) => (t <= g ? Math.pow(t / g, 2) : 0.5 * (1 + Math.cos(Math.PI * Math.min(1, (t - g) / Math.max(1e-3, T - g)))));
   rush(v, t0, T, g, from, (u) => expo(params.whooshLo, params.whooshHi, (u * T) / g), swell);
-  log(`enter ${Math.round(ms)}ms, glass at ${Math.round(g * 1000)}ms${fromMs > 0 ? `, from ${Math.round(fromMs)}ms` : ''}`);
   return v;
 }
 
@@ -527,7 +511,7 @@ export function enter(ms: number, fromMs = 0, glassMs = (ms * playMs(ENTER.fillB
  * for exitTail after the camera has stopped.
  */
 export function exit(ms: number, fromMs = 0, path: (tMs: number) => number = (t) => playP(ms - t)): Voice | null {
-  if (!ready('exit') || ms - fromMs < 20) return null;
+  if (!ready() || ms - fromMs < 20) return null;
   const move = ms / 1000;
   const tail = Math.max(0, params.exitTail);
   const T = move + tail;
@@ -551,8 +535,6 @@ export function exit(ms: number, fromMs = 0, path: (tMs: number) => number = (t)
   const t0 = ctx!.currentTime + 0.005;
   const v = new Voice('exit');
   rush(v, t0, T, 0, from, band, swell, buzzCut, params.exitWhooshLevel);
-  const peak = smooth.indexOf(vmax) * dt * 1000;
-  log(`exit ${Math.round(ms)}ms + ${Math.round(tail * 1000)}ms tail, fastest at ${Math.round(peak)}ms${fromMs > 0 ? `, from ${Math.round(fromMs)}ms` : ''}`);
   return v;
 }
 
@@ -562,7 +544,7 @@ export function exit(ms: number, fromMs = 0, path: (tMs: number) => number = (t)
  */
 export function crack(stage: number, shift?: number, file?: FileName, cut?: boolean): void {
   const label = `crack ${stage}`;
-  if (!ready(label)) return;
+  if (!ready()) return;
   const entry = CRACK_STAGES[Math.min(5, Math.max(0, stage - 1))]!;
   const name = file ?? entry.file;
   cut ??= file ? false : entry.cut;
@@ -589,13 +571,12 @@ export function crack(stage: number, shift?: number, file?: FileName, cut?: bool
     s.playbackRate.value = rate;
     s.connect(g).connect(v.out);
     v.source(s, at, at + len + 0.02);
-    log(`${label} ${name}${st ? ` ${st > 0 ? '+' : ''}${st} st` : ''} rate ${rate.toFixed(3)}${trim ? ` +${trim.db} dB` : ''}${cut ? `, cut to ${Math.round(len * 1000)}ms` : ''}`);
   });
 }
 
 /** The glass breaking: once, a little louder than the cracks. */
 export function shatter(pitch = params.shatterPitch, bodyLevel = params.shatterBody): void {
-  if (!ready('shatter')) return;
+  if (!ready()) return;
   withFile('shatter', 'shatter', (b) => {
     if (!ctx || !on) return;
     const at = ctx.currentTime + 0.002;
@@ -609,7 +590,6 @@ export function shatter(pitch = params.shatterPitch, bodyLevel = params.shatterB
     s.connect(g).connect(v.out);
     v.source(s, at, at + b.duration / rate + 0.02);
     body(v, at, bodyLevel);
-    log(`shatter${pitch ? ` ${pitch > 0 ? '+' : ''}${pitch} st` : ''}${bodyLevel > 0 ? ` + body ${bodyLevel}` : ''}`);
   });
 }
 
@@ -650,17 +630,16 @@ function staticEnvelope(name: string, level: number) {
 /** The broken tube's static, under the shatter, once per visit: it holds, fades to exactly 0 and stops. */
 export function playStatic(force = false): Voice | null {
   if (staticPlayed && !force) {
-    log('static skipped: already played');
     return null;
   }
-  if (!ready('static')) return null;
+  if (!ready()) return null;
   staticPlayed = true;
   return staticSynth();
 }
 
 /** Hiss (noise round 4 kHz), a quiet 60 Hz hum with a few harmonics and sparse crackle. */
 function staticSynth(): Voice {
-  const { c, v, env, t0, end, stop } = staticEnvelope('static', params.staticLevel);
+  const { c, v, env, t0, stop } = staticEnvelope('static', params.staticLevel);
 
   const bp = v.node(c.createBiquadFilter());
   bp.type = 'bandpass';
@@ -688,8 +667,6 @@ function staticSynth(): Voice {
   cr.connect(cg).connect(env);
   v.source(cr, t0, stop, Math.random() * 2);
 
-  log(`static: hold ${params.staticHold}s, fade ${params.staticFade}s → gain 0 at +${(end - t0).toFixed(2)}s`);
-  if (import.meta.env.DEV) watchGain(env, t0, end, v);
   return v;
 }
 export { playStatic as static };
@@ -712,7 +689,7 @@ let powerVoice: Voice | null = null;
  */
 export function power(dir: 1 | -1): Voice | null {
   const what = dir > 0 ? 'power on' : 'power off';
-  if (!ready(what)) return null;
+  if (!ready()) return null;
   const c = ctx!;
   powerVoice?.stop();
   if (dir < 0) for (const v of voices) if (v.name === 'static') v.stop(POWER_T.open);
@@ -720,8 +697,8 @@ export function power(dir: 1 | -1): Voice | null {
   powerVoice = v;
   v.out.gain.value = params.powerLevel;
   const at = c.currentTime + 0.005;
-  const end = dir > 0 ? powerOn(v, at) : powerOff(v, at);
-  log(`${what}, ${Math.round((end - at) * 1000)}ms`);
+  if (dir > 0) powerOn(v, at);
+  else powerOff(v, at);
   return v;
 }
 
@@ -813,72 +790,48 @@ function crinkle(v: Voice, at: number, len: number, n: number, lvl: number): voi
 
 /** The paper catching air at the end of a swing: a soft "ff", `size` 1 high up, smaller near the ground. */
 export function flutter(size = 1): void {
-  if (!ready('flutter')) return;
+  if (!ready()) return;
   const at = ctx!.currentTime + 0.005;
   const v = new Voice('flutter');
   const lvl = params.flutterLevel * (0.4 + 0.6 * size);
   const hz = params.flutterHz * (0.9 + Math.random() * 0.2);
   paperBand(v, at, 0.16, hz * 0.7, hz * 1.25, 1.1, lvl, puff(0.3));
-  log(`flutter ${size.toFixed(2)}`);
 }
 
 /** The flyer settling on the ground: a small dry tap, then the air it pushed out. */
 export function land(): void {
-  if (!ready('land')) return;
+  if (!ready()) return;
   const at = ctx!.currentTime + 0.005;
   const v = new Voice('land');
   paperBand(v, at, 0.03, 1400, 900, 1.6, params.landLevel, (u) => (u < 0.08 ? u / 0.08 : Math.pow(1 - u, 3)));
   paperBand(v, at + 0.01, 0.12, 2600, 1600, 0.9, params.landLevel * 0.35, puff(0.2));
-  log('land');
 }
 
 /** Sam picks the flyer up: a short crinkle of paper. */
 export function pickup(): void {
-  if (!ready('pickup')) return;
+  if (!ready()) return;
   const at = ctx!.currentTime + 0.005;
   const v = new Voice('pickup');
   crinkle(v, at, 0.2, 9, params.pickupLevel);
   paperBand(v, at, 0.18, 1500, 2600, 0.9, params.pickupLevel * 0.4, puff(0.4));
-  log('pickup');
 }
 
 /** The flyer opening out of Sam's hands: unfolding (a rising rustle), flat with a little snap. `ms`: the open's length. */
 export function paperOpen(ms = 200): void {
-  if (!ready('paper open')) return;
+  if (!ready()) return;
   const at = ctx!.currentTime + 0.005;
   const len = Math.max(0.08, ms / 1000);
   const v = new Voice('paper open');
   paperBand(v, at, len + 0.06, 900, 3200, 0.8, params.openLevel, puff(0.7));
   crinkle(v, at + len * 0.75, 0.08, 4, params.openLevel * 1.4);
-  log(`paper open ${Math.round(len * 1000)}ms`);
 }
 
 /** The flyer folding away: a shorter, falling rustle and a soft tap as it closes. `ms`: the close's length. */
 export function paperClose(ms = 150): void {
-  if (!ready('paper close')) return;
+  if (!ready()) return;
   const at = ctx!.currentTime + 0.005;
   const len = Math.max(0.06, ms / 1000);
   const v = new Voice('paper close');
   paperBand(v, at, len, 3000, 1000, 0.8, params.closeLevel, puff(0.35));
   paperBand(v, at + len * 0.85, 0.03, 1300, 900, 1.6, params.closeLevel * 0.9, (u) => (u < 0.1 ? u / 0.1 : Math.pow(1 - u, 3)));
-  log(`paper close ${Math.round(len * 1000)}ms`);
 }
-
-/** Dev only: the static's envelope read back as it runs, until it is 0 and its nodes have ended. */
-function watchGain(env: GainNode, t0: number, end: number, v: Voice): void {
-  const id = setInterval(() => {
-    if (!ctx) return clearInterval(id);
-    const t = ctx.currentTime;
-    if (t >= end && env.gain.value === 0) {
-      log(`static gain 0 @ ${(t - t0).toFixed(2)}s`);
-      clearInterval(id);
-    } else if (v.ended) clearInterval(id);
-  }, 100);
-}
-
-/** Dev checks (__sound): the context, the counts, the voices. */
-export function debug() {
-  return { state: ctx?.state ?? null, on, holds: [...holds], live: live(), stats: { ...stats }, files: Object.fromEntries([...buffers].map(([k, b]) => [k, b instanceof AudioBuffer ? 'ready' : b])), staticPlayed };
-}
-
-if (import.meta.env.DEV && typeof window !== 'undefined') (window as unknown as { __sound: unknown }).__sound = { debug, params, live, stopAll };

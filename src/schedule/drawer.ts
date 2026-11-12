@@ -17,6 +17,7 @@
  */
 import type { SceneId } from '../data/sessions';
 import { SceneRunner } from './runner';
+import { reducedMotion } from '../lib/reduced-motion';
 
 interface Timed {
   /** A pending hide once the element has settled out of the picture. */
@@ -49,7 +50,6 @@ interface Move {
   reveal?: boolean;
 }
 
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 /** The longest a folder waits for its scene's first frame before rising without it. */
 const FIRST_FRAME_WAIT = 150;
 /** Focus resting this long on a day tab warms that day's first scene. */
@@ -66,7 +66,7 @@ function msOf(drawer: HTMLElement, name: string, fallback: number): number {
 
 /** How long until a move has settled: the longer of a folder's move and a day change. */
 function settleMs(drawer: HTMLElement): number {
-  if (reduced.matches) return 0;
+  if (reducedMotion.matches) return 0;
   return Math.max(msOf(drawer, '--dur-folder', 450), msOf(drawer, '--dur-base', 200)) + 60;
 }
 
@@ -148,7 +148,7 @@ export function bootDrawer(drawer: HTMLElement): void {
       if (open !== f) return;
       const r = f.region.getBoundingClientRect();
       const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 0;
-      if (r.top - f.tab.offsetHeight < nav || r.bottom > innerHeight) f.region.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'instant' : 'smooth' });
+      if (r.top - f.tab.offsetHeight < nav || r.bottom > innerHeight) f.region.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'instant' : 'smooth' });
     }, settleMs(drawer));
   };
 
@@ -163,7 +163,7 @@ export function bootDrawer(drawer: HTMLElement): void {
     const f = nextOpen;
     // Its still is usually on the canvas already, so this resolves at once.
     const first = runner.show(f.scene, f.canvas);
-    const ready = reduced.matches ? Promise.resolve() : Promise.race([first, wait(FIRST_FRAME_WAIT)]);
+    const ready = reducedMotion.matches ? Promise.resolve() : Promise.race([first, wait(FIRST_FRAME_WAIT)]);
     if (how.focus) f.title.focus({ preventScroll: true });
     ready.then(() => {
       if (t !== token) return; // a newer move took over

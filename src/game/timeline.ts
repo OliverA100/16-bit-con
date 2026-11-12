@@ -9,6 +9,7 @@
  *  - drive   Keys / d-pad (later mash and auto) own t for the frame: Sam's run physics set X
  *            directly and the loop scrolls the page to match. Those are the only scrollTo calls.
  */
+import { clamp } from '../lib/math';
 export type Source = 'idle' | 'scroll' | 'keys' | 'dpad' | 'mash' | 'auto';
 
 /** Time constant of the visual ease toward the scroll position, seconds. */
@@ -18,7 +19,6 @@ const MIN_CLOSE_SPEED = 60;
 /** Within an art pixel the ease snaps; the camera rounds to whole pixels anyway. */
 const SETTLE_PX = 1;
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 export class Timeline {
   /** Visual position, what the renderer draws. */
@@ -95,9 +95,6 @@ export class Timeline {
     this.speed = (move * this.W) / Math.max(dt, 1e-4);
   }
 
-  get settled(): boolean {
-    return this.t === this.tTarget && this.speed === 0;
-  }
 }
 
 /** Pinned scroll distance for the whole run (px). */

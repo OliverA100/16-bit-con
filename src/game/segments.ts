@@ -6,6 +6,7 @@
  * up plays it backwards. Free of three.js: the page and the monitor both read it.
  */
 import { pinnedDistance } from './timeline';
+import { clamp01 } from '../lib/math';
 
 /**
  * The scroll lengths, px: the enter segment (one viewport), the run (14 viewports, 9 000–15 000 px)
@@ -49,18 +50,6 @@ export function crackStage(q: number): number {
   return Math.min(CRACK_STAGES, Math.ceil((q - BREAKOUT.cracks[0]) / CRACK_STEP - 1e-6));
 }
 
-/** Where a hit takes q from `q`: to the middle of the next stage — and the sixth hit, the one that breaks the glass, all the way (null: play on to the end). */
-export function hitTarget(q: number): number | null {
-  const next = crackStage(q) + 1;
-  if (next >= CRACK_STAGES) return null;
-  return BREAKOUT.cracks[0] + (next - 0.5) * CRACK_STEP;
-}
-
-/** After the sixth hit the breakout plays itself to the end, q per ms: shatter, leap and landing in about 2.4 s. */
-export const BREAK_PLAY_MS = 2400;
-/** Idle this long with the glass cracking and the page hits it by itself, one crack every AUTO_HIT_MS. */
-export const AUTO_IDLE_MS = 1000;
-export const AUTO_HIT_MS = 380;
 
 /** The enter segment's schedule, in p. */
 export const ENTER = {
@@ -98,7 +87,6 @@ export const ENTER = {
   fullRes: 0.3,
 } as const;
 
-export const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 /** A CSS cubic-bezier(x1, y1, x2, y2) easing (x1, x2 in 0–1): y for x, by Newton's method, bisection when it stalls. */
 export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (x: number) => number {
@@ -162,9 +150,4 @@ export function playMs(p: number): number {
 export const smooth = (v: number, [a, b]: readonly [number, number]) => {
   const x = clamp01((v - a) / (b - a));
   return x * x * (3 - 2 * x);
-};
-/** Slow start, fast middle, soft landing. */
-export const smoother = (v: number, [a, b]: readonly [number, number]) => {
-  const x = clamp01((v - a) / (b - a));
-  return x * x * x * (x * (x * 6 - 15) + 10);
 };

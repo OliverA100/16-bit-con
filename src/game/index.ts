@@ -48,13 +48,15 @@ import { ScreenFrame } from './screen-frame';
 import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
 import type { BreakoutState, Hero } from '../monitor/hero';
-import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, PLAY, clamp01, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
+import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, PLAY, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
 import { drawCell, idleOnPerch, queryPerch, withSmile } from './landing';
 import { createRegisterDialog, focusRegister } from './register-dialog';
 import { createFlyerDialog } from './flyer-dialog';
 import { typeOut } from './typing';
 import { GL_ATTRIBUTES } from '../monitor/spec';
 import * as sound from './sound';
+import { clamp01 } from '../lib/math';
+import { reducedMotion } from '../lib/reduced-motion';
 
 const W = 6000;
 /** The whole run: the field, the city, the night and the dawn at the Javits plaza, the game's last level (world x 0–6000). */
@@ -115,7 +117,7 @@ const HERO_TIMEOUT_MS = 10000;
 
 export function shouldRunWorld(): boolean {
   if (typeof window === 'undefined') return false;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  if (reducedMotion.matches) return false;
   const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
   if (nav.connection?.saveData) return false;
   if ((nav.deviceMemory ?? 8) <= 2) return false;
@@ -137,8 +139,6 @@ interface Overlay {
   samTyped: HTMLElement | null;
   samSaid: HTMLElement | null;
   samPortrait: HTMLCanvasElement | null;
-  loading: HTMLElement | null;
-  loadingText: HTMLElement | null;
   dpadLeft: HTMLElement | null;
   dpadRight: HTMLElement | null;
   buttonA: HTMLElement | null;
@@ -163,8 +163,6 @@ function query(section: HTMLElement): Overlay {
     samTyped: q('[data-sam-typed]'),
     samSaid: q('[data-sam-said]'),
     samPortrait: q<HTMLCanvasElement>('[data-sam-portrait]'),
-    loading: q('.world__loading'),
-    loadingText: q('[data-loading-text]'),
     dpadLeft: q('[data-dpad="left"]'),
     dpadRight: q('[data-dpad="right"]'),
     buttonA: q('[data-button="a"]'),
@@ -278,10 +276,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // loading window covers it — and the world's ~1 MB of art waits until the opening's LCP element
   // has painted, so the opening's text never queues behind it.
   await afterOpeningPaint(section.querySelector('[data-stage]'));
-  const assets = await loadLevel1((done, total) => {
-    if (o.loadingText) o.loadingText.textContent = `Loading… ${Math.round((done / total) * 100)}%`;
-  });
-  const bootAt = performance.now();
+  const assets = await loadLevel1();
 
   // ── Viewport, buffers, geometry ─────────────────────────────────────────
   // The game frame, drawn offscreen at art pixels and scaled onto the canvas over the far sky.
@@ -365,8 +360,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // at the top of the page, and above 1 through the breakout, to 1 + D_B / D_W. By default it rests at
   // the top (the monitor at rest); after the landing, at the end (the broken monitor glided up).
   // Dev only: ?hero=poster holds the poster (the swap check), ?hero=static is the no-3D opening.
-  const devHero = import.meta.env.DEV ? new URLSearchParams(location.search).get('hero') : null;
-  let wantBreakout = !!o.hero && 'WebGL2RenderingContext' in window && devHero !== 'static' && devHero !== 'poster';
+  let wantBreakout = !!o.hero && 'WebGL2RenderingContext' in window;
   let { DE, DW, DB, D } = scrollLengths(viewH(), wantBreakout);
   const timeline = new Timeline(W, T_MAX + DB / DW, -DE / DW);
   /** The lengths for this viewport, and the timeline's ends with them. */
@@ -457,18 +451,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // The city set (and the plaza's art) loads right behind the field; city-far first enters at world x 300.
   loadCity()
     .then((c) => {
-      const c0 = performance.now();
       level.city = c;
       level.plaza.warm(c);
       level.prepareNight();
-      if (import.meta.env.DEV) performance.measure('world:city', { start: c0, end: performance.now() });
     })
     .catch((err) => console.error('[world] city assets failed to load', err));
-  // A dev-only virtual clock (?clock=virtual): time stands still until __world.clock.now moves, so the
-  // power-on, the zoom and the breakout can be captured at exact steps. Everything that keeps time — the
-  // loop, and the scroll lock a user's scroll starts — reads it.
-  const vclock = import.meta.env.DEV && new URLSearchParams(location.search).get('clock') === 'virtual' ? { now: performance.now() } : null;
-  const clockNow = () => (vclock ? vclock.now : performance.now());
+  const clockNow = () => performance.now();
   let expectedY = Number.NaN;
   /**
    * PRESS START's play through the enter segment at the reference's pace (segments.ts PLAY): it began
@@ -494,7 +482,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const cueDone = (owner: object) => {
     if (cue?.owner === owner) cue = null;
   };
-  const frameLag = (now: number) => (vclock ? 0 : Math.min(200, Math.max(0, performance.now() - now)));
+  const frameLag = (now: number) => Math.min(200, Math.max(0, performance.now() - now));
   /** When, in a dive from the top, the camera passes the glass: the picture nearly fills the view (the monitor finds it per viewport). */
   const glassMs = () => playMs(hero3d ? hero3d.flatP + ENTER.flatten.lead : ENTER.fillBy);
   /** The pin, created by PRESS START (never on load), so the page is only as long as its content until then. */
@@ -643,7 +631,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     timeline.jumpTo(timeline.t);
     window.scrollTo({ top: Math.round(pinTop() + DE + timeline.t * DW), behavior: 'instant' });
     expectedY = window.scrollY;
-    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const still = reducedMotion.matches;
     const centre = timeline.X + SAM_CELL / 2;
     // from above the top of the screen (the paper's bottom 30 px over it)
     const flyer = new FallingFlyer(flyerSprites, now, F + 30, centre + FLYER_FROM, centre + FLYER_LAND, { swing: sound.flutter, land: sound.land }, still);
@@ -675,7 +663,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // and steps out over 150 ms
     onClosing: () => sound.paperClose(150),
     onClose: () => {
-      lastInputAt = clockNow();
       paused = false;
       endOpening();
     },
@@ -694,12 +681,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   };
 
   // ── HUD wiring, and the Player 1 bonus line in the Register window at 12/12 ──
-  const bonus = document.getElementById('bonus');
   const registerBonus = document.getElementById('register-bonus');
   const setCoins = (n: number) => {
     if (o.hudCoins) o.hudCoins.textContent = `${String(n).padStart(2, '0')}/${TOTAL_COINS}`;
     const all = n >= TOTAL_COINS;
-    bonus?.toggleAttribute('hidden', !all);
     registerBonus?.toggleAttribute('hidden', !all);
   };
   coins.onChange = setCoins;
@@ -890,19 +875,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     }
   };
   if (d) {
-    if (devHero === 'static' || !('WebGL2RenderingContext' in window)) toStatic(null);
-    else if (devHero !== 'poster')
+    if (!('WebGL2RenderingContext' in window)) toStatic(null);
+    else
       whenIdleAfterLoad(() => {
         // The context first: without one the page never downloads three.js.
-        const c0 = performance.now();
         const gl = d.gl.getContext('webgl2', GL_ATTRIBUTES);
-        if (import.meta.env.DEV) performance.measure('monitor:context', { start: c0, end: performance.now() });
         if (!gl) return toStatic('no WebGL 2 context');
         const timer = window.setTimeout(() => toStatic(`not ready after ${HERO_TIMEOUT_MS} ms`), HERO_TIMEOUT_MS);
-        if (import.meta.env.DEV) performance.mark('monitor:import');
         import('../monitor/hero')
           .then(({ createHero }) => {
-            if (import.meta.env.DEV) performance.mark('monitor:imported');
             return createHero(d.gl, gl, screen.canvas, pauseTask);
           })
           .then((h) => {
@@ -946,9 +927,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     hero3d.breakout(b);
     if (screen.update(f, level, dust, now)) hero3d.frameChanged(false);
     if (shownAt < 0) {
-      const t0 = performance.now();
       hero3d.render(now);
-      if (import.meta.env.DEV) performance.measure('monitor:first-render', { start: t0, end: performance.now() });
       d.gl.classList.add('is-on');
       d.poster.classList.add('is-hidden');
       shownAt = now;
@@ -1104,8 +1083,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     else nextLine = GG_LINE;
   });
   /** Sam out on the page after the landing (src/game/journey.ts): loaded on his first landing, never before. */
-  let journey: Promise<{ debug(): unknown } | null> | null = null;
-  const updatePerch = (q: number) => {
+  let journey: Promise<void> | null = null;
+  const updatePerch = () => {
     if (!perch) return;
     const landed = mode === 'done' && !landing;
     const flying = !!landing;
@@ -1118,7 +1097,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           .then((m) => m.startJourney({ perch, sheets: assets.sam, perchIdle, paused: () => paused || root.classList.contains('is-paused') || !!regDialog?.open }))
           .catch((err) => {
             console.error('[journey] Sam stays on the Register window', err);
-            return null;
           });
         // Sam's line on the Register window types out as his lines in the game do
         if (landingTyped) {
@@ -1361,14 +1339,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     root.classList.remove('is-finale');
   };
 
-  /** The pin's last step, at once: Sam lands on the Register window and the game closes. */
-  const landNow = () => {
-    stopPlays();
-    timeline.jumpTo(timeline.tMax);
-    window.scrollTo({ top: pinTop() + D, behavior: 'instant' });
-    expectedY = window.scrollY;
-    finish();
-  };
 
   /**
    * Exit game or Esc: the spot is saved, the game's UI goes, and the camera pulls back out of the screen
@@ -1524,7 +1494,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         opening.t0 += away;
         opening.flyer.shift(away);
       }
-      lastInputAt = clockNow();
       paused = false;
       input.enabled = mode === 'play';
       sound.hold('dialog', false);
@@ -1609,11 +1578,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let last = performance.now();
   let prevSamX = timeline.X;
   let wasAirborne = false;
-  let lastInputAt = performance.now();
   let lastClock = '';
 
   const frame = (rafNow: number) => {
-    const now = vclock ? vclock.now : rafNow;
+    const now = rafNow;
     const dt = Math.min(0.05, Math.max(0, now - last) / 1000);
     last = now;
     const pxPerWorld = DW / X_MAX;
@@ -1710,7 +1678,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       const next = hitNext(qT);
       sam.jumpPress(now);
       sam.jumpRelease();
-      lastInputAt = now;
       if (next === null) {
         startFinale(qT);
         return;
@@ -1768,7 +1735,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
     }
     const held = input.active && now >= scrollOverrideUntil && !heroUp && !playing && !inBreak && !breakPlay ? input.dir : 0;
-    if (held !== 0) lastInputAt = now;
     // While the visual is still easing after a scroll, keys move the target (the page) from where
     // the user left it and the visual catches up; otherwise they move Sam directly.
     const catchingUp = Math.abs(timeline.tTarget - timeline.t) * W > 2;
@@ -1821,7 +1787,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // hit on the glass (as is a tap or click on its screen).
     if (input.active && live) {
       if (input.consumeJumpPress() || pendingHit) {
-        lastInputAt = now;
         if (hitZone) hit();
         else if (DB > 0 && !breakPlay && ((atEnd && twistSaid) || (qT > 0 && qT < BREAKOUT.cracks[0]))) pullTo(BREAKOUT.cracks[0]);
         else if (!heroUp && !inBreak) sam.jumpPress(now);
@@ -1862,7 +1827,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         const rate = breakoutRate(allowQ);
         const cap = pushed ? limit : Math.min(qPage, limit);
         allowQ = Math.min(cap, allowQ + rate * dt * 1000);
-        lastInputAt = now;
       }
       if (pushing) {
         const y = gateY();
@@ -2206,7 +2170,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     }
     stepLanding(now);
     // Sam on the page, wherever the page is (below the pin the world no longer draws).
-    updatePerch(q);
+    updatePerch();
     if (landingSince >= 0 && landingTyped) {
       const n = Math.min(landingLine.length, Math.floor((now - landingSince) / TYPE_MS));
       if (n !== landingShown) {
@@ -2218,76 +2182,4 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
-  if (import.meta.env.DEV) performance.measure('world:boot', { start: bootAt, end: performance.now() });
-
-  if (import.meta.env.DEV) {
-    (window as unknown as { __world: unknown }).__world = {
-      timeline,
-      motion,
-      sam,
-      coins,
-      get trigger() {
-        return trigger;
-      },
-      get mode() {
-        return { mode, paused };
-      },
-      enterPlay,
-      exitPlay,
-      get saved() {
-        return saved;
-      },
-      get finale() {
-        return finale;
-      },
-      /** The opening's phase and the flyer's pose now (dev: the fall's measurements). */
-      opening(now: number) {
-        return opening ? { phase: opening.phase, t0: opening.t0, pose: opening.flyer.pose(now), samX: timeline.X, facing: sam.facing } : null;
-      },
-      get gate() {
-        return { allowQ, wheel: gateWheelOn, glassT0 };
-      },
-      get zoom() {
-        return zoom ? { ...zoom, p: lastHeroP } : null;
-      },
-      input,
-      get F() {
-        return F;
-      },
-      get vp() {
-        return vp;
-      },
-      get lengths() {
-        return { DE, DW, DB, D };
-      },
-      get p() {
-        return clamp01(1 + (timeline.t * DW) / DE);
-      },
-      get q() {
-        return DB > 0 ? clamp01(((timeline.t - T_MAX) * DW) / DB) : 0;
-      },
-      get breakout() {
-        return { want: wantBreakout, play: breakPlay, stage: crackStage(DB > 0 ? clamp01(((timeline.t - T_MAX) * DW) / DB) : 0), perch: perch?.root.className ?? null, samOnScreen };
-      },
-      get hero() {
-        return { mode: heroMode, phase: hero3d?.phase ?? null, shownAt, startShown, startUV, screen: screen.geom, version: screen.version, hero3d };
-      },
-      clock: vclock,
-      start,
-      screen,
-      get loop() {
-        return { overrideUntil: scrollOverrideUntil, expectedY, lastInputAt, active: input.active, dir: input.dir };
-      },
-      level,
-      /** Dev only: the game closes as if Sam had just landed (PRESS START, then the pin's last step). */
-      landNow: () => {
-        if (mode === 'default') enterPlay();
-        if (mode === 'play') landNow();
-      },
-      /** Dev only: Sam's state out on the page. */
-      journey: async () => (await journey)?.debug() ?? null,
-    };
-  }
 }
-
-export const samCell = SAM_CELL;

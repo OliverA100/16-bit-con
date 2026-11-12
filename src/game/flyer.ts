@@ -18,6 +18,7 @@
  */
 import { flyerFrame, flyerGround, FLYER_CELL, GROUND_H, GROUND_W, type FlyerInk, type Rgb } from './flyer-art';
 import { hexToRgb, readToken } from './palette';
+import { clamp01, lerp } from '../lib/math';
 
 /** Top of the screen to the ground. */
 export const FALL_MS = 3900;
@@ -56,9 +57,7 @@ const LIE_KEYS: [number, number][] = [
  */
 const DRAG: [number, number] = [1.15, 0.9];
 
-const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 const smooth = (k: number) => k * k * (3 - 2 * k);
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 function lieAt(t: number): number {
   for (let i = 1; i < LIE_KEYS.length; i++) {

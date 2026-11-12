@@ -12,8 +12,8 @@ import { downloadIcs } from './ics';
 import { mountTicket, type MountedTicket, type TicketData } from './ticket';
 import { makeCode, type PassId } from './ticket-data';
 import { GG_LINE } from '../data/guide';
+import { reducedMotion } from '../lib/reduced-motion';
 
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** The site's beat: a step every 50 ms. */
 const BEAT = 50;
 
@@ -39,7 +39,7 @@ export function initSuccess(formApi: RegisterFormApi | null): { show(r: Registra
 
   /** Swap one state for the other, stepping out, the height, then stepping in. */
   const swap = async (from: HTMLElement, to: HTMLElement, before: () => void) => {
-    if (reduced()) {
+    if (reducedMotion.matches) {
       before();
       from.hidden = true;
       to.hidden = false;

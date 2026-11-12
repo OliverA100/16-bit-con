@@ -12,8 +12,8 @@
 import type { SceneId } from '../data/sessions';
 import { preloadFiles, type Scene, type SceneModule, type View } from './kit';
 import { sceneModules } from './scenes';
+import { reducedMotion } from '../lib/reduced-motion';
 
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const phone = matchMedia('(max-width: 53.6875rem)'); // the drawer's own break (ScheduleDrawer.astro)
 
 /** CSS px per art px: k = max(1, round(this × dpr)), whole device pixels per art pixel (the mock's scale). */
@@ -86,7 +86,7 @@ export class SceneRunner {
       }
       this.update();
     });
-    reduced.addEventListener('change', () => {
+    reducedMotion.addEventListener('change', () => {
       for (const slot of this.slots.values()) this.still(slot);
       this.update();
     });
@@ -221,7 +221,7 @@ export class SceneRunner {
 
   /** With reduced motion, every scene at its still. */
   private still(slot: Slot): void {
-    if (!slot.scene || !reduced.matches) return;
+    if (!slot.scene || !reducedMotion.matches) return;
     slot.t = slot.scene.still ?? slot.scene.start ?? 0;
     slot.dirty = true;
     this.draw(slot);
@@ -232,7 +232,7 @@ export class SceneRunner {
     if (!a || !a.scene) return;
     if (!a.view) this.size(a);
     if (!a.view) return;
-    if (reduced.matches) {
+    if (reducedMotion.matches) {
       cancelAnimationFrame(this.raf);
       this.raf = 0;
       this.still(a);
@@ -253,7 +253,7 @@ export class SceneRunner {
   private tick = (now: number) => {
     const a = this.active;
     this.raf = 0;
-    if (!a || !a.scene || !this.visible || reduced.matches) return;
+    if (!a || !a.scene || !this.visible || reducedMotion.matches) return;
     a.t += Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     this.draw(a);

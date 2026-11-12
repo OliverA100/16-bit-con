@@ -166,10 +166,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   <!-- The game's mode changes, announced (the overlays' own live regions are hidden outside the game). -->
   <p class="sr-only" aria-live="polite" data-world-status></p>
-
-  <Window title="Loading" class="world__loading" hidden>
-    <p class="mono" data-loading-text>Loading… 0%</p>
-  </Window>
 </section>
 
 <script>
@@ -499,8 +495,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .world__hud,
   .world__hint,
   .world__prompt,
-  .world__sam,
-  .world__loading {
+  .world__sam {
     position: absolute;
     z-index: 3;
     display: none;
@@ -530,8 +525,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .world__touch,
   .world__hud,
   .world__hint,
-  .world__prompt,
-  .world__loading {
+  .world__prompt {
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
@@ -550,7 +544,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .world__hud,
   .world__prompt,
-  .world__loading,
   .hero__start {
     touch-action: manipulation;
   }
@@ -800,17 +793,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       max-width: calc(100% - 2 * var(--gutter) - 11rem - var(--space-2));
       translate: none;
     }
-  }
-
-  .world__loading {
-    display: block;
-    top: 50%;
-    left: 50%;
-    translate: -50% -50%;
-  }
-
-  .world__loading[hidden] {
-    display: none !important;
   }
 
   .world__touch {
