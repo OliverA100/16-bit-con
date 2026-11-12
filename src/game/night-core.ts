@@ -5,7 +5,15 @@
  */
 export type ColorMap = Record<string, string>;
 /** A night palette: explicit colours, or a luminance-rank split into targets with role overrides. */
-export type NightSpec = { map: ColorMap } | { rank: { targets: string[]; weights?: number[]; roles?: ColorMap } };
+/**
+ * A layer's night colours: an explicit map; a rank by luminance into a few tokens (buildings, the street); or a
+ * shade, every colour mixed `amount` of the way towards a night ink, so it keeps its own hue (characters: a
+ * brown dog stays a dimmer brown, never a grey).
+ */
+export type NightSpec =
+  | { map: ColorMap }
+  | { rank: { targets: string[]; weights?: number[]; roles?: ColorMap } }
+  | { shade: { toward: string; amount: number; roles?: ColorMap } };
 
 export const pack = (r: number, g: number, b: number) => (r << 16) | (g << 8) | b;
 export const hexOf = (p: number) => `#${p.toString(16).padStart(6, '0').toUpperCase()}`;
@@ -74,7 +82,19 @@ export function rankMap(im: Indexed, targets: string[], weights?: number[], role
 }
 
 export function mapOf(im: Indexed, spec: NightSpec): ColorMap {
-  return 'map' in spec ? spec.map : rankMap(im, spec.rank.targets, spec.rank.weights, spec.rank.roles);
+  if ('map' in spec) return spec.map;
+  if ('rank' in spec) return rankMap(im, spec.rank.targets, spec.rank.weights, spec.rank.roles);
+  const [tr, tg, tb] = rgbOf(spec.shade.toward);
+  const k = spec.shade.amount;
+  const map: ColorMap = {};
+  for (const p of im.colors) {
+    const r = Math.round(((p >> 16) & 255) * (1 - k) + tr * k);
+    const g = Math.round(((p >> 8) & 255) * (1 - k) + tg * k);
+    const b = Math.round((p & 255) * (1 - k) + tb * k);
+    map[hexOf(p)] = hexOf(pack(r, g, b));
+  }
+  for (const [from, to] of Object.entries(spec.shade.roles ?? {})) map[from.toUpperCase()] = to;
+  return map;
 }
 
 /** The fully mapped night image (every colour at its night token, alpha kept), as RGBA. */

@@ -10,10 +10,10 @@
  */
 import type { CityAssets, Level1Assets } from './assets';
 import type { Drawable } from './sprites';
-import { drawTiled, STACK, type Frame } from './world';
-import { hexToRgb, readToken } from './palette';
+import { STACK, type Frame } from './world';
+import { readToken } from './palette';
 import { board, ledBoard, letter } from './lettering';
-import { NIGHT_STEPS, Stepper, rank, type NightTokens } from './night';
+import { Stepper, rank, type NightTokens } from './night';
 
 export const PLAZA = {
   /**
@@ -39,8 +39,6 @@ export const PLAZA = {
 } as const;
 /** Cypress row along the facade base, facade x; the entrance with its flags and kiosk stays open. */
 const CYPRESS = { from: 140, to: 1270, step: 22, gap: [560, 910] } as const;
-/** The plaza → daisy-bed seam tile puts X1 at its column 16. */
-const SEAM_BACK_X1 = 16;
 /**
  * The facade's glass (Blue 300/500/700 and its cloud reflections): dark at night, under its space frame
  * — the LED board and the Booth sign are the plaza's lights. (Lit cell by cell like the city's windows,
@@ -59,14 +57,8 @@ interface PlazaNight {
   bay: Stepper;
   cypress: Stepper;
   post: Stepper;
-  seamBack: Stepper;
-  daisySurface: Stepper;
-  dirtRows: Stepper;
-  dirtFill: Stepper;
   tree: Stepper;
   plant: Stepper;
-  dirt: [number, number, number];
-  dark: [number, number, number];
 }
 
 export class Plaza {
@@ -99,7 +91,6 @@ export class Plaza {
   prepareNight(T: NightTokens, tree: Stepper, plant: Stepper): void {
     const c = this.city;
     if (!c || this.night) return;
-    const a = this.a;
     const glass = Object.fromEntries(FACADE_GLASS.map((h) => [h, T.k]));
     const facadeSpec = rank([T.n9, T.g7], [2, 1], glass);
     const pave = rank([T.k, T.g7, T.g5], [1, 1, 1]);
@@ -108,17 +99,11 @@ export class Plaza {
       bay: new Stepper(c.facadeBay, facadeSpec),
       cypress: new Stepper(c.cypress, rank([T.n9, T.n7], [2, 1])),
       post: new Stepper(c.signPost, pave),
-      seamBack: new Stepper(c.seamBack, pave),
-      daisySurface: new Stepper(a.daisySurface, rank([T.n9, T.n7, T.g7], [2, 1, 1])),
-      dirtRows: new Stepper(a.dirtRows, rank([T.k, T.n9], [1, 1])),
-      dirtFill: new Stepper(a.dirtFill, rank([T.k, T.n9], [1, 1])),
       tree,
       plant,
-      dirt: hexToRgb(a.dirt),
-      dark: hexToRgb(T.k),
     };
     const n = this.night;
-    for (const s of [n.facade, n.bay, n.cypress, n.post, n.seamBack, n.daisySurface, n.dirtRows, n.dirtFill]) s.prepare();
+    for (const s of [n.facade, n.bay, n.cypress, n.post]) s.prepare();
   }
 
   /** The big sign: 16-BIT CON on an LED board, centred over the entrance high on the front cube. */
@@ -201,35 +186,6 @@ export class Plaza {
     ctx.restore();
   }
 
-  /**
-   * The daisy bed beyond the plaza's seams — the street's bands stop at them (Level1 draws those) —
-   * and the seam tile's details; below the viewport (the monitor's screen frame) the fill carries on down.
-   */
-  drawGround(ctx: CanvasRenderingContext2D, f: Frame, look: PlazaLook): void {
-    const c = this.city;
-    if (!c) return;
-    const { camLeft, F, bh, range: r } = f;
-    const a = this.a;
-    const n = this.night;
-    const g = STACK.ground;
-    const s = look.street;
-    const X1 = PLAZA.seam;
-    const X2 = X1 + g.seamStep;
-    const X3 = X1 + 2 * g.seamStep;
-    const edgeX = Math.max(r.x0, Math.round(X2 - camLeft));
-    if (edgeX < r.x1) {
-      ctx.fillStyle = n && s > 0 ? mix(n.dirt, n.dark, s / NIGHT_STEPS) : a.dirt;
-      ctx.fillRect(edgeX, F + g.edgeTop, r.x1 - edgeX, g.fillTop - g.edgeTop);
-    }
-    const fill = n ? n.dirtFill.at(s) : a.dirtFill;
-    for (let y = F + g.fillTop; y < Math.max(bh, r.y1); y += a.dirtFill.height) drawTiled(ctx, fill, camLeft, y, r, { from: X3, phase: g.daisyPhase });
-    drawTiled(ctx, n ? n.dirtRows.at(s) : a.dirtRows, camLeft, F + g.edgeTop, r, { from: X2, phase: g.daisyPhase });
-    drawTiled(ctx, n ? n.daisySurface.at(s) : a.daisySurface, camLeft, F + g.daisyTop, r, { from: X1, phase: g.daisyPhase });
-    const seam = n ? n.seamBack.at(s) : c.seamBack;
-    const sx = Math.round(X1 - SEAM_BACK_X1 - camLeft);
-    if (sx + seam.width > r.x0 && sx < r.x1) ctx.drawImage(seam, sx, F + g.seamTileTop);
-  }
-
   /** The plaza's trees, plants and daisies, and the Booth 630 sign on its two posts beside where Sam stops. */
   drawProps(ctx: CanvasRenderingContext2D, f: Frame, look: PlazaLook): void {
     const c = this.city;
@@ -254,10 +210,4 @@ export class Plaza {
     // the sign itself stays lit through the night
     place(sign, left, F - PLAZA.signClear);
   }
-}
-
-/** a → b by u, as an rgb() string (the edge band's flat tone between its day and night colours). */
-function mix(a: [number, number, number], b: [number, number, number], u: number): string {
-  const c = a.map((v, i) => Math.round(v + (b[i]! - v) * Math.min(1, Math.max(0, u))));
-  return `rgb(${c[0]} ${c[1]} ${c[2]})`;
 }

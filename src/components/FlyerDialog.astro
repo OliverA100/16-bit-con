@@ -1,8 +1,8 @@
 ---
 /**
  * FlyerDialog — the flyer Sam picks up at the start of the game, opened over the world. It is a sheet of
- * paper, not a Window: the cream of Vega's poster art in an orange band and a green rule, a strip of tape
- * at the top, tilted a little, with a yellow "Free entry" burst on its right edge. A native modal <dialog>
+ * paper, not a Window: the cream of Vega's poster art in an orange band and a green rule, tilted a
+ * little, with a yellow "Free entry" burst on its right edge. A native modal <dialog>
  * like the Register one (focus trapped, the page inert, no backdrop); "Let's go" and Esc close it
  * (src/game/flyer-dialog.ts). Only in play mode.
  *
@@ -16,7 +16,6 @@ import Wordmark from './Wordmark.astro';
 <dialog class="flyer-dialog" aria-labelledby="flyer-title" data-flyer-dialog>
   <div class="flyer-dialog__stack" data-flyer-stack>
     <article class="flyer">
-      <span class="flyer__tape" aria-hidden="true"></span>
       <p class="flyer__kicker">Calling all players</p>
       <h2 class="flyer__title" id="flyer-title"><Wordmark size="flyer" tone="flyer" /></h2>
       <img class="flyer__art" src="/sprites/props/arcade-machine.png" width="53" height="87" alt="An arcade machine with VEGA on its marquee" />
@@ -49,8 +48,9 @@ import Wordmark from './Wordmark.astro';
 
   @media (max-width: 64rem) {
     .flyer-dialog {
-      margin-top: calc(var(--nav-h) + var(--space-4) + 5rem + var(--space-2));
-      max-height: calc(100dvh - var(--nav-h) - var(--space-4) - 5rem - var(--space-4));
+      /* under the HUD's right column: Skip, then the Player 1 window (~5rem) */
+      margin-top: calc(var(--nav-h) + var(--space-4) + var(--control-h) + var(--space-2) + 5rem + var(--space-2));
+      max-height: calc(100dvh - var(--nav-h) - var(--space-4) - var(--control-h) - var(--space-2) - 5rem - var(--space-4));
     }
   }
 
@@ -80,20 +80,6 @@ import Wordmark from './Wordmark.astro';
       inset 0 0 0 14px var(--color-yellow-600),
       inset 0 0 0 20px var(--color-green-500),
       6px 6px 0 color-mix(in srgb, var(--color-green-900) 30%, transparent);
-  }
-
-  /* A strip of clear tape over the top edge */
-  .flyer__tape {
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    width: 84px;
-    height: 24px;
-    translate: -50% 0;
-    rotate: 3deg;
-    background: color-mix(in srgb, var(--color-daisy-white) 70%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-cloud-white) 80%, transparent);
-    pointer-events: none;
   }
 
   .flyer p,

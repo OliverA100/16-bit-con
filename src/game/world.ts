@@ -6,16 +6,14 @@
  * out of the ground and the horizon never moves. Everything is a pure function of the timeline
  * plus wall-clock cloud drift, coin spin, dust and the idle NPC loops, so reverse is free.
  */
-import type { CityAssets, Level1Assets } from './assets';
+import { FIELD, JOINT_SLOPE, STREET, type CityAssets, type Level1Assets } from './assets';
 import type { Drawable } from './sprites';
 import { FOOT_SINK, type Sam } from './sam';
 import type { Coins } from './coins';
 import type { Dust } from './dust';
-import { Lights, NIGHT_STEPS, Stepper, nightTokens, rank, type NightTokens } from './night';
+import { CHARACTER_SHADE, Lights, NIGHT_STEPS, Stepper, nightTokens, rank, shade, type NightTokens } from './night';
 import { makeStrip, type Strip } from './sprites';
 import { CLOUD_ROLES, RANGE_ROLES, Tinted } from './tint';
-import { board, letter } from './lettering';
-import { readToken } from './palette';
 import { Plaza, PLAZA, type PlazaLook } from './plaza';
 import { horizonAt } from './stages';
 import { PLAZA_TIME } from '../data/layers';
@@ -74,8 +72,9 @@ export const SEQ = {
   midHedgeEnd: 1850,
   cityMidBegin: 1850,
   hedgeEnd: 1930, // behind Sam the bushes end (behind the last field tree) …
-  fenceBegin: 1944, // … and the city fence starts before the seam, on the grass
-  seam: 2000, // X0: the surface changes (grass → pavement); the edge at X0 + 28, the fill at X0 + 56
+  fenceBegin: 2016, // … and the city fence starts on the corner's paving, at one of its posts
+  seam: 2000, // X0: the park's grass bank ends here; the street's corner of paving follows (bushes in front of the join)
+  corner: 2028, // the road starts where its kerb turns towards the viewer, along the slabs' joints
   subway: 2136, // the entrance stands on the pavement 80 px after the fill seam, like any prop
   nearBegin: 2150, // building fronts
   fenceEnd: 5520, // the street's railing stops before the plaza's first planter
@@ -107,12 +106,12 @@ export const STACK = {
   javits: { p: 0.35 },
   near: { hedgeBottom: 20, bottom: 2, treeBottom: 3 },
   /**
-   * The ground band is 48 px, identical in field and city: surface 8 px from F (grass tips and
-   * fill / sidewalk rows 0–7), edge 12 px from F + 8 (the daisy row's dirt / the kerb face), fill
-   * 28 px from F + 20 (a deeper dirt / the road with its lane marks). Sam's feet never change
-   * height. The three seams are vertical and crisp, 28 px apart, farthest-down last.
+   * The ground band is 48 px under F. The field: Vega's grass over grey rock (its blades above F). The city:
+   * surface 8 px (sidewalk rows 0–7), edge 12 px from F + 8 (the kerb face), fill 28 px from F + 20 (the road
+   * with its lane marks). The plaza: the sidewalk's slab face, the whole band deep. Sam's feet never change
+   * height. Field → street and street → plaza meet along the slabs' 45° joints, not on a vertical cut.
    */
-  ground: { daisyTop: -47, daisyPhase: 492, edgeTop: 8, fillTop: 20, seamStep: 28, seamTileLeft: -8, seamTileTop: -4 },
+  ground: { edgeTop: 8, fillTop: 20, fieldPhase: 492, tufts: [2] },
 } as const;
 
 interface Seed {
@@ -142,35 +141,51 @@ const CUMULUS: Seed[] = [
 const FIELD_TREES = [600, 900, 1250, 1600, 1900];
 /** Mid-layer trees in that layer's own space (u). */
 const MID_TREES = [260, 1000, 1760];
-/** The street, world x, through Level 3 and into the dawn; the plaza has its own trees and planters (src/game/plaza.ts). */
-const STREET_TREES = [2330, 2630, 2930, 3230, 3530, 3830, 4130, 4430, 4730, 5030, 5330];
-const PLANTS = [2400, 2950, 3380, 3900, 4500, 5200];
-const ARCADES = [2620, 3420];
-/** Level 2's life (one office-chair gag, then street chess) and Level 3's crowd toward the after party at Booth 630. */
-const NPCS = { molePhone: 2380, moleCoffee: 2680, molesChess: 3340, molesSofa: 4300, molePizza: 4450, dogBark: 4600, molePhone2: 4780 } as const;
-/** The after-party spot: vega-sign-horizontal over two arcade machines. */
-const PARTY = { x: 4950, arcadeGap: 56 } as const;
 /**
- * Signage hierarchy: the event is 16-Bit Con and Vega is a booth at it. A 16-BIT CON ·
- * OCT 3–5 billboard on a Level 2 front (near-layer space), and 16-BIT CON in neon over the party
- * cabinets; "vega" stays only on the cabinets and the Booth 630 sign at the end.
+ * The street, world x (left edges), through the afternoon, the night and into the dawn, placed by hand on an
+ * uneven rhythm, as a street grows (on review: nothing evenly spaced): planter trees, now and then two close
+ * together; plants, sometimes a pair; and New York's own life on the sidewalk — a mole on the phone, the dog's
+ * walk, a chess game, ping-pong at an outdoor table, a mole watering a tree, a slice of pizza at night, a
+ * barking dog, the closed subway, another call. Every thing at least STREET_GAP from the next (checked in dev:
+ * checkStreet). The plaza has its own trees and planters (src/game/plaza.ts).
  */
-/** On the first front after the park opening (near-layer u, past gapTo), above the street trees. */
-const BILLBOARD = { u: 616, bottom: -112 } as const;
-interface Signs {
-  billboard: { day: Drawable; neon: Drawable };
-  party: { day: Drawable; neon: Drawable };
-}
-function buildSigns(c: CityAssets): Signs {
-  const k = readToken('--color-outline-black');
-  const g7 = readToken('--color-grey-700');
-  const make = (neon: boolean) => ({
-    billboard: board([letter(c.letters, '16-BIT CON', 'large', neon), letter(c.letters, 'OCT 3-5', 'small', neon)], { fill: k, outline: k, frame: g7 }),
-    party: board([letter(c.letters, '16-BIT CON', 'large', neon)], { fill: k, outline: k, pad: 2 }),
-  });
-  const day = make(false);
-  const neon = make(true);
-  return { billboard: { day: day.billboard, neon: neon.billboard }, party: { day: day.party, neon: neon.party } };
+const STREET_TREES = [2392, 2668, 3034, 3318, 3560, 3918, 4204, 4466, 4700, 4800, 5360];
+const PLANTS = [2556, 3418, 3466, 4044, 5232];
+const NPCS = { molePhone: 2470, molesChess: 3150, pingPong: 3640, watering: 4138, molePizza: 4330, dogBark: 4590, molePhone2: 5150 } as const;
+/** The night's closed subway entrance: no train tonight, Sam runs on. */
+const SUBWAY_CLOSED = 4880;
+/** Railing posts (counted from its first) that carry a street lamp, at uneven spacing; never behind a subway entrance. The two ends always do. */
+const LAMP_POSTS = [4, 7, 11, 14, 18, 23];
+/** Space between things on the street, px (their visible bodies). */
+const STREET_GAP = 12;
+/** A 60 px character's body inside its cell (the careers sheets centre it). */
+const BODY = { from: 14, to: 46 } as const;
+
+/**
+ * Dev only: every thing standing on the street (its visible width) at least STREET_GAP from the next, the
+ * dog's walk included; a clash is warned in the console the moment the world is built.
+ */
+function checkStreet(c: CityAssets, tree: Drawable): void {
+  const boxes: [string, number, number][] = [
+    ['subway', SEQ.subway, SEQ.subway + c.subway.width],
+    ...STREET_TREES.map((x) => ['tree', x, x + tree.width] as [string, number, number]),
+    ...PLANTS.map((x) => ['plant', x, x + c.plant.width] as [string, number, number]),
+    ['mole on the phone', NPCS.molePhone + BODY.from, NPCS.molePhone + BODY.to],
+    ['chess', NPCS.molesChess, NPCS.molesChess + c.molesChess.fw],
+    ['ping-pong', NPCS.pingPong, NPCS.pingPong + c.molesPingPong.fw],
+    ['watering', NPCS.watering, NPCS.watering + c.moleWatering.width],
+    ['closed subway', SUBWAY_CLOSED, SUBWAY_CLOSED + c.subwayClosed.width],
+    ['pizza', NPCS.molePizza + BODY.from, NPCS.molePizza + BODY.to],
+    ['barking dog', NPCS.dogBark + BODY.from, NPCS.dogBark + BODY.to],
+    ['second call', NPCS.molePhone2 + BODY.from, NPCS.molePhone2 + BODY.to],
+    ['dog walk', DOG.from + BODY.from, DOG.to + BODY.to],
+  ];
+  boxes.sort((a, b) => a[1] - b[1]);
+  for (let i = 1; i < boxes.length; i++) {
+    const [na, , ea] = boxes[i - 1]!;
+    const [nb, sb] = boxes[i]!;
+    if (sb - ea < STREET_GAP) console.warn(`[world] street clash: ${na} (to ${ea}) and ${nb} (from ${sb}) are ${sb - ea} px apart`);
+  }
 }
 
 /**
@@ -181,16 +196,14 @@ function buildSigns(c: CityAssets): Signs {
 const NIGHT = { span: 0.06, far: 0.64, towers: 0.665, mid: 0.69, near: 0.715, street: 0.74 } as const;
 /** Window lighting: [from, to] in t, and the share of a layer's windows that end up lit — a night city is not fully lit, and the shuffled order leaves the dark ones scattered. */
 const LIGHTS = { far: [0.7, 0.76, 0.7], towers: [0.72, 0.78, 0.55], mid: [0.74, 0.8, 0.5], near: [0.76, 0.82, 0.45] } as const;
-const NEON_AT = 0.76;
 /**
  * Dawn at the plaza: each layer steps back to its day palette over `span`, far
  * first and near last — the far skyline, Javits, the towers, the mid and near fronts, then the street
- * and the plaza's props; before that the windows go dark one by one (LIGHTS_OUT) and the neon goes
- * back to day. None of it at a night plaza (PLAZA_TIME).
+ * and the plaza's props; before that the windows go dark one by one (LIGHTS_OUT). None of it at a night
+ * plaza (PLAZA_TIME).
  */
 const DAWN = PLAZA_TIME === 'dawn' ? { span: 0.04, far: 0.845, javits: 0.85, towers: 0.855, mid: 0.865, near: 0.875, street: 0.885 } : null;
 const LIGHTS_OUT = { far: [0.845, 0.875], towers: [0.85, 0.88], mid: [0.855, 0.885], near: [0.86, 0.89] } as const;
-const NEON_OFF = PLAZA_TIME === 'dawn' ? 0.88 : Infinity;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 interface NightSet {
@@ -203,8 +216,12 @@ interface NightSet {
   sidewalk: Stepper;
   kerb: Stepper;
   road: Stepper;
-  seam: Stepper;
+  plazaFloor: Stepper;
+  kerbReturn: Stepper;
+  kerbReturnLeft: Stepper;
   subway: Stepper;
+  subwayClosed: Stepper;
+  watering: Stepper;
   arcade: Stepper;
   plant: Stepper;
   poster: Stepper;
@@ -243,8 +260,8 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
   const pave = { '#E8DECF': T.g5, '#CBC3C7': T.g7, '#CBBFBF': T.g7, '#ACA5A8': T.g7, '#ABA3A3': T.g7, '#BB9147': T.g5, '#767272': T.g7, '#55575B': T.k, '#353535': T.k, '#777B80': T.g7, '#84C5FF': T.g5 };
   const greens = { '#224100': T.n9, '#2E5700': T.n9, '#1F3B00': T.n9, '#457D07': T.n7, '#75A70D': T.n7 };
   const strips = new Map<Strip, Stepper>();
-  for (const st of [c.molePhone, c.moleCoffee, c.molesChess, c.molesSofa, c.molePizza, c.dogBark, c.dog]) {
-    strips.set(st, new Stepper(st.image, rank([T.k, T.g7, T.g5], [1, 1, 1])));
+  for (const st of [c.molePhone, c.molesChess, c.molesPingPong, c.molePizza, c.dogBark, c.dog]) {
+    strips.set(st, new Stepper(st.image, shade(T.n9, CHARACTER_SHADE)));
   }
   return {
     far: new Stepper(c.far, farMap),
@@ -256,8 +273,12 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
     sidewalk: new Stepper(c.sidewalk, { map: pave }),
     kerb: new Stepper(c.kerb, { map: pave }),
     road: new Stepper(c.road, { map: pave }),
-    seam: new Stepper(c.seam, rank([T.k, T.n9, T.g7, T.g5])),
+    plazaFloor: new Stepper(c.plazaFloor, { map: pave }),
+    kerbReturn: new Stepper(c.kerbReturn, { map: pave }),
+    kerbReturnLeft: new Stepper(c.kerbReturnLeft, { map: pave }),
     subway: new Stepper(c.subway, { map: { ...greens, '#282828': T.k, '#464646': T.g7, '#FFCF3B': T.y1, '#FFF15B': T.y1, '#FFFFFF': T.y1 } }),
+    subwayClosed: new Stepper(c.subwayClosed, { map: { ...greens, '#282828': T.k, '#464646': T.g7, '#FFCF3B': T.y1, '#FFF15B': T.y1, '#FFFFFF': T.y1 } }),
+    watering: new Stepper(c.moleWatering, shade(T.n9, CHARACTER_SHADE)),
     arcade: new Stepper(c.arcade, rank([T.k, T.g7], [1, 1], { ...greens, '#5DB3FF': T.y1, '#70A736': T.y4, '#FFCF3B': T.y4, '#FFD11B': T.y4, '#F0A125': T.y4 })),
     plant: new Stepper(c.plant, rank([T.n9, T.n7], [1, 1], { '#834622': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
     poster: new Stepper(c.poster, rank([T.k, T.g7, T.g5])),
@@ -271,8 +292,21 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
     },
   };
 }
+/** The park corner's foreground bushes: (x from the seam, bottom below the screen's foot), left to right. */
+const CORNER_BUSHES: [number, number][] = [
+  [-40, 22],
+  [-2, 13],
+  [36, 24],
+];
+/**
+ * The street fence tile's post: its columns, so a run starts and ends on one; its centre; the top of its cap
+ * (row 17: its ball and neck are rows 0–16, columns 8–24).
+ */
+const FENCE_POST = { from: 11, to: 22, centre: 16, cap: 17, ball: [8, 25] } as const;
+/** The subway entrance's left lamp: the globe and its pole down to where the subway's railing starts (row 97); the pole's centre column. */
+const STREET_LAMP = { x: 0, y: 0, w: 30, h: 97, poleCentre: 13 } as const;
 /** The dog patrols the sidewalk on its own clock, independent of Sam: world px and px/s. */
-const DOG = { from: 2700, to: 3100, speed: 28, stride: 8 } as const;
+const DOG = { from: 2756, to: 2950, speed: 28, stride: 8 } as const;
 const POSTER_U = 140; // on the leading near building, in that layer's space
 
 /** Where the mid fronts and the towers can be cut cleanly: roofline steps, and fully transparent columns. */
@@ -329,6 +363,62 @@ function cityEndU(phase: number, limit: number): number {
 }
 const nearestEdge = (col: number) => Math.min(...MID_EDGES.map((e) => Math.abs(e - col)));
 const insideClear = (col: number) => Math.min(...TOWER_CLEAR.map(([a, b]) => (col >= a && col <= b ? 0 : Math.min(Math.abs(col - a), Math.abs(col - b)))));
+
+/** 2-row clumps: the park's grass blades spill a little over the paving's edge, unevenly. */
+const EDGE_JAG = [0, 2, 1, 3, 1, 0, 2, 3];
+/** Where the park's grass bank stops on a ground row (rows from F; above F, its blades spill a little further). */
+function fieldEdge(row: number): number {
+  if (row >= 0) return SEQ.seam;
+  return SEQ.seam + EDGE_JAG[((Math.floor(row / 2) % EDGE_JAG.length) + EDGE_JAG.length) % EDGE_JAG.length]!;
+}
+/** Where the street's paving starts: where the bank stops. */
+function wallEdge(): number {
+  return SEQ.seam;
+}
+/** Where the road starts at the park's corner: its kerb from the kerb's top (F + 8) down the band along the joints. */
+function cornerEdge(row: number): number {
+  return SEQ.corner + Math.round(Math.min(Math.max(0, row - STACK.ground.edgeTop), STREET.plazaRows) * JOINT_SLOPE);
+}
+/** Where the kerb turns towards the viewer at the plaza: from the kerb's top (F + 8) down the band along the joints. */
+function plazaEdge(row: number): number {
+  return PLAZA.seam + Math.round(Math.min(Math.max(0, row - STACK.ground.edgeTop), STREET.plazaRows) * JOINT_SLOPE);
+}
+
+/**
+ * Draw `draw` clipped, row by row from y0 to y1, to one side of an edge given as a world x per ground row (rows
+ * from F): 'before' keeps what is left of it, 'after' the rest. Rows with the same edge share one rectangle.
+ */
+function rowClip(
+  ctx: CanvasRenderingContext2D,
+  r: Rect,
+  camLeft: number,
+  F: number,
+  y0: number,
+  y1: number,
+  edge: (row: number) => number,
+  side: 'before' | 'after',
+  draw: () => void,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  let runFrom = y0;
+  let runX = Math.round(edge(y0 - F) - camLeft);
+  const flush = (to: number) => {
+    const x = Math.min(r.x1, Math.max(r.x0, runX));
+    if (side === 'before') ctx.rect(r.x0, runFrom, x - r.x0, to - runFrom);
+    else ctx.rect(x, runFrom, r.x1 - x, to - runFrom);
+  };
+  for (let y = y0 + 1; y <= y1; y++) {
+    const x = y < y1 ? Math.round(edge(y - F) - camLeft) : NaN;
+    if (x === runX) continue;
+    flush(y);
+    runFrom = y;
+    runX = x;
+  }
+  ctx.clip();
+  draw();
+  ctx.restore();
+}
 
 /** A tiled far layer on the screen canvas: positions snap to device pixels, tiles abut exactly (k · width is whole). */
 export function farTiled(ctx: CanvasRenderingContext2D, img: Drawable, scroll: number, y: number, r: Pick<Rect, 'x0' | 'x1'>, snap: (v: number) => number, mirror: boolean): void {
@@ -392,7 +482,6 @@ export class Level1 {
   /** The Javits plaza at the end of the run, the game's last level (src/game/plaza.ts). */
   readonly plaza: Plaza;
   private night: NightSet | null = null;
-  private signs: Signs | null = null;
   /** The clouds and the far range, recoloured gradually with the sky. */
   private readonly tints: Map<Drawable, Tinted>;
 
@@ -406,6 +495,7 @@ export class Level1 {
   prepareNight(): void {
     if (!this.city || this.night) return;
     const c = this.city;
+    if (import.meta.env.DEV) checkStreet(c, this.a.tree);
     const T = nightTokens();
     this.night = buildNight(this.a, c, T);
     // Queue the night images and window lists in the order the night reaches them:
@@ -418,7 +508,7 @@ export class Level1 {
     n.lights.far.prepare();
     n.near.prepare();
     n.lights.towers.prepare();
-    for (const st of [n.sidewalk, n.kerb, n.road, n.seam, n.fence, n.subway, n.tree, n.plant, n.arcade, n.poster]) st.prepare();
+    for (const st of [n.sidewalk, n.kerb, n.road, n.plazaFloor, n.kerbReturn, n.kerbReturnLeft, n.fence, n.subway, n.subwayClosed, n.watering, n.tree, n.plant, n.arcade, n.poster]) st.prepare();
     for (const st of n.strips.values()) st.prepare();
     n.lights.mid.prepare();
     n.lights.near.prepare();
@@ -625,9 +715,6 @@ export class Level1 {
         drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb === Infinity ? Infinity : nearBegin + STACK.cityNear.gapTo, to: endShown, phase: nearPhase });
       }
       place(nt ? nt.poster.at(streetStep) : c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
-      const signs = this.signs ?? (this.signs = buildSigns(c));
-      const neon = t >= NEON_AT && t < NEON_OFF;
-      place(neon ? signs.billboard.neon : signs.billboard.day, STACK.cityNear.p, nearBegin + BILLBOARD.u, F + BILLBOARD.bottom);
     }
     ctx.restore();
 
@@ -636,57 +723,92 @@ export class Level1 {
     drawTiled(ctx, a.hedge, camLeft, F + STACK.near.hedgeBottom - a.hedge.height, r, { to: SEQ.hedgeEnd });
     for (const x of FIELD_TREES) place(a.treeField, 1, x, F + STACK.near.treeBottom);
 
-    // ── Ground: three bands, three vertical seams 28 px apart, farthest-down last ──
+    // ── Ground. The park's grass bank (Vega's grass over rock) ends at the street's corner; a corner of the
+    //    sidewalk's paving follows, and the road starts where its kerb turns towards the viewer along the slabs'
+    //    45° joints — the road never runs into the bank. The sidewalk's surface carries on through the plaza,
+    //    where the kerb turns away again and the paving takes the whole band. ──
     const g = STACK.ground;
-    const seamEdge = SEQ.seam + g.seamStep;
-    const seamFill = SEQ.seam + 2 * g.seamStep;
-    const edgeX = Math.min(r.x1, Math.round(seamEdge - camLeft));
-    if (edgeX > r.x0) {
-      ctx.fillStyle = a.dirt;
-      ctx.fillRect(r.x0, F + g.edgeTop, edgeX - r.x0, g.fillTop - g.edgeTop);
-    }
-    // The fill band, and below the viewport (the monitor's screen frame only) the same fill carrying on down.
-    // The street's bands run on as the plaza's paving and stop at its three seams, where the daisy bed takes over.
-    const plazaSurface = PLAZA.seam;
-    const plazaEdge = PLAZA.seam + g.seamStep;
-    const plazaFill = PLAZA.seam + 2 * g.seamStep;
-    const road = c ? (nt ? nt.road.at(streetStep) : c.road) : null;
-    for (let y = F + g.fillTop; y < Math.max(bh, r.y1); y += a.dirtFill.height) {
-      drawTiled(ctx, a.dirtFill, camLeft, y, r, { to: seamFill, phase: g.daisyPhase });
-      if (road) drawTiled(ctx, road, camLeft, y, r, { from: seamFill, to: plazaFill });
-    }
-    drawTiled(ctx, a.dirtRows, camLeft, F + g.edgeTop, r, { to: seamEdge, phase: g.daisyPhase });
-    drawTiled(ctx, a.daisySurface, camLeft, F + g.daisyTop, r, { to: SEQ.seam, phase: g.daisyPhase });
+    const bottom = Math.max(bh, r.y1);
+    const fieldTop = F - FIELD.above;
+    rowClip(ctx, r, camLeft, F, fieldTop, bottom, fieldEdge, 'before', () => {
+      drawTiled(ctx, a.field, camLeft, fieldTop, r, { phase: g.fieldPhase });
+      for (let y = fieldTop + a.field.height; y < bottom; y += a.fieldFill.height) drawTiled(ctx, a.fieldFill, camLeft, y, r, { phase: g.fieldPhase });
+    });
     if (c) {
-      const sw = nt ? nt.sidewalk.at(streetStep) : c.sidewalk;
-      drawTiled(ctx, sw, camLeft, F, r, { from: SEQ.seam, to: plazaSurface });
-      drawTiled(ctx, nt ? nt.kerb.at(streetStep) : c.kerb, camLeft, F + g.edgeTop, r, { from: seamEdge, to: plazaEdge });
-      // The seam details: tufts on the first slabs, a lighter kerb end-stone, dirt pixels on kerb and road.
-      place(nt ? nt.seam.at(streetStep) : c.seam, 1, SEQ.seam + g.seamTileLeft, F + g.seamTileTop + c.seam.height);
-      this.plaza.drawGround(ctx, f, plazaLook);
+      const st = streetStep;
+      const sw = nt ? nt.sidewalk.at(st) : c.sidewalk;
+      const kerb = nt ? nt.kerb.at(st) : c.kerb;
+      const road = nt ? nt.road.at(st) : c.road;
+      const floor = nt ? nt.plazaFloor.at(st) : c.plazaFloor;
+      const paving = () => {
+        for (let y = F; y < bottom; y += floor.height) drawTiled(ctx, floor, camLeft, y, r);
+      };
+      rowClip(ctx, r, camLeft, F, F, bottom, wallEdge, 'after', () => {
+        drawTiled(ctx, sw, camLeft, F, r);
+        rowClip(ctx, r, camLeft, F, F + g.edgeTop, bottom, cornerEdge, 'before', paving);
+        rowClip(ctx, r, camLeft, F, F + g.edgeTop, bottom, cornerEdge, 'after', () => {
+          rowClip(ctx, r, camLeft, F, F + g.edgeTop, bottom, plazaEdge, 'before', () => {
+            drawTiled(ctx, kerb, camLeft, F + g.edgeTop, r);
+            for (let y = F + g.fillTop; y < bottom; y += road.height) drawTiled(ctx, road, camLeft, y, r);
+          });
+          rowClip(ctx, r, camLeft, F, F + g.edgeTop, bottom, plazaEdge, 'after', paving);
+        });
+      });
+      const retL = nt ? nt.kerbReturnLeft.at(st) : c.kerbReturnLeft;
+      place(retL, 1, SEQ.corner - 3, F + g.edgeTop + retL.height);
+      const ret = nt ? nt.kerbReturn.at(st) : c.kerbReturn;
+      place(ret, 1, PLAZA.seam - 1, F + g.edgeTop + ret.height);
+      // a tuft of the park's grass in the first slabs
+      g.tufts.forEach((dx, i) => {
+        const tuft = a.tufts[i % a.tufts.length]!;
+        place(tuft, 1, SEQ.seam + dx, F + 2);
+      });
     }
 
     if (c) {
       // Everything on the street stands on the surface like a field prop; the fence starts on the grass.
       const base = F + STACK.near.bottom;
       const fence = nt ? nt.fence.at(streetStep) : c.fence;
-      for (let x = SEQ.fenceBegin; x < SEQ.fenceEnd; x += c.fence.width) place(fence, 1, x, base);
+      // the railing starts and ends on one of its posts (the tile's post is its columns 11–21), never on loose balusters
+      const tiles = Math.ceil((SEQ.fenceEnd - SEQ.fenceBegin) / c.fence.width);
+      const fx0 = Math.round(SEQ.fenceBegin + FENCE_POST.from - camLeft);
+      const fx1 = Math.round(SEQ.fenceBegin + tiles * c.fence.width + FENCE_POST.to - camLeft);
+      // Street lamps (the subway entrance's own, green globes that light at night) stand on the railing's two end
+      // posts and on a few posts between, unevenly: on those posts the ball is left out and the lamp's pole stands
+      // on the post's cap, so no post reads as a lamppost cut short.
+      const top = base - c.fence.height;
+      const lampPosts = [0, ...LAMP_POSTS.filter((k) => k < tiles), tiles].map((k) => Math.round(SEQ.fenceBegin + k * c.fence.width - camLeft));
+      ctx.save();
+      ctx.beginPath();
+      // below the posts' caps the whole run; above them, between the lamp posts' balls
+      ctx.rect(fx0, top + FENCE_POST.cap, fx1 - fx0, c.fence.height - FENCE_POST.cap);
+      for (let i = 1; i < lampPosts.length; i++) {
+        const from = lampPosts[i - 1]! + FENCE_POST.ball[1];
+        ctx.rect(from, top, lampPosts[i]! + FENCE_POST.ball[0] - from, FENCE_POST.cap);
+      }
+      ctx.clip();
+      for (let i = 0; i <= tiles; i++) place(fence, 1, SEQ.fenceBegin + i * c.fence.width, base);
+      ctx.restore();
+      const lampSrc = nt ? nt.subway.at(streetStep) : c.subway;
+      const L = STREET_LAMP;
+      for (const ex of lampPosts) {
+        const lx = ex + FENCE_POST.centre - L.poleCentre;
+        if (lx + L.w < r.x0 || lx > r.x1) continue;
+        ctx.drawImage(lampSrc, L.x, L.y, L.w, L.h, lx, top + FENCE_POST.cap - L.h, L.w, L.h);
+      }
       place(nt ? nt.subway.at(streetStep) : c.subway, 1, SEQ.subway, base);
+      place(nt ? nt.subwayClosed.at(streetStep) : c.subwayClosed, 1, SUBWAY_CLOSED, base);
       const tree = nt ? nt.tree.at(streetStep) : a.tree;
       for (const x of STREET_TREES) place(tree, 1, x, base);
       const plant = nt ? nt.plant.at(streetStep) : c.plant;
       for (const x of PLANTS) place(plant, 1, x, base);
-      const arcade = nt ? nt.arcade.at(streetStep) : c.arcade;
-      for (const x of [...ARCADES, PARTY.x, PARTY.x + PARTY.arcadeGap]) place(arcade, 1, x, base);
-      const party = this.signs ? (t >= NEON_AT && t < NEON_OFF ? this.signs.party.neon : this.signs.party.day) : null;
-      if (party) place(party, 1, PARTY.x + (PARTY.arcadeGap + c.arcade.width) / 2 - party.width / 2, base - c.arcade.height - 6);
       // Characters live on their own clocks, independent of Sam: idle loops, and the dog patrolling.
       const npc = (st: Strip) => (nt ? stripOver(nt.strips.get(st)!.at(streetStep), st) : st);
       const feet = F - 60 + FOOT_SINK;
       npc(c.molePhone).draw(ctx, Math.floor(now / 500), NPCS.molePhone - camLeft, feet);
-      npc(c.moleCoffee).draw(ctx, Math.floor(now / 125), NPCS.moleCoffee - camLeft, feet);
       npc(c.molesChess).draw(ctx, Math.floor(now / 400), NPCS.molesChess - camLeft, F - c.molesChess.fh + FOOT_SINK);
-      npc(c.molesSofa).draw(ctx, Math.floor(now / 160), NPCS.molesSofa - camLeft, F - c.molesSofa.fh + FOOT_SINK);
+      npc(c.molesPingPong).draw(ctx, Math.floor(now / 90), NPCS.pingPong - camLeft, F - c.molesPingPong.fh + FOOT_SINK);
+      place(nt ? nt.watering.at(streetStep) : c.moleWatering, 1, NPCS.watering, F + FOOT_SINK);
       npc(c.molePizza).draw(ctx, Math.floor(now / 140), NPCS.molePizza - camLeft, feet);
       npc(c.dogBark).draw(ctx, Math.floor(now / 180), NPCS.dogBark - camLeft, feet, true);
       npc(c.molePhone).draw(ctx, Math.floor(now / 700) + 1, NPCS.molePhone2 - camLeft, feet, true);
@@ -705,5 +827,8 @@ export class Level1 {
     if (!f.hideSam) f.sam.draw(ctx, f.samX - camLeft, F);
     if (f.flyer && !flyerDown) f.flyer.draw(ctx, camLeft, F, FOOT_SINK - 1, now);
     f.dust.draw(ctx, camLeft, F + FOOT_SINK, now);
+    // In front of everything at the park's corner: a clump of its flowering bushes, their bases below the
+    // screen, over the foot of the wall and the kerb's turn into the road (their tops just under Sam's path).
+    if (c) for (const [dx, dy] of CORNER_BUSHES) place(a.treeField, 1, SEQ.seam + dx, bh + dy);
   }
 }

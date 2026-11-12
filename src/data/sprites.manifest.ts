@@ -46,7 +46,6 @@ export const sprites = {
   hills: { file: '/sprites/world/bg-green-hills_509x200.png', w: 509, h: 200, period: 509, parallax: 0.1, scale: 'world', note: 'edges differ in 10 rows → seam patched at load, tiled plainly; ends at a world x and scrolls off' },
   bushes: { file: '/sprites/world/ground-bushes-strip_509x53.png', w: 509, h: 53, period: 509, parallax: 1, scale: 'world' },
   tree: { file: '/sprites/props/tree-1.png', w: 58, h: 81, scale: 'world', note: 'rows 65–80 are a white planter: cropped at load in the field, kept for the street trees after the gate' },
-  daisyRow: { file: '/sprites/world/ground-daisy-row-strip_898x63.png', w: 898, h: 63, period: 898, parallax: 1, scale: 'world', note: 'anti-aliased export → snapped to 8 colours at load' },
   cloudA: { file: '/sprites/world/cloud-a_171x49.png', w: 171, h: 49, scale: 'world' },
   cloudB: { file: '/sprites/world/cloud-b_219x63.png', w: 219, h: 63, scale: 'world' },
   cloudD: { file: '/sprites/world/cloud-d_182x91.png', w: 182, h: 91, scale: 'world' },
@@ -74,12 +73,14 @@ export const sprites = {
   molePizza: { file: '/sprites/npc/mole-pizza.png', w: 1260, h: 60, frames: 21, fw: 60, fh: 60, scale: 'world' },
   molePhone: { file: '/sprites/npc/mole-phone.png', w: 120, h: 60, frames: 2, fw: 60, fh: 60, scale: 'world' },
   molesChess: { file: '/sprites/npc/moles-chess.png', w: 840, h: 100, frames: 6, fw: 140, fh: 100, scale: 'world' },
+  moleWatering: { file: '/sprites/npc/mole-watering.png', w: 50, h: 43, scale: 'world', note: 'single pose: watering a street tree' },
+  subwayClosed: { file: '/sprites/props/subway-closed.png', w: 228, h: 146, scale: 'world', note: 'a closed subway entrance: the night stretch' },
   molesSofa: { file: '/sprites/npc/moles-sofa.png', w: 3360, h: 90, frames: 24, fw: 140, fh: 90, scale: 'world' },
   dogWalk: { file: '/sprites/npc/dog-walk.png', w: 240, h: 60, frames: 4, fw: 60, fh: 60, scale: 'world' },
   dogBark: { file: '/sprites/npc/dog-bark.png', w: 300, h: 60, frames: 5, fw: 60, fh: 60, scale: 'world' },
 
   // ── Schedule scenes (src/schedule): Vega's files at their native size, composed per folder ─────────
-  grassRocks: { file: '/sprites/world/ground-grass-rocks-strip_960x115.png', w: 960, h: 115, period: 960, scale: 'world', note: 'grass surface at row 44, grey rock under it' },
+  grassRocks: { file: '/sprites/world/ground-grass-rocks-strip_960x115.png', w: 960, h: 115, period: 960, scale: 'world', note: 'a 17/13 enlargement: sampled back to its own 734 x 88 grid at load (grass top on row 34, rock from 70)' },
   daisySway: { file: '/sprites/world/daisy-clouds-sway_8f_500x364.png', w: 4000, h: 364, frames: 8, fw: 500, fh: 364, scale: 'world', note: 'the daisy is lifted out of its clouds at load (x 190–320, rows 10–327 of each frame)' },
   cloudLg: { file: '/sprites/world/cloud-lg_207x130.png', w: 207, h: 130, scale: 'world' },
   cloudMd: { file: '/sprites/world/cloud-md_128x64.png', w: 128, h: 64, scale: 'world' },
@@ -116,10 +117,7 @@ export const sprites = {
   moleFiling: { file: '/sprites/npc/mole-filing.png', w: 35, h: 46, scale: 'world', note: 'a mole with its arms out' },
 
   // ── New art ──────────────────────────────────────────────────────────────────
-  dirtFill: { file: '/sprites/new/dirt-fill_256x28.png', w: 256, h: 28, period: 256, parallax: 1, scale: 'world', note: 'NEW: the 28 px dirt fill — deep dirt, a 1 px darker top line, a sparse scatter of the daisy row\'s dirt tones at the road\'s speck density' },
   javitsSilhouette: { file: '/sprites/new/javits-silhouette_300x100.png', w: 300, h: 100, parallax: 0.35, scale: 'world', note: 'NEW: Javits as a long low glass box (3:1) with a slightly raised central block and a space-frame grid every 8 px, in the towers\' own glass and frame colours so it sits in their depth; darkens with them at night' },
-  seamFieldStreet: { file: '/sprites/new/seam-field-street_72x52.png', w: 72, h: 52, scale: 'world', note: 'NEW: the seam details only — tufts after X0, a lighter kerb end-stone at X0+28, dirt pixels after X0+56; F at row 4, X0 at x 8' },
-  seamStreetField: { file: '/sprites/new/seam-street-field_72x52.png', w: 72, h: 52, scale: 'world', note: 'NEW: the plaza → daisy-bed seam details — tufts on the last slabs before X1, the kerb\'s lighter end-stone ending at X1+28, dirt pixels on the last road pixels before X1+56; F at row 4, X1 at x 16' },
   javitsFacade: { file: '/sprites/new/javits-facade_1408x680.png', w: 1408, h: 680, parallax: 0.25, scale: 'world', note: 'NEW: the real Javits — stepped glass cubes with peaked tops (the tallest centre-back, taller than any viewport), Blue 300/500/700 glass with cloud reflections, a 1 px Outline Black space frame every 8 px with Grey 700 diagonals every 16 px, Grey 500 mullions, Cloud White ridges; the entrance with its canopy, doors, the 16-BIT CON marquee, a glass pyramid kiosk and two flags; its first 128 px (a flat annex) repeats outward' },
   cypress: { file: '/sprites/new/cypress_12x40.png', w: 12, h: 40, parallax: 0.25, scale: 'world', note: 'NEW: a clipped columnar tree for the row along the Javits base' },
   letters: { file: '/sprites/new/pixel-letters_5x7.png', w: 532, h: 58, scale: 'world', note: 'NEW: the 5×7 letter set in the vega-sign yellow-tile style — rows: small day (9×11 tiles), large day (14×18, 2 px cells), small neon, large neon; A–Z, 0–9, hyphen, middle dot' },

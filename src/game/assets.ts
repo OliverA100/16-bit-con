@@ -1,13 +1,13 @@
 /**
  * Assets. Level 1 (field + sky) loads before the first frame; the city set (Levels 2–3 layers,
  * street tiles, props, NPCs) loads right after and slots in — city-far first enters at world
- * x 300, seconds away. Everything derived — the brand goggles, the daisy-row snap, the cropped
- * tree, the cumulus lobes, the hills' seam patch, the street rows — is built here at load, in
+ * x 300, seconds away. Everything derived — the brand goggles, the grass strip back on its own pixel
+ * grid, the cropped tree, the cumulus lobes, the hills' seam patch, the street rows — is built here at load, in
  * memory, so Vega's files in public/sprites stay untouched and unaltered.
  */
 import { sprites } from '../data/sprites.manifest';
 import { loadImage, makeStrip, type Drawable, type Strip } from './sprites';
-import { cropImage, dominantColor, patchTileSeam, snapToPalette } from './palette';
+import { cropImage, patchTileSeam } from './palette';
 import { loadSamSheets, type SamSheets } from './sam';
 
 export interface Level1Assets {
@@ -32,14 +32,16 @@ export interface Level1Assets {
   treeField: Drawable;
   /** tree-1 as drawn, planter included: the street tree. */
   tree: Drawable;
-  /** Snapped daisy row, rows 0–54, its daisies taken out at load (withoutFlowers): the grass tips and fill — the 8 px surface below F. */
-  daisySurface: Drawable;
-  /** Its rows 55–60: the grass's shade and outline and its four dirt rows, the top of the 12 px edge band. */
-  dirtRows: Drawable;
-  /** The edge band's flat tone under those rows (the strip's own darkest dirt row). */
-  dirt: string;
-  /** The 28 px fill below the edge band: NEW dirt-fill tile (deep dirt, a darker top line, a sparse scatter). */
-  dirtFill: Drawable;
+  /**
+   * The field's ground: Vega's grass over grey rock (ground-grass-rocks-strip) on its own pixel grid, its little
+   * flowers and all — the blades above F (FIELD.above rows), then the 48 px band: the grass's top 18 rows, its
+   * lower edge and the rock.
+   */
+  field: Drawable;
+  /** The rock's last rows, to carry the field on down below the band (the monitor's screen frame). */
+  fieldFill: Drawable;
+  /** Small grass tufts cut from the same strip: the first slabs of the sidewalk after the field. */
+  tufts: Drawable[];
 }
 
 export interface CityAssets {
@@ -49,33 +51,37 @@ export interface CityAssets {
   mid: Drawable;
   near: Drawable;
   fence: Drawable;
-  /** The same three bands as the field: sidewalk-tile rows 0–7 (surface), its kerb face rows 70–81 (edge), road-tile rows 12–39 with the lane marks (fill). */
+  /** The street's three bands: sidewalk-tile rows 0–7 (surface), its kerb face rows 70–81 (edge), road-tile rows 12–39 with the lane marks (fill). */
   sidewalk: Drawable;
   kerb: Drawable;
   road: Drawable;
-  /** NEW art: the seam details and the far-horizon Javits. */
-  seam: Drawable;
+  /** The plaza: the sidewalk's own paving, its slab face rows 0–47, the whole band deep (no kerb, no road). */
+  plazaFloor: Drawable;
+  /** The kerb turning towards the viewer where the road ends at the plaza: drawn from the kerb's own greys. */
+  kerbReturn: Drawable;
+  /** The same where the road starts at the park's corner (its face to the right, towards the road). */
+  kerbReturnLeft: Drawable;
+
+  /** NEW art: the far-horizon Javits. */
   javits: Drawable;
   subway: Drawable;
   arcade: Drawable;
   plant: Drawable;
   poster: Drawable;
   molePhone: Strip;
-  moleCoffee: Strip;
-  moleTyping: Strip;
   dog: Strip;
-  /** Level 3's crowd and signs. */
   molesChess: Strip;
-  molesSofa: Strip;
+  molesPingPong: Strip;
+  moleWatering: Drawable;
+  subwayClosed: Drawable;
   molePizza: Strip;
   dogBark: Strip;
   vegaSignHorizontal: Drawable;
-  /** The plaza, all NEW art: the real Javits and its end annex, the cypress row, the sign post, the plaza → daisy-bed seam details. */
+  /** The plaza, all NEW art: the real Javits and its end annex, the cypress row, the sign post. */
   facade: Drawable;
   facadeBay: Drawable;
   cypress: Drawable;
   signPost: Drawable;
-  seamBack: Drawable;
   /** The NEW letter set, and the signage composed from it at load. */
   letters: Drawable;
 }
@@ -87,22 +93,36 @@ export const CUMULUS_LOBES: [number, number, number, number][] = [
   [776, 80, 233, 39],
 ];
 const TREE_PLANTER_TOP = 65;
-const DAISY_SURFACE_ROWS = 55;
-/** The strip's grass starts on this row; above it, the daisies stand (and a few small grass tufts). */
-const DAISY_GRASS_TOP = 47;
-/** A shape above the grass this big or bigger is a daisy (the smallest has 74 px; the tufts fewer than 20). */
-const DAISY_MIN_PX = 40;
-/** How far along the strip the flower-free grass is that fills in under each daisy (its daisies are all in x 0–320). */
-const DAISY_GRASS_DONOR = 449;
-const DAISY_DIRT = { top: 55, rows: 6 } as const;
-const DAISY_FILL_ROW = 60;
+/**
+ * Vega's grass-over-rock strip is a 17/13 nearest-neighbour enlargement (four doubled rows and columns in every
+ * 17): sampled back to its own 734 × 88 pixels at load, so its pixels are Sam's size. On that grid: the blades
+ * stand above row 34 (the grass's top line), the grass runs to row ~66, its lower edge and the rock to 88.
+ */
+const GRASS_SCALE = 17 / 13;
+export const FIELD = {
+  /** Rows of blades above the grass's top line, drawn above F. */
+  above: 34,
+  /** The band below F: the grass's top rows, then from `lowerFrom` its lower edge and the rock, 48 in all. */
+  grassRows: 18,
+  lowerFrom: 58,
+  /** The rock carrying on below the band. */
+  fillFrom: 75,
+} as const;
+/** Small tufts on its top line, native (x, y, w, h): cut for the sidewalk's first slabs. */
+const GRASS_TUFTS: [number, number, number, number][] = [
+  [88, 27, 14, 8],
+  [136, 28, 14, 7],
+  [178, 27, 20, 8],
+];
 const CITY_FAR_ROWS = 323;
 /** city-near: one 1152 px period, rows 434–1107 — all that a ≤ 720 px buffer can show with its base at F + 2. */
 const CITY_NEAR = { period: 1152, top: 434 } as const;
 const PLAIN_TOP = 100; // the hills' path ends at row 98
 /** The facade's first bay (one door, one structure line) repeats either side of it on wide screens. */
 const FACADE_BAY = 128; // the flat annex at the facade's left end
-export const STREET = { sidewalkRows: 8, kerbTop: 70, kerbRows: 12, roadTop: 12, roadRows: 28 } as const;
+export const STREET = { sidewalkRows: 8, kerbTop: 70, kerbRows: 12, roadTop: 12, roadRows: 28, plazaRows: 48 } as const;
+/** The sidewalk's slab joints run at 45°: a kerb turning towards the viewer, or a path's edge, follows them. */
+export const JOINT_SLOPE = 1;
 
 async function loadAll(files: { file: string }[], onProgress?: (done: number, total: number) => void, extra = 0): Promise<HTMLImageElement[]> {
   let done = 0;
@@ -132,8 +152,7 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     sprites.hills,
     sprites.bushes,
     sprites.tree,
-    sprites.daisyRow,
-    sprites.dirtFill,
+    sprites.grassRocks,
   ];
   const total = files.length + 4;
   const [sam, imgs] = await Promise.all([
@@ -143,9 +162,9 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     }),
     loadAll(files, onProgress, 4),
   ]);
-  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, daisyRaw, dirtFill] =
+  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, grassRaw] =
     imgs as [HTMLImageElement, ...HTMLImageElement[]];
-  const snapped = snapToPalette(daisyRaw!, 16);
+  const grass = nativeGrid(grassRaw!, GRASS_SCALE);
   const hillsPatched = patchTileSeam(hills!);
   const small = [cloudF!, cloudG!, cloudH!, cloudFaint!];
   const medium = [cloudA!, cloudB!, cloudD!];
@@ -163,10 +182,9 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     hedge: bushes!,
     treeField: cropImage(tree!, 0, 0, tree!.width, TREE_PLANTER_TOP),
     tree: tree!,
-    daisySurface: cropImage(withoutFlowers(snapped), 0, 0, snapped.width, DAISY_SURFACE_ROWS),
-    dirtRows: cropImage(snapped, 0, DAISY_DIRT.top, snapped.width, DAISY_DIRT.rows),
-    dirt: dominantColor(snapped, 0, DAISY_FILL_ROW, snapped.width, 1),
-    dirtFill: dirtFill!,
+    field: fieldGround(grass),
+    fieldFill: cropImage(grass, 0, FIELD.fillFrom, grass.width, grass.height - FIELD.fillFrom),
+    tufts: GRASS_TUFTS.map(([x, y, w, h]) => cropImage(grass, x, y, w, h)),
   };
 }
 
@@ -184,23 +202,21 @@ export async function loadCity(): Promise<CityAssets> {
     sprites.plantFlowers,
     sprites.poster,
     sprites.molePhone,
-    sprites.moleCoffee,
-    sprites.moleTyping,
     sprites.dogWalk,
-    sprites.seamFieldStreet,
     sprites.javitsSilhouette,
     sprites.molesChess,
-    sprites.molesSofa,
+    sprites.molesPingPong,
+    sprites.moleWatering,
+    sprites.subwayClosed,
     sprites.molePizza,
     sprites.dogBark,
     sprites.vegaSignHorizontal,
     sprites.javitsFacade,
     sprites.cypress,
     sprites.signPost,
-    sprites.seamStreetField,
     sprites.letters,
   ];
-  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, moleCoffee, moleTyping, dog, seam, javits, chess, sofa, pizza, dogBark, vegaSignH, facade, cypress, signPost, seamBack, letters] =
+  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, poster, molePhone, dog, javits, chess, pingPong, watering, subwayClosed, pizza, dogBark, vegaSignH, facade, cypress, signPost, letters] =
     await loadAll(files);
   const strip = (img: HTMLImageElement | undefined, fw = 60, fh = 60) => makeStrip(img!, fw, fh);
   return {
@@ -212,18 +228,20 @@ export async function loadCity(): Promise<CityAssets> {
     sidewalk: cropImage(sidewalk!, 0, 0, sidewalk!.width, STREET.sidewalkRows),
     kerb: cropImage(sidewalk!, 0, STREET.kerbTop, sidewalk!.width, STREET.kerbRows),
     road: cropImage(road!, 0, STREET.roadTop, road!.width, STREET.roadRows),
-    seam: seam!,
+    plazaFloor: cropImage(sidewalk!, 0, 0, sidewalk!.width, STREET.plazaRows),
+    kerbReturn: kerbReturn(sidewalk!, 'left'),
+    kerbReturnLeft: kerbReturn(sidewalk!, 'right'),
     javits: javits!,
     subway: subway!,
     arcade: arcade!,
     plant: plant!,
     poster: poster!,
     molePhone: strip(molePhone),
-    moleCoffee: strip(moleCoffee),
-    moleTyping: strip(moleTyping),
     dog: strip(dog),
     molesChess: strip(chess, sprites.molesChess.fw, sprites.molesChess.fh),
-    molesSofa: strip(sofa, sprites.molesSofa.fw, sprites.molesSofa.fh),
+    molesPingPong: strip(pingPong, sprites.molesPingPong.fw, sprites.molesPingPong.fh),
+    moleWatering: watering!,
+    subwayClosed: subwayClosed!,
     molePizza: strip(pizza),
     dogBark: strip(dogBark),
     vegaSignHorizontal: withDaisy(vegaSignH!, await loadImage(sprites.daisyIcon.file), 'left'),
@@ -231,7 +249,6 @@ export async function loadCity(): Promise<CityAssets> {
     facadeBay: cropImage(facade!, 0, 0, FACADE_BAY, facade!.height),
     cypress: cypress!,
     signPost: signPost!,
-    seamBack: seamBack!,
     letters: letters!,
   };
 }
@@ -256,62 +273,78 @@ function withDaisy(sign: Drawable, daisy: Drawable, at: 'left' | 'above'): HTMLC
   return c;
 }
 
-/**
- * The ground's surface without its daisies. Every shape standing above the grass that is a daisy's size goes
- * (found by a fill over the rows above the grass, so a stem never pulls the grass in); the small grass tufts
- * stay. Under each one, its stem's foot and lowest leaves run on into the grass rows, so across its width
- * those rows take the grass from a flower-free stretch of the same strip (DAISY_GRASS_DONOR along, still
- * inside the strip's period). Vega's file is untouched; this is made in memory from the snapped strip.
- */
-function withoutFlowers(strip: HTMLCanvasElement): HTMLCanvasElement {
+/** A nearest-neighbour enlargement by `scale`, sampled back to its own pixel grid (each pixel's centre). */
+function nativeGrid(img: HTMLImageElement, scale: number): HTMLCanvasElement {
+  const W = Math.round(img.width / scale);
+  const H = Math.round(img.height / scale);
+  const src = document.createElement('canvas');
+  src.width = img.width;
+  src.height = img.height;
+  const sctx = src.getContext('2d', { willReadFrequently: true })!;
+  sctx.drawImage(img, 0, 0);
+  const from = sctx.getImageData(0, 0, img.width, img.height).data;
   const c = document.createElement('canvas');
-  c.width = strip.width;
-  c.height = strip.height;
-  const ctx = c.getContext('2d', { willReadFrequently: true })!;
-  ctx.drawImage(strip, 0, 0);
-  const w = c.width;
-  const h = DAISY_GRASS_TOP;
-  const rows = DAISY_SURFACE_ROWS;
-  const im = ctx.getImageData(0, 0, w, rows);
-  const d = im.data;
-  const seen = new Uint8Array(w * h);
-  for (let y0 = 0; y0 < h; y0++)
-    for (let x0 = 0; x0 < w; x0++) {
-      const i0 = y0 * w + x0;
-      if (seen[i0] || d[i0 * 4 + 3] === 0) continue;
-      const shape: number[] = [];
-      const stack = [i0];
-      seen[i0] = 1;
-      let minX = x0;
-      let maxX = x0;
-      while (stack.length) {
-        const i = stack.pop()!;
-        shape.push(i);
-        const x = i % w;
-        const y = (i - x) / w;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        for (let dy = -1; dy <= 1; dy++)
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-            const j = ny * w + nx;
-            if (seen[j] || d[j * 4 + 3] === 0) continue;
-            seen[j] = 1;
-            stack.push(j);
-          }
-      }
-      if (shape.length < DAISY_MIN_PX) continue;
-      for (const i of shape) d[i * 4 + 3] = 0;
-      // the grass rows under it, across its width: the flower-free grass further along the strip
-      for (let y = h; y < rows; y++)
-        for (let x = minX; x <= maxX; x++) {
-          const to = (y * w + x) * 4;
-          const from = (y * w + ((x + DAISY_GRASS_DONOR) % w)) * 4;
-          for (let k = 0; k < 4; k++) d[to + k] = d[from + k]!;
-        }
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d')!;
+  const out = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    const sy = Math.min(img.height - 1, Math.floor((y + 0.5) * scale));
+    for (let x = 0; x < W; x++) {
+      const sx = Math.min(img.width - 1, Math.floor((x + 0.5) * scale));
+      const i = (sy * img.width + sx) * 4;
+      const o = (y * W + x) * 4;
+      for (let k = 0; k < 4; k++) out.data[o + k] = from[i + k]!;
     }
-  ctx.putImageData(im, 0, 0);
+  }
+  ctx.putImageData(out, 0, 0);
   return c;
 }
+
+/** The field's ground from the strip: the blades, the grass's top rows, then its lower edge and the rock. */
+function fieldGround(grass: HTMLCanvasElement): HTMLCanvasElement {
+  const top = FIELD.above + FIELD.grassRows;
+  const lower = grass.height - FIELD.lowerFrom;
+  const c = document.createElement('canvas');
+  c.width = grass.width;
+  c.height = top + lower;
+  const ctx = c.getContext('2d')!;
+  ctx.drawImage(grass, 0, 0, grass.width, top, 0, 0, grass.width, top);
+  ctx.drawImage(grass, 0, FIELD.lowerFrom, grass.width, lower, 0, top, grass.width, lower);
+  return c;
+}
+
+/**
+ * The kerb turning towards the viewer where the road ends at the plaza: a diagonal down the band along the
+ * slab joints (JOINT_SLOPE), the kerb's light top, its face and its dark foot, in the sidewalk tile's own
+ * greys. Its top-left is the corner where the kerb meets the sidewalk's surface band (F + 8).
+ */
+function kerbReturn(sidewalk: HTMLImageElement, road: 'left' | 'right'): HTMLCanvasElement {
+  const rows = STREET.plazaRows - STREET.sidewalkRows;
+  const c = document.createElement('canvas');
+  c.width = Math.round(rows * JOINT_SLOPE) + 4;
+  c.height = rows;
+  const ctx = c.getContext('2d')!;
+  // the kerb's own colours: its lit face, its shaded face and its dark foot (sidewalk-tile rows 66, 70, 73)
+  const src = document.createElement('canvas');
+  src.width = 1;
+  src.height = sidewalk.height;
+  const sctx = src.getContext('2d', { willReadFrequently: true })!;
+  sctx.drawImage(sidewalk, 4, 0, 1, sidewalk.height, 0, 0, 1, sidewalk.height);
+  const col = (row: number) => {
+    const p = sctx.getImageData(0, row, 1, 1).data;
+    return `rgb(${p[0]},${p[1]},${p[2]})`;
+  };
+  const [lit, face, foot] = [col(66), col(70), col(73)];
+  // the dark foot on the road's side, the lit top on the paving's
+  const across = road === 'left' ? [foot, face, face, lit] : [lit, face, face, foot];
+  for (let y = 0; y < rows; y++) {
+    const x = Math.round(y * JOINT_SLOPE);
+    across.forEach((colour, i) => {
+      ctx.fillStyle = colour;
+      ctx.fillRect(x + i, y, 1, 1);
+    });
+  }
+  return c;
+}
+

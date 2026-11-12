@@ -27,7 +27,7 @@ export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void }): F
     shown = false;
     closing = false;
     dialog.classList.remove('is-closing');
-    document.documentElement.classList.remove('is-paused', 'is-reading');
+    document.documentElement.classList.remove('is-reading');
     hooks.onClose();
   };
   /** The step out has played (or its time is up): close for real. */
@@ -66,7 +66,9 @@ export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void }): F
     show(from) {
       if (dialog.open) return;
       shown = true;
-      document.documentElement.classList.add('is-paused', 'is-reading');
+      // (no page lock as the Register dialog has: the opening already holds the wheel, touch and keys, and an
+      // overflow lock here moved the pinned page back into the dive on review)
+      document.documentElement.classList.add('is-reading');
       hooks.onOpen();
       dialog.showModal();
       // grow out of the little flyer: from its centre and size to the stack's own

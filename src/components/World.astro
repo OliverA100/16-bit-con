@@ -12,12 +12,15 @@ import Button from './Button.astro';
 import Wordmark from './Wordmark.astro';
 import FlyerDialog from './FlyerDialog.astro';
 import { POSTER } from '../monitor/poster';
-import { PIXEL_ICONS, pixelPath } from '../data/pixel-icons';
+import { PIXEL_ICONS, halfThick, pixelPath } from '../data/pixel-icons';
 
 /** Icons, 16 × 16 in 2 px pixel blocks like every icon on the site (src/data/pixel-icons.ts). */
-const skipIcon = pixelPath(PIXEL_ICONS.skip);
-const soundOn = pixelPath(PIXEL_ICONS.soundOn);
-const soundOff = pixelPath(PIXEL_ICONS.soundOff);
+/** The HUD's icons at 1.5 px lines (vega.io's buttons): on half-pixel cells, 16.5 × 16.5 in a 17 box. */
+const hudIcon = (grid: readonly string[]) => pixelPath(halfThick(grid), 0.5);
+const backIcon = hudIcon(PIXEL_ICONS.back);
+const skipIcon = hudIcon(PIXEL_ICONS.skip);
+const soundOn = hudIcon(PIXEL_ICONS.soundOn);
+const soundOff = hudIcon(PIXEL_ICONS.soundOff);
 
 const pct = (v: number) => `${+(v * 100).toFixed(3)}%`;
 const posterStyle = `left: ${pct(POSTER.left)}; top: ${pct(POSTER.top)}; width: ${pct(POSTER.width)}; height: ${pct(POSTER.height)};`;
@@ -84,25 +87,35 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   </script>
 
   <!-- Live-only overlays -->
-  <Window size="compact" title="Player 1" class="world__hud" aria-label="Coins and time">
-    <p class="world__hud-row">
-      <span class="world__coin pixel" aria-hidden="true"></span>
-      <span class="mono" data-hud-coins>00/12</span>
-      <span class="mono world__clock" data-hud-clock>07:00 AM</span>
+  <!-- The HUD. The controls stand straight on the scene, as on vega.io's own game: Exit game and sound top
+       left; Skip top right, with the Player 1 window (coins and time) under it. -->
+  <div class="world__hud" role="group" aria-label="Game">
+    <div class="world__controls">
+      <Button variant="ghost" class="world__exit" data-exit>
+        <svg class="world__icon" viewBox="0 0 17 17" width="17" height="17" shape-rendering="crispEdges" aria-hidden="true"><path d={backIcon} /></svg>
+        <span>Exit game</span>
+      </Button>
       <Button variant="ghost" class="world__sound" data-sound aria-label="Sound" aria-pressed="true">
-        <svg class="world__sound-icon" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true">
+        <svg class="world__icon world__sound-icon" viewBox="0 0 17 17" width="17" height="17" shape-rendering="crispEdges" aria-hidden="true">
           <path class="world__sound-waves" d={soundOn} />
           <path class="world__sound-x" d={soundOff} />
         </svg>
       </Button>
-      <Button variant="ghost" class="world__exit" data-exit>Exit game</Button>
-    </p>
-  </Window>
-
-  <Button variant="ghost" class="world__skip" data-skip aria-label="Skip to the end of the run">
-    <svg class="world__skip-icon" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true"><path d={skipIcon} /></svg>
-    <span>Skip</span>
-  </Button>
+    </div>
+    <div class="world__hud-right">
+      <Button variant="ghost" class="world__skip" data-skip aria-label="Skip to the end of the run">
+        <span>Skip</span>
+        <svg class="world__icon" viewBox="0 0 17 17" width="17" height="17" shape-rendering="crispEdges" aria-hidden="true"><path d={skipIcon} /></svg>
+      </Button>
+      <Window size="compact" title="Player 1" class="world__player" aria-label="Coins and time">
+        <p class="world__hud-row">
+          <span class="world__coin pixel" aria-hidden="true"></span>
+          <span class="mono" data-hud-coins>00/12</span>
+          <span class="mono world__clock" data-hud-clock>07:00 AM</span>
+        </p>
+      </Window>
+    </div>
+  </div>
 
   <Window size="compact" title="Sam" class="world__sam">
     <div class="sam-bubble">
@@ -474,8 +487,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .world__hint,
   .world__prompt,
   .world__sam,
-  .world__loading,
-  .world :global(.world__skip) {
+  .world__loading {
     position: absolute;
     z-index: 3;
     display: none;
@@ -484,8 +496,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .world--live .world__hud,
   .world--live .world__hint,
   .world--live .world__prompt,
-  .world--live .world__sam,
-  .world--live :global(.world__skip) {
+  .world--live .world__sam {
     display: block;
     opacity: 0;
     transform: translateY(-8px);
@@ -527,23 +538,22 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   .world__hud,
   .world__prompt,
   .world__loading,
-  .hero__start,
-  .world :global(.world__skip) {
+  .hero__start {
     touch-action: manipulation;
   }
 
-  .world--live :is(.world__hud, .world__hint, .world__prompt, .world__sam, :global(.world__skip)).is-visible {
+  .world--live :is(.world__hud, .world__hint, .world__prompt, .world__sam).is-visible {
     opacity: 1;
     transform: none;
   }
 
   /* Hidden overlays take no clicks or focus (the HUD holds Exit game). */
-  .world--live :is(.world__sam, .world__hud, :global(.world__skip)):not(.is-visible) {
+  .world--live :is(.world__sam, .world__hud):not(.is-visible) {
     visibility: hidden;
   }
 
   /* By default the page is a landing page: nothing of the game is there, nothing in it focusable. */
-  :global(:root:not(.is-playing)) :is(.world__hud, .world__hint, .world__touch, .world__sam, .world__prompt, :global(.world__skip)) {
+  :global(:root:not(.is-playing)) :is(.world__hud, .world__hint, .world__touch, .world__sam, .world__prompt) {
     display: none !important;
   }
 
@@ -553,27 +563,16 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     opacity: 0;
   }
 
-  /* The HUD's foot: where the overlays under it start (the compact window is ~5rem tall). */
+  /* The controls' foot: where the overlays under the top row start. */
   .world {
-    --hud-foot: calc(var(--nav-h) + var(--space-4) + 5rem);
+    --hud-foot: calc(var(--nav-h) + var(--space-4) + var(--control-h));
   }
 
-  /* Skip: a ghost button right under the HUD, its right edge on the HUD's. */
-  .world :global(.world__skip) {
-    top: calc(var(--hud-foot) + var(--space-2));
-    right: var(--gutter);
-  }
-
-  .world__skip-icon {
-    display: block;
-    flex: none;
-    fill: currentColor;
-  }
-
-  /* ── Sam: small and sticky in a corner — top left on wide screens (the HUD has the right),
-        above the controls on narrow ones — with his portrait at 2:1 and typewriter mono text. ── */
+  /* ── Sam: small and sticky in a corner — top left under the controls on wide screens (the Player 1
+        window has the right), above the touch controls on narrow ones — with his portrait at 2:1 and
+        typewriter mono text. ── */
   .world__sam {
-    top: calc(var(--nav-h) + var(--space-4));
+    top: calc(var(--hud-foot) + var(--space-3));
     left: var(--gutter);
     width: min(22rem, calc(100% - 2 * var(--gutter)));
     text-align: left;
@@ -650,35 +649,61 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     line-height: var(--leading-snug);
   }
 
+  /* ── The HUD: the controls straight on the scene, as on vega.io's own game — Exit game and sound top
+        left; Skip top right with the Player 1 window under it. The row itself takes no clicks. ── */
   .world__hud {
     top: calc(var(--nav-h) + var(--space-4));
+    left: var(--gutter);
     right: var(--gutter);
+    pointer-events: none;
   }
 
-  .world__hud :global(.window__body) {
+  .world--live .world__hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .world__controls,
+  .world__hud-right {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .world__hud-right {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .world__controls > :global(*),
+  .world__hud-right > :global(*) {
+    pointer-events: auto;
+  }
+
+  .world__player :global(.window__body) {
     padding: var(--space-2) var(--space-3);
   }
 
-  /* Exit game: a ghost button at the HUD's text size, at the end of its row. */
-  .world__hud :global(.world__exit) {
-    min-height: 0;
-    margin-left: var(--space-1);
-    padding: var(--space-1) var(--space-2);
-    font-size: var(--text-sm);
-  }
-
-  /* Sound on/off: a square ghost button at Exit game's height, a pixel icon in it — a speaker
-     with its waves, or with an × when off. */
-  .world__hud :global(.world__sound) {
-    flex: none;
-    min-height: 0;
-    margin-left: var(--space-1);
-    padding: var(--space-1);
-  }
-
-  .world__sound-icon {
+  /* The HUD's icons: Vega's pixel line at 2 px, 17 × 17. Sound is a square button. */
+  .world__icon {
     display: block;
+    flex: none;
     fill: currentColor;
+  }
+
+  .world__hud :global(.world__sound) {
+    width: var(--control-h);
+    padding: 0;
+  }
+
+  /* Skip is there from the flyer's close until the run's end (index.ts sets hidden), and never over the flyer. */
+  .world__hud :global(.world__skip[hidden]) {
+    display: none;
+  }
+
+  :global(:root.is-reading) .world__hud :global(.world__skip) {
+    visibility: hidden;
   }
 
   :global(.world__sound[aria-pressed='false']) .world__sound-waves,
@@ -706,8 +731,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     border-left: var(--border);
   }
 
-  /* Phones: the row, the body and Exit game are tighter, so the HUD keeps a 16 px margin on a 360 px
-     screen; below 24rem the clock gives way. */
+  /* Phones: the Player 1 window's row is tighter; below 24rem the clock gives way. */
   @media (max-width: 48rem) {
     .world__hud-row {
       gap: var(--space-1);
@@ -717,16 +741,8 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       padding-left: var(--space-1);
     }
 
-    .world__hud :global(:is(.world__sound, .world__exit)) {
-      margin-left: 0;
-    }
-
-    .world__hud :global(.window__body) {
+    .world__player :global(.window__body) {
       padding-inline: var(--space-2);
-    }
-
-    .world__hud :global(.world__exit) {
-      padding-inline: var(--space-1);
     }
   }
 
@@ -737,7 +753,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   /* How to play: small, bottom centre over the ground on wide screens; on phones top left under the
-     HUD, beside Skip, so it never meets Sam's window or the controls at the bottom. One line per
+     controls, beside the Player 1 window, so it never meets Sam's window or the touch controls. One line per
      kind of device: the keys and the scroll with a mouse or trackpad, the controls and a swipe on touch. */
   .world__hint {
     left: 50%;
@@ -767,7 +783,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       top: calc(var(--hud-foot) + var(--space-2));
       bottom: auto;
       left: var(--gutter);
-      max-width: calc(100% - 2 * var(--gutter) - 6rem - var(--space-2));
+      max-width: calc(100% - 2 * var(--gutter) - 11rem - var(--space-2));
       translate: none;
     }
   }

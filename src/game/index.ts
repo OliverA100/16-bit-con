@@ -572,6 +572,19 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let samLine: SamLine | null = null;
   let samSince = 0;
   let samShown = -1;
+  /** Lines said this visit (each once), and the ones waiting their turn. */
+  const samSaidLines = new Set<SamLine>();
+  const samQueue: SamLine[] = [];
+  /** A line stays up after it is typed: long enough to read it (a floor, and more for a longer line) … */
+  const LINE_READ_MIN = 2200;
+  const LINE_READ_PER_CHAR = 55;
+  /** … or this long when the next one is waiting. */
+  const LINE_NEXT_MS = 800;
+  /** A line Sam ran past this far (a jump) is not said; one that is part of the story (`key`) still is, up to the longer reach. */
+  const LINE_STALE = 0.04;
+  const LINE_STALE_KEY = 0.12;
+  /** Sam has said he is breaking out: until then the run's end holds, and the breakout waits. */
+  let twistRead = false;
   /** Typewriter pace: one character per this many ms. */
   const TYPE_MS = 32;
 
@@ -592,32 +605,50 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const FLYER_FROM = 4;
   const FLYER_LAND = 84;
   /** The opening is on, or still to come (the dive's last frames, before the flyer drops): the story's UI waits. */
+  /**
+   * Nothing moves from PRESS START until the flyer has been read: the page (wheel, touch, scroll keys) and the
+   * run keys are held through the dive, the fall, the walk and the read. Esc and Exit game still work.
+   */
+  let storyHeld = false;
+  const holdStory = (on: boolean) => {
+    if (on === storyHeld) return;
+    storyHeld = on;
+    holdPage(on);
+    if (on) {
+      input.enabled = false;
+      input.reset();
+      motion.cancel();
+    } else {
+      input.reset();
+      input.enabled = mode === 'play';
+    }
+  };
   const openingHolds = () => (opening ? opening.phase !== 'done' : !flyerSeen && mode === 'play');
   const startOpening = (now: number) => {
     flyerSeen = true;
+    // The run stands still where it is (a scroll in the dive may still be easing it on): the picture and the
+    // page settle on the same spot, so Sam stays exactly where the flyer was dropped for him.
+    timeline.jumpTo(timeline.t);
+    window.scrollTo({ top: Math.round(pinTop() + DE + timeline.t * DW), behavior: 'instant' });
+    expectedY = window.scrollY;
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const centre = timeline.X + SAM_CELL / 2;
     // from above the top of the screen (the paper's bottom 30 px over it)
     const flyer = new FallingFlyer(flyerSprites, now, F + 30, centre + FLYER_FROM, centre + FLYER_LAND, {}, still);
     opening = { phase: 'fall', t0: now, flyer };
-    holdPage(true);
-    input.enabled = false;
-    input.reset();
-    motion.cancel();
+    holdStory(true);
   };
   /** The flyer has been read: the run is Sam's. */
   const endOpening = () => {
     if (!opening) return;
     opening.phase = 'done';
     opening.flyer.taken = true;
-    holdPage(false);
-    input.reset();
-    input.enabled = mode === 'play';
+    holdStory(false);
   };
   /** Exit before the flyer was read: it drops again when the game resumes. */
   const cancelOpening = () => {
+    holdStory(false);
     if (!opening || opening.phase === 'done') return;
-    holdPage(false);
     opening = null;
     flyerSeen = false;
   };
@@ -1163,6 +1194,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     motion.cancel();
     input.reset();
     input.enabled = true;
+    // a first start: nothing moves until the flyer has dropped and been read
+    if (!flyerSeen && resume === null) holdStory(true);
     // the page goes to its top as the pin takes the section there; the stage keeps its place on screen
     entryShift = y0;
     if (d && y0 > 0) d.stage.style.translate = `0 ${-y0}px`;
@@ -1477,6 +1510,19 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     });
   }
   o.exit?.addEventListener('click', () => exitPlay());
+  // ── Skip: from the flyer's close until the twist, straight to the story's end — the run at SKIP_TO, where Sam
+  //    realises the Javits is pixels; the twist plays and the breakout follows as ever. A short stepped fade to
+  //    the sky hides the jump (in the canvas, so Safari's bars fade with it). ──
+  const SKIP_TO = 0.95;
+  const SKIP_FADE_MS = 240;
+  let skipFade: { t0: number; jumped: boolean } | null = null;
+  o.skip?.addEventListener('click', () => {
+    if (mode !== 'play' || paused || zoom || finale || exiting || openingHolds() || skipFade || timeline.t >= SKIP_TO) return;
+    motion.cancel();
+    playing = null;
+    skipFade = { t0: clockNow(), jumped: false };
+    announce('Skipped to the Javits Center.');
+  });
   // Sound on/off (the HUD, play mode only): remembered; off silences everything at once.
   const soundButton = section.querySelector<HTMLButtonElement>('[data-sound]');
   if (soundButton) {
@@ -1504,6 +1550,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // ── Loop ────────────────────────────────────────────────────────────────
   let last = performance.now();
   let prevSamX = timeline.X;
+  let wasAirborne = false;
   let lastInputAt = performance.now();
   let lastClock = '';
 
@@ -1521,6 +1568,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
     /** Only in play mode, and not while the Register dialog is open, does anything move the page or the world. */
     const live = mode === 'play' && !paused && !zoom;
+    // Skip: halfway through its fade the run jumps (the page and the picture together)
+    if (skipFade && !skipFade.jumped && now - skipFade.t0 >= SKIP_FADE_MS / 2) {
+      skipFade.jumped = true;
+      window.scrollTo({ top: Math.round(pinTop() + DE + SKIP_TO * DW), behavior: 'instant' });
+      expectedY = window.scrollY;
+      timeline.jumpTo(SKIP_TO);
+    }
     // PRESS START playing the enter segment: the page scrolls on, the visual follows it exactly.
     if (playing && live) {
       if (playing.t0 < 0) {
@@ -1621,7 +1675,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     if (heroUp && input.active && (rightPress || input.dir > 0 || input.consumeJumpPress()) && now >= scrollOverrideUntil && !playing) start();
     // At the plaza's end and through the pull-back: → pulls the camera back to the monitor, ← dives back into the game.
     if (input.active && DB > 0 && !breakPlay && !heroUp && now >= scrollOverrideUntil && qT < BREAKOUT.cracks[0]) {
-      if ((atEnd || qT > 0) && (rightPress || (qT > 0 && input.dir > 0))) pullTo(BREAKOUT.cracks[0]);
+      if (((atEnd && twistRead) || qT > 0) && (rightPress || (qT > 0 && input.dir > 0))) pullTo(BREAKOUT.cracks[0]);
       else if (qT > 0 && input.dir < 0) pullTo(0);
     }
     // Keys / d-pad: Sam runs with real velocity and the page follows him.
@@ -1694,9 +1748,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       else timeline.drive(X, blocked ? 0 : motion.vx, source);
       if (motion.puff) dust.spawn(X + SAM_CELL / 2, Math.sign(motion.vx), now);
       if (overflow !== 0 && DB > 0) {
-        // pushing on past the plaza's end: the camera pulls back out of the game
+        // pushing on past the plaza's end: the camera pulls back out of the game — once Sam has said he is
+        // breaking out (the story's last beat); until then he stands at the end
         scrollToX(X_MAX);
-        pullTo(BREAKOUT.cracks[0]);
+        if (twistRead) pullTo(BREAKOUT.cracks[0]);
       } else if (overflow !== 0) {
         window.scrollBy({ top: overflow * pxPerWorld, behavior: 'instant' });
         expectedY = window.scrollY;
@@ -1709,7 +1764,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (input.consumeJumpPress() || pendingHit) {
         lastInputAt = now;
         if (hitZone) hit();
-        else if (DB > 0 && !breakPlay && (atEnd || (qT > 0 && qT < BREAKOUT.cracks[0]))) pullTo(BREAKOUT.cracks[0]);
+        else if (DB > 0 && !breakPlay && ((atEnd && twistRead) || (qT > 0 && qT < BREAKOUT.cracks[0]))) pullTo(BREAKOUT.cracks[0]);
         else if (!heroUp && !inBreak) sam.jumpPress(now);
       }
       if (!input.jumpHeld && !inBreak) sam.jumpRelease();
@@ -1743,7 +1798,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       const theirs = !atGlass || freshWheel || (scrollCracks && (overshoot || pushed));
       // how far a scroll may take the breakout: through the pull-back to the glass, then through the cracks
       // and on to the break, at most a crack every CRACK_MIN_MS
-      const limit = atGlass ? BREAKOUT.shatter[0] : BREAKOUT.cracks[0];
+      const limit = !twistRead ? 0 : atGlass ? BREAKOUT.shatter[0] : BREAKOUT.cracks[0];
       if (pushing && theirs && allowQ < limit) {
         const rate = breakoutRate(allowQ);
         const cap = pushed ? limit : Math.min(qPage, limit);
@@ -1830,6 +1885,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // headed: a fast scroll's target can be past the plaza while the picture still runs (on review
     // 2026-11-10 he stood still there with the world sliding under him).
     sam.update(dt, timeline.t > 0 && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
+    // The little puffs he kicks up running (on the ground only), and a burst as he lands a jump.
+    const onGround = !sam.airborne;
+    dust.run(timeline.X + SAM_CELL / 2, onGround && timeline.t > 0 && !inBreakout ? timeline.speed : 0, dt);
+    if (onGround && wasAirborne) dust.land(timeline.X + SAM_CELL / 2);
+    wasAirborne = !onGround;
     // Sam watches the flyer come down: he turns to whichever side of him it is (with a little slack, so he never flickers).
     if (opening && (opening.phase === 'fall' || (opening.phase === 'walk' && now < opening.t0))) {
       const fx = opening.flyer.pose(now).x;
@@ -1923,14 +1983,28 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         const glide = !d || (t > 0 && !inBreakout);
         // The game frame, then the far sky at device resolution (clouds glide) and the buffer over it.
         level.draw(bctx, { ...view, samX: X, range: canvasRange });
+        if (skipFade) {
+          // to the sky and back, four steps each way
+          const k = (now - skipFade.t0) / SKIP_FADE_MS;
+          if (k >= 1) skipFade = null;
+          else {
+            const a = Math.ceil((1 - Math.abs(2 * k - 1)) * 4) / 4;
+            bctx.save();
+            bctx.globalAlpha = a;
+            bctx.fillStyle = view.sky;
+            bctx.fillRect(0, 0, buffer.width, buffer.height);
+            bctx.restore();
+          }
+        }
         level.drawFar(sctx, { ...view, samX: X, range: canvasRange }, vp.k, glide);
         sctx.drawImage(buffer, 0, 0, vp.bw * vp.k, (vp.bh + skirtRows) * vp.k);
       }
 
       // The game's overlays come in at the end of the enter segment.
       const inGame = mode === 'play' && !exiting && (!d || heroP >= ENTER.overlays);
-      // The world is in view and the run has not begun: the flyer drops (once a visit).
-      if (inGame && live && !flyerSeen && !opening && !playing && timeline.t < 0.002) startOpening(now);
+      // The run has begun (the dive is over, however it was scrolled): the flyer drops, once a visit, wherever the
+      // run is. Never in the dive itself, where the monitor is still handing over.
+      if (inGame && live && !flyerSeen && !opening && !playing && timeline.t >= 0 && timeline.tTarget >= 0) startOpening(now);
       // While the run fills a phone's screen, Safari 26's bars show the world: the pinned section is hidden
       // from Safari (World.astro), so behind the clock it shows the page as it scrolls — the sky's colour;
       // under the bottom bar it extends the floor strip, the ground's colour read off the canvas' bottom row.
@@ -1967,16 +2041,34 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         }
       }
       o.hud?.classList.toggle('is-visible', inGame);
+      if (o.skip) {
+        const showSkip = inGame && !openingHolds() && !inBreakout && t < SKIP_TO && !skipFade;
+        if (o.skip.hidden === showSkip) o.skip.hidden = !showSkip;
+      }
       o.hint?.classList.toggle('is-visible', inGame && !openingHolds() && t < 0.14);
-      // Sam: the line for this stretch types out once it starts; screen readers get it whole.
-      const line = inGame && !openingHolds() ? (samLines.find((l) => t >= l.from && t < l.to) ?? null) : null;
-      if (line !== samLine) {
-        samLine = line;
+      // Sam: each line is said once, as he passes it; lines queue, each is typed out in full and stays up long
+      // enough to read, however fast the run goes (on review a line went before it was typed). Screen readers get
+      // each line whole.
+      if (inGame && !openingHolds()) {
+        for (const l of samLines) {
+          if (samSaidLines.has(l) || t < l.at) continue;
+          samSaidLines.add(l);
+          if (t - l.at < (l.key ? LINE_STALE_KEY : LINE_STALE)) samQueue.push(l);
+        }
+      }
+      if (samLine) {
+        const typedAt = samSince + samLine.text.length * TYPE_MS;
+        if (samLine.end && now >= typedAt + LINE_NEXT_MS) twistRead = true;
+        const hold = samQueue.length ? LINE_NEXT_MS : Math.max(LINE_READ_MIN, samLine.text.length * LINE_READ_PER_CHAR);
+        if (now >= typedAt + hold) samLine = null;
+      }
+      if (!samLine && samQueue.length && inGame) {
+        samLine = samQueue.shift()!;
         samSince = now;
         samShown = -1;
-        if (o.samSaid) o.samSaid.textContent = line?.text ?? '';
-        o.sam?.classList.toggle('is-visible', !!line);
+        if (o.samSaid) o.samSaid.textContent = samLine.text;
       }
+      o.sam?.classList.toggle('is-visible', inGame && !!samLine);
       if (samLine && o.samTyped) {
         const n = Math.min(samLine.text.length, Math.floor((now - samSince) / TYPE_MS));
         if (n !== samShown) {

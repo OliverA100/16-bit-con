@@ -66,6 +66,39 @@ export function board(lines: HTMLCanvasElement[], opts: { pad?: number; frame?: 
   return canvas;
 }
 
+/** Glyphs the sheet does not have, drawn here (5 × 7): the arrow for wayfinding. */
+const EXTRA: Record<string, string[]> = {
+  '→': ['.....', '..#..', '...#.', '#####', '...#.', '..#..', '.....'],
+};
+
+/**
+ * Plain pixel type: the sheet's 5 × 7 letter shapes (plus EXTRA) in one colour, `scale` px a cell, one cell
+ * between letters and three for a space. For small print on posters and signs.
+ */
+export function pixelText(sheet: Drawable, text: string, colour: string, scale = 1): HTMLCanvasElement {
+  const g = glyphsOf(sheet);
+  const chars = [...text.toUpperCase().replace('–', '-')];
+  const cols = chars.reduce((n, ch, i) => n + (ch === ' ' ? 3 : 5) + (i ? 1 : 0), 0);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, cols * scale);
+  canvas.height = 7 * scale;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = colour;
+  let x = 0;
+  chars.forEach((ch, i) => {
+    if (i) x++;
+    if (ch === ' ') {
+      x += 3;
+      return;
+    }
+    const extra = EXTRA[ch];
+    const cells = extra ? Uint8Array.from(extra.join(''), (c) => (c === '#' ? 1 : 0)) : g.get(ch);
+    if (cells) for (let y = 0; y < 7; y++) for (let cx = 0; cx < 5; cx++) if (cells[y * 5 + cx]) ctx.fillRect((x + cx) * scale, y * scale, scale, scale);
+    x += 5;
+  });
+  return canvas;
+}
+
 /** The 5×7 glyphs as on/off cells, read once from the small day row of the letter sheet. */
 let glyphs: Map<string, Uint8Array> | null = null;
 function glyphsOf(sheet: Drawable): Map<string, Uint8Array> {

@@ -42,6 +42,10 @@ export function nightTokens(): NightTokens {
 
 /** A night palette by luminance rank into `targets` (pixel-share `weights`), with explicit role colours on top. */
 export const rank = (targets: string[], weights?: number[], roles: ColorMap = {}): NightSpec => ({ rank: { targets, weights, roles } });
+/** A night shade: every colour `amount` of the way to `toward` (keeps each colour's hue: characters). */
+export const shade = (toward: string, amount: number, roles: ColorMap = {}): NightSpec => ({ shade: { toward, amount, roles } });
+/** How far the characters go towards the night's ink. */
+export const CHARACTER_SHADE = 0.45;
 
 // ── The job queue: a worker when there is one, else one job per idle callback ──────────────
 type NightResult = { bitmap: ImageBitmap };
