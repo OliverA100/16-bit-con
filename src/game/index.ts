@@ -1510,14 +1510,25 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     });
   }
   o.exit?.addEventListener('click', () => exitPlay());
-  // ── Skip: from the flyer's close until the twist, straight to the story's end — the run at SKIP_TO, where Sam
-  //    realises the Javits is pixels; the twist plays and the breakout follows as ever. A short stepped fade to
-  //    the sky hides the jump (in the canvas, so Safari's bars fade with it). ──
+  // ── Skip: from the start of the game until the twist, straight to the story's end — the run at SKIP_TO, where
+  //    Sam realises the Javits is pixels; the twist plays and the breakout follows as ever. Skipped before the
+  //    flyer is read, the opening simply ends. A short stepped fade to the sky hides the jump (in the canvas, so
+  //    Safari's bars fade with it). ──
   const SKIP_TO = 0.95;
   const SKIP_FADE_MS = 240;
   let skipFade: { t0: number; jumped: boolean } | null = null;
   o.skip?.addEventListener('click', () => {
-    if (mode !== 'play' || paused || zoom || finale || exiting || openingHolds() || skipFade || timeline.t >= SKIP_TO) return;
+    if (mode !== 'play' || paused || zoom || finale || exiting || skipFade || timeline.t >= SKIP_TO) return;
+    if (opening && opening.phase !== 'done') {
+      opening.flyer.taken = true;
+      opening.phase = 'done';
+    }
+    flyerSeen = true;
+    holdStory(false);
+    // the story's lines from before the twist are not said (one already up goes)
+    for (const l of samLines) if (l.at < SKIP_TO - LINE_STALE_KEY) samSaidLines.add(l);
+    samQueue.splice(0, samQueue.length, ...samQueue.filter((l) => !samSaidLines.has(l) || l.at >= SKIP_TO - LINE_STALE_KEY));
+    if (samLine && samLine.at < SKIP_TO - LINE_STALE_KEY) samLine = null;
     motion.cancel();
     playing = null;
     skipFade = { t0: clockNow(), jumped: false };
@@ -2042,7 +2053,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
       o.hud?.classList.toggle('is-visible', inGame);
       if (o.skip) {
-        const showSkip = inGame && !openingHolds() && !inBreakout && t < SKIP_TO && !skipFade;
+        const showSkip = inGame && !inBreakout && t < SKIP_TO && !skipFade && opening?.phase !== 'read';
         if (o.skip.hidden === showSkip) o.skip.hidden = !showSkip;
       }
       o.hint?.classList.toggle('is-visible', inGame && !openingHolds() && t < 0.14);

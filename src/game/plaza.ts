@@ -11,8 +11,7 @@
 import type { CityAssets, Level1Assets } from './assets';
 import type { Drawable } from './sprites';
 import { STACK, type Frame } from './world';
-import { readToken } from './palette';
-import { board, ledBoard, letter } from './lettering';
+import { BOOTH_DEPTH, boothSign, boothSignStand, javitsLetters } from './signage';
 import { Stepper, rank, type NightTokens } from './night';
 
 export const PLAZA = {
@@ -22,20 +21,28 @@ export const PLAZA = {
    * small Booth sign never share a column; centred on phones.
    */
   facade: { p: 0.25, bottom: 6, hallAt: 6000, entrance: 730, wide: 0.62, narrow: 0.5 },
-  /** The 16-BIT CON LED board on the building: high on the front cube, its top `gap` px under the face top (just below the roof bevel), 4 px LED pitch. */
-  marquee: { faceTop: 206, gap: 6, pitch: 4 },
+  /**
+   * The 16-Bit Con letters on the building: on the tall central tower (centred over the entrance too), their
+   * bottom `lift` px above the front cube's face top — clear of the HUD above and of Sam's window below on
+   * phones (on the front cube they sat behind it).
+   */
+  marquee: { faceTop: 206, lift: 24 },
   /** The horizon band: this many px above F, hidden behind the facade except over its lowest rooflines. */
   horizon: 260,
   /** X1: paving → daisy bed at the surface; the edge at X1 + 28, the fill at X1 + 56 — farthest-down last. */
   seam: 5800,
-  /** The Booth 630 sign's near edge: its right edge just left of Sam on wide screens, its left edge just right of him on phones. */
-  sign: { wide: 6012, narrow: 6048 },
-  /** Its two legs, inset from the panel's ends. */
-  legInset: 18,
-  /** The sign board's bottom, px above F: clear of the daisies and of Sam's head. */
+  /**
+   * The Booth 630 sign's near edge: its right edge just left of Sam on wide screens; on phones (the compact
+   * sign) its left edge just right of him, in the gap Sam's bubble and the touch controls leave before the A button.
+   */
+  sign: { wide: 6012, narrow: 5988 },
+  /** The sign board's bottom, px above F: clear of the daisies and of Sam's head; on phones, beside him and under his bubble. */
   signClear: 64,
+  signClearNarrow: 40,
   trees: [5680, 5760],
   plants: [5560],
+  /** The con's promo cabinet on the plaza, between the plant and the first tree. */
+  arcade: 5608,
 } as const;
 /** Cypress row along the facade base, facade x; the entrance with its flags and kiosk stays open. */
 const CYPRESS = { from: 140, to: 1270, step: 22, gap: [560, 910] } as const;
@@ -65,6 +72,9 @@ export class Plaza {
   /** The city set carries the plaza's art; until it is here there is no plaza to draw. */
   city: CityAssets | null = null;
   private sign: Drawable | null = null;
+  private signCompact: Drawable | null = null;
+  private stand: Drawable | null = null;
+  private standCompact: Drawable | null = null;
   private marquee: { img: Drawable; x: number; bottom: number } | null = null;
   private night: PlazaNight | null = null;
 
@@ -75,8 +85,9 @@ export class Plaza {
     this.city = c;
     const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };
     (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 50)))(() => {
-      this.boothSign(c);
-      this.marqueeFor(c);
+      this.boothSign(c, false);
+      this.boothSign(c, true);
+      this.marqueeFor();
       const probe = document.createElement('canvas');
       probe.width = probe.height = 1;
       const pctx = probe.getContext('2d')!;
@@ -106,41 +117,17 @@ export class Plaza {
     for (const s of [n.facade, n.bay, n.cypress, n.post]) s.prepare();
   }
 
-  /** The big sign: 16-BIT CON on an LED board, centred over the entrance high on the front cube. */
-  private marqueeFor(c: CityAssets): { img: Drawable; x: number; bottom: number } {
+  /** The big sign: the 16-Bit Con wordmark in channel letters, centred over the entrance on the tall tower. */
+  private marqueeFor(): { img: Drawable; x: number; bottom: number } {
     if (this.marquee) return this.marquee;
     const m = PLAZA.marquee;
-    const img = ledBoard(c.letters, ['16-BIT CON'], m.pitch, 1);
-    return (this.marquee = { img, x: Math.round(PLAZA.facade.entrance - img.width / 2), bottom: m.faceTop - m.gap - img.height });
+    const img = javitsLetters();
+    return (this.marquee = { img, x: Math.round(PLAZA.facade.entrance - img.width / 2), bottom: m.faceTop + m.lift });
   }
 
-  /** The small sign: Vega's own vega tiles over a BOOTH 630 plate (the letter set), at native size. */
-  private boothSign(c: CityAssets): Drawable {
-    if (this.sign) return this.sign;
-    // One physical sign: a Grey 700 panel in an Outline Black frame, bevelled Grey 500 on its lit
-    // edges, holding the vega tiles over the BOOTH 630 plate, with a bolt in each corner.
-    const vega = c.vegaSignHorizontal;
-    const [k, g7, g5] = ['--color-outline-black', '--color-grey-700', '--color-grey-500'].map(readToken) as [string, string, string];
-    const plate = board([letter(c.letters, 'BOOTH 630', 'large')], { fill: k, outline: k, pad: 2 });
-    const pad = 5;
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(vega.width, plate.width) + 2 * pad;
-    canvas.height = vega.height + 3 + plate.height + 2 * pad;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = k;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = g7;
-    ctx.fillRect(1, 1, canvas.width - 2, canvas.height - 2);
-    ctx.fillStyle = g5;
-    ctx.fillRect(1, 1, canvas.width - 2, 1);
-    ctx.fillRect(1, 1, 1, canvas.height - 2);
-    for (const [x, y] of [[3, 3], [canvas.width - 4, 3], [3, canvas.height - 4], [canvas.width - 4, canvas.height - 4]]) {
-      ctx.fillStyle = k;
-      ctx.fillRect(x!, y!, 1, 1);
-    }
-    ctx.drawImage(vega, Math.floor((canvas.width - vega.width) / 2), pad);
-    ctx.drawImage(plate, Math.floor((canvas.width - plate.width) / 2), pad + vega.height + 3);
-    return (this.sign = canvas);
+  /** The small sign: Vega's tiles and daisy over BOOTH 630 → on a Leaf Green board (signage.ts). */
+  private boothSign(c: CityAssets, compact: boolean): Drawable {
+    return compact ? (this.signCompact ??= boothSign(c, true)) : (this.sign ??= boothSign(c));
   }
 
   /** The facade's left edge on screen: its entrance lands where Sam stops at hallAt. */
@@ -174,7 +161,7 @@ export class Plaza {
     for (let x = fx + c.facade.width; x < r.x1; x += bw) bays.push(x);
     if (fx + c.facade.width > x0 && fx < r.x1) ctx.drawImage(facade, fx, fy);
     for (const x of bays) ctx.drawImage(bay, x, fy);
-    const mq = this.marqueeFor(c);
+    const mq = this.marqueeFor();
     ctx.drawImage(mq.img, fx + mq.x, f.F + PLAZA.facade.bottom - mq.bottom - mq.img.height);
     const cypress = n ? n.cypress.at(look.facade) : c.cypress;
     const treeY = f.F + PLAZA.facade.bottom - c.cypress.height;
@@ -203,11 +190,15 @@ export class Plaza {
     for (const x of PLAZA.trees) place(tree, x, base);
     const plant = n ? n.plant.at(s) : c.plant;
     for (const x of PLAZA.plants) place(plant, x, base);
-    const sign = this.boothSign(c);
-    const left = bw >= 480 ? PLAZA.sign.wide - sign.width : PLAZA.sign.narrow;
-    const post = n ? n.post.at(s) : c.signPost;
-    for (const x of [left + PLAZA.legInset, left + sign.width - PLAZA.legInset - c.signPost.width]) place(post, x, base);
+    place(c.arcade, PLAZA.arcade, base);
+    const wide = bw >= 480;
+    const sign = this.boothSign(c, !wide);
+    const left = wide ? PLAZA.sign.wide - sign.width : PLAZA.sign.narrow;
+    const clear = wide ? PLAZA.signClear : PLAZA.signClearNarrow;
+    // one post under the board's middle, on its plinth
+    const stand = wide ? (this.stand ??= boothSignStand(base - (F - clear))) : (this.standCompact ??= boothSignStand(base - (F - clear)));
+    place(stand, left + Math.round((sign.width - BOOTH_DEPTH - stand.width) / 2), base);
     // the sign itself stays lit through the night
-    place(sign, left, F - PLAZA.signClear);
+    place(sign, left, F - clear);
   }
 }

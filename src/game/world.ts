@@ -7,6 +7,7 @@
  * plus wall-clock cloud drift, coin spin, dust and the idle NPC loops, so reverse is free.
  */
 import { FIELD, JOINT_SLOPE, STREET, type CityAssets, type Level1Assets } from './assets';
+import { cityAd, conPoster } from './signage';
 import type { Drawable } from './sprites';
 import { FOOT_SINK, type Sam } from './sam';
 import type { Coins } from './coins';
@@ -150,8 +151,10 @@ const MID_TREES = [260, 1000, 1760];
  * checkStreet). The plaza has its own trees and planters (src/game/plaza.ts).
  */
 const STREET_TREES = [2392, 2668, 3034, 3318, 3560, 3918, 4204, 4466, 4700, 4800, 5360];
-const PLANTS = [2556, 3418, 3466, 4044, 5232];
-const NPCS = { molePhone: 2470, molesChess: 3150, pingPong: 3640, watering: 4138, molePizza: 4330, dogBark: 4590, molePhone2: 5150 } as const;
+const PLANTS = [3418, 3466, 4044, 5232];
+/** The 16-Bit Con poster in a city ad panel on the sidewalk, among the first things in town. */
+const STREET_AD = 2466;
+const NPCS = { molePhone: 2604, molesChess: 3150, pingPong: 3640, watering: 4138, molePizza: 4330, dogBark: 4590, molePhone2: 5150 } as const;
 /** The night's closed subway entrance: no train tonight, Sam runs on. */
 const SUBWAY_CLOSED = 4880;
 /** Railing posts (counted from its first) that carry a street lamp, at uneven spacing; never behind a subway entrance. The two ends always do. */
@@ -168,6 +171,7 @@ const BODY = { from: 14, to: 46 } as const;
 function checkStreet(c: CityAssets, tree: Drawable): void {
   const boxes: [string, number, number][] = [
     ['subway', SEQ.subway, SEQ.subway + c.subway.width],
+    ['ad panel', STREET_AD, STREET_AD + 92],
     ...STREET_TREES.map((x) => ['tree', x, x + tree.width] as [string, number, number]),
     ...PLANTS.map((x) => ['plant', x, x + c.plant.width] as [string, number, number]),
     ['mole on the phone', NPCS.molePhone + BODY.from, NPCS.molePhone + BODY.to],
@@ -224,7 +228,6 @@ interface NightSet {
   watering: Stepper;
   arcade: Stepper;
   plant: Stepper;
-  poster: Stepper;
   tree: Stepper;
   strips: Map<Strip, Stepper>;
   lights: { far: Lights; towers: Lights; mid: Lights; near: Lights };
@@ -265,7 +268,7 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
   }
   return {
     far: new Stepper(c.far, farMap),
-    javits: new Stepper(c.javits, rank([T.n9, T.g7], [1, 1], { '#5487E2': T.k, '#629EFB': T.k })),
+    javits: new Stepper(c.javits, rank([T.n9, T.g7], [2, 1], { '#5DB3FF': T.k, '#8DCAFF': T.k, '#CAE6FF': T.k, '#2189E5': T.k })),
     towers: new Stepper(c.towers, towersMap),
     mid: new Stepper(c.mid, midMap),
     near: new Stepper(c.near, nearMap),
@@ -281,7 +284,6 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
     watering: new Stepper(c.moleWatering, shade(T.n9, CHARACTER_SHADE)),
     arcade: new Stepper(c.arcade, rank([T.k, T.g7], [1, 1], { ...greens, '#5DB3FF': T.y1, '#70A736': T.y4, '#FFCF3B': T.y4, '#FFD11B': T.y4, '#F0A125': T.y4 })),
     plant: new Stepper(c.plant, rank([T.n9, T.n7], [1, 1], { '#834622': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
-    poster: new Stepper(c.poster, rank([T.k, T.g7, T.g5])),
     tree: new Stepper(a.tree, rank([T.n9, T.n7], [1, 1], { '#58311B': T.k, '#834622': T.k, '#AE6228': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
     strips,
     lights: {
@@ -307,7 +309,6 @@ const FENCE_POST = { from: 11, to: 22, centre: 16, cap: 17, ball: [8, 25] } as c
 const STREET_LAMP = { x: 0, y: 0, w: 30, h: 97, poleCentre: 13 } as const;
 /** The dog patrols the sidewalk on its own clock, independent of Sam: world px and px/s. */
 const DOG = { from: 2756, to: 2950, speed: 28, stride: 8 } as const;
-const POSTER_U = 140; // on the leading near building, in that layer's space
 
 /** Where the mid fronts and the towers can be cut cleanly: roofline steps, and fully transparent columns. */
 const MID_EDGES = [104, 117, 152, 283, 331, 352, 518, 525, 531, 556, 582, 705, 728, 797, 919, 936, 979, 1048, 1078, 1091];
@@ -482,6 +483,8 @@ export class Level1 {
   /** The Javits plaza at the end of the run, the game's last level (src/game/plaza.ts). */
   readonly plaza: Plaza;
   private night: NightSet | null = null;
+  /** The 16-Bit Con ad panel, composed once the city is here. */
+  private ad: Drawable | null = null;
   /** The clouds and the far range, recoloured gradually with the sky. */
   private readonly tints: Map<Drawable, Tinted>;
 
@@ -508,7 +511,7 @@ export class Level1 {
     n.lights.far.prepare();
     n.near.prepare();
     n.lights.towers.prepare();
-    for (const st of [n.sidewalk, n.kerb, n.road, n.plazaFloor, n.kerbReturn, n.kerbReturnLeft, n.fence, n.subway, n.subwayClosed, n.watering, n.tree, n.plant, n.arcade, n.poster]) st.prepare();
+    for (const st of [n.sidewalk, n.kerb, n.road, n.plazaFloor, n.kerbReturn, n.kerbReturnLeft, n.fence, n.subway, n.subwayClosed, n.watering, n.tree, n.plant, n.arcade]) st.prepare();
     for (const st of n.strips.values()) st.prepare();
     n.lights.mid.prepare();
     n.lights.near.prepare();
@@ -714,7 +717,6 @@ export class Level1 {
         drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
         drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb === Infinity ? Infinity : nearBegin + STACK.cityNear.gapTo, to: endShown, phase: nearPhase });
       }
-      place(nt ? nt.poster.at(streetStep) : c.poster, STACK.cityNear.p, nearBegin + POSTER_U, F - 30);
     }
     ctx.restore();
 
@@ -798,6 +800,8 @@ export class Level1 {
       }
       place(nt ? nt.subway.at(streetStep) : c.subway, 1, SEQ.subway, base);
       place(nt ? nt.subwayClosed.at(streetStep) : c.subwayClosed, 1, SUBWAY_CLOSED, base);
+      // the 16-Bit Con poster in its ad panel, lit through the night
+      place((this.ad ??= cityAd(conPoster(c))), 1, STREET_AD, base);
       const tree = nt ? nt.tree.at(streetStep) : a.tree;
       for (const x of STREET_TREES) place(tree, 1, x, base);
       const plant = nt ? nt.plant.at(streetStep) : c.plant;

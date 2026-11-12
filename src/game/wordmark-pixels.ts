@@ -9,7 +9,8 @@ import { readToken } from './palette';
 
 export interface WordmarkInk {
   fill: string;
-  outline: string;
+  /** null: no outline (the page's own look, solid Green 900). */
+  outline: string | null;
 }
 
 /**
@@ -46,7 +47,7 @@ export function wordmarkPixels(width: number, opts: { daisy?: boolean; ink?: Wor
     for (let x = -1; x <= w; x++) {
       let colour: string | null = null;
       if (on(x, y)) colour = ink.fill;
-      else
+      else if (ink.outline)
         for (let dy = -1; dy <= 1 && !colour; dy++)
           for (let dx = -1; dx <= 1; dx++)
             if (on(x + dx, y + dy)) {
