@@ -9,7 +9,7 @@
  * run, the breakout. Exit game or Esc leaves it (the pin reverted, back at the top of the hero); when
  * Sam lands on the Register window the game closes itself ('done'), the scroll shifted by the pin's
  * length in the same frame so nothing moves. In play mode "Register now" opens the form in a dialog
- * over the paused game (src/game/register-dialog.ts).
+ * over the paused game (src/register/register-dialog.ts).
  *
  * Who moves what: native scroll sets the timeline's target and the visual eases
  * toward it — nothing here ever scrolls the page back. Keys and the d-pad run Sam with real
@@ -38,19 +38,21 @@ import { FOOT_SINK, Sam, SAM_CELL } from './sam';
 import { Coins, LEVEL1_COINS, TOTAL_COINS } from './coins';
 import { loadCity, loadLevel1 } from './assets';
 import { Level1 } from './world';
-import { skyAt } from './stages';
-import { GROUND_BAND, PLAZA_TIME } from '../data/layers';
+import { clockFor, skyAt } from './stages';
+import { GROUND_BAND } from '../data/layers';
 import { GG_LINE, samLines, type SamLine } from '../data/guide';
 import { sprites } from '../data/sprites.manifest';
 import { loadImage } from './sprites';
 import { remap, SAM_BRAND_MAP } from './palette';
 import { ScreenFrame } from './screen-frame';
-import { placeStart, queryHero, scanStart, slotBox, startRect, staticHero, type HeroDom } from './hero-dom';
+import { placeStart, scanStart, slotBox, startRect, staticHero } from './hero-dom';
 import type { Frame as WorldFrame, Rect } from './world';
 import type { BreakoutState, Hero } from '../monitor/hero';
-import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, PLAY, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
-import { drawCell, idleOnPerch, queryPerch, withSmile } from './landing';
-import { createRegisterDialog, focusRegister } from './register-dialog';
+import { BREAKOUT, CRACK_STAGES, CRACK_STEP, DIVE, ENTER, HITS, LAST_CRACK, PLAY, crackStage, hitNext, playMs, playP, scrollLengths, smooth } from './segments';
+import { queryOverlay } from './overlay';
+import { afterOpeningPaint, pauseTask, whenIdleAfterLoad, type IdleWindow } from './idle';
+import { drawCell, idleOnPerch, queryPerch, withSmile } from '../page/landing';
+import { createRegisterDialog, focusRegister } from '../register/register-dialog';
 import { createFlyerDialog } from './flyer-dialog';
 import { typeOut } from './typing';
 import { GL_ATTRIBUTES } from '../monitor/spec';
@@ -97,21 +99,6 @@ const CRACK_MIN_MS = 150;
 const SCROLL_REST_MS = 250;
 /** After the page reaches the glass, a wheel step there counts only after this long (the swipe that arrived doesn't). */
 const GLASS_GRACE_MS = 400;
-/** One crack's stretch of the breakout's progress q. */
-const CRACK_STEP = (BREAKOUT.cracks[1] - BREAKOUT.cracks[0]) / CRACK_STAGES;
-/** The hits it takes: one per crack (six), and one more that breaks the glass. */
-const HITS = CRACK_STAGES + 1;
-/** Where the glass rests with all six cracks: the middle of the last crack's stretch. */
-const LAST_CRACK = BREAKOUT.cracks[0] + (CRACK_STAGES - 0.5) * CRACK_STEP;
-/**
- * Where a hit takes the breakout from q: one crack further, to the middle of its stretch, all six of them;
- * with all six showing, the next hit breaks the glass (null). Every hit shows something: before, the sixth
- * hit both made the last crack and set off the burst.
- */
-const hitNext = (q: number): number | null => {
-  const next = crackStage(q) + 1;
-  return next > CRACK_STAGES ? null : BREAKOUT.cracks[0] + (next - 0.5) * CRACK_STEP;
-};
 /** A 3D that is not on screen this long after it was asked for gives way to the static opening. */
 const HERO_TIMEOUT_MS = 10000;
 
@@ -124,148 +111,11 @@ export function shouldRunWorld(): boolean {
   return !!document.createElement('canvas').getContext('2d');
 }
 
-interface Overlay {
-  section: HTMLElement;
-  canvas: HTMLCanvasElement;
-  hero: HeroDom | null;
-  hud: HTMLElement | null;
-  hudCoins: HTMLElement | null;
-  hudClock: HTMLElement | null;
-  hint: HTMLElement | null;
-  skip: HTMLButtonElement | null;
-  prompt: HTMLElement | null;
-  promptTitle: HTMLElement | null;
-  sam: HTMLElement | null;
-  samTyped: HTMLElement | null;
-  samSaid: HTMLElement | null;
-  samPortrait: HTMLCanvasElement | null;
-  dpadLeft: HTMLElement | null;
-  dpadRight: HTMLElement | null;
-  buttonA: HTMLElement | null;
-  exit: HTMLButtonElement | null;
-  status: HTMLElement | null;
-}
-
-function query(section: HTMLElement): Overlay {
-  const q = <T extends HTMLElement>(sel: string) => section.querySelector<T>(sel);
-  return {
-    section,
-    canvas: q<HTMLCanvasElement>('.world__canvas')!,
-    hero: queryHero(section),
-    hud: q('.world__hud'),
-    hudCoins: q('[data-hud-coins]'),
-    hudClock: q('[data-hud-clock]'),
-    hint: q('.world__hint'),
-    skip: q<HTMLButtonElement>('[data-skip]'),
-    prompt: q('.world__prompt'),
-    promptTitle: q('.world__prompt .window__title'),
-    sam: q('.world__sam'),
-    samTyped: q('[data-sam-typed]'),
-    samSaid: q('[data-sam-said]'),
-    samPortrait: q<HTMLCanvasElement>('[data-sam-portrait]'),
-    dpadLeft: q('[data-dpad="left"]'),
-    dpadRight: q('[data-dpad="right"]'),
-    buttonA: q('[data-button="a"]'),
-    exit: q<HTMLButtonElement>('[data-exit]'),
-    status: q('[data-world-status]'),
-  };
-}
-
 const clamp1 = (v: number) => Math.min(1, Math.max(-1, v));
-
-type IdleWindow = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
-
-/** Once the page has loaded and the main thread has gone idle. */
-function whenIdleAfterLoad(cb: () => void): void {
-  const w = window as IdleWindow;
-  const idle = () => (w.requestIdleCallback ? w.requestIdleCallback(cb, { timeout: 2000 }) : window.setTimeout(cb, 300));
-  if (document.readyState === 'complete') idle();
-  else window.addEventListener('load', idle, { once: true });
-}
-
-/**
- * Once the opening has painted: a largest-contentful-paint entry for an element in it where the
- * browser reports one (its text: the wordmark is inline SVG paths, which are never an LCP
- * candidate), else the fonts in and two frames painted with them — and never later than 1.5 s.
- */
-function afterOpeningPaint(opening: Element | null): Promise<void> {
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      resolve();
-    };
-    window.setTimeout(finish, 1500);
-    if (opening && PerformanceObserver.supportedEntryTypes?.includes('largest-contentful-paint')) {
-      const po = new PerformanceObserver((list) => {
-        const inOpening = (e: PerformanceEntry) => {
-          const el = (e as LargestContentfulPaint).element;
-          return !!el && opening.contains(el);
-        };
-        if (!list.getEntries().some(inOpening)) return;
-        po.disconnect();
-        requestAnimationFrame(finish);
-      });
-      po.observe({ type: 'largest-contentful-paint', buffered: true });
-    } else {
-      void document.fonts?.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(finish)));
-    }
-  });
-}
-
-/** Yield the main thread between the 3D's setup steps, so each runs as its own short task. */
-function pauseTask(): Promise<void> {
-  return new Promise((resolve) => {
-    const w = window as IdleWindow;
-    if (w.requestIdleCallback) w.requestIdleCallback(() => resolve(), { timeout: 100 });
-    else window.setTimeout(resolve, 16);
-  });
-}
-
-function clockFor(t: number): string {
-  // The journey's time, kept with the light: 07:00 as the run starts, the afternoon through the city,
-  // 19:00 as the sky turns Yellow 600 (sunset), on through the night to 06:30 as the dawn sky warms
-  // (sunrise), 07:30 in the Blue 100 morning, 08:00 at the plaza's end — or, at a night plaza, on to
-  // midnight. Stepped to 10 minutes.
-  const stops: [number, number][] = [
-    [0, 7 * 60],
-    [0.34, 13 * 60],
-    [0.6, 17 * 60 + 30],
-    [0.68, 19 * 60],
-    [0.77, 22 * 60],
-    ...(PLAZA_TIME === 'dawn'
-      ? ([
-          [0.84, 27 * 60],
-          [0.88, 30 * 60 + 30],
-          [0.92, 31 * 60 + 30],
-          [1, 32 * 60],
-        ] as [number, number][])
-      : ([[1, 24 * 60]] as [number, number][])),
-  ];
-  let minutes = stops[stops.length - 1]![1];
-  if (t <= 0) minutes = stops[0]![1];
-  else {
-    for (let i = 1; i < stops.length; i++) {
-      const [t0, m0] = stops[i - 1]!;
-      const [t1, m1] = stops[i]!;
-      if (t < t1) {
-        minutes = m0 + ((t - t0) / (t1 - t0)) * (m1 - m0);
-        break;
-      }
-    }
-  }
-  minutes = Math.floor(minutes / 10) * 10;
-  const h = Math.floor(minutes / 60) % 24;
-  const m = minutes % 60;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = ((h + 11) % 12) + 1;
-  return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
-}
 
 export async function bootWorld(section: HTMLElement): Promise<void> {
   if (!shouldRunWorld()) return;
-  const o = query(section);
+  const o = queryOverlay(section);
   gsap.registerPlugin(ScrollTrigger);
   // ScrollTrigger never re-measures on a resize by itself: the resize handler below decides, so a
   // height-only resize on a touch screen (a keyboard takes ~40 % of the height, beyond what
@@ -1043,7 +893,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     return { stage: crackStage(q), shatter, sam: samB, glide: { up: 0, scale: 1 } };
   };
 
-  // ── Sam on the page (src/game/landing.ts): perched on the Register window only once he has escaped
+  // ── Sam on the page (src/page/landing.ts): perched on the Register window only once he has escaped
   //    the game (the 'done' mode, for the rest of the visit); until then the perch is empty. With the
   //    breakout he leaps out, then in flight from the monitor — shrinking smoothly from twice the
   //    game's scale (where the page takes him from the billboard, exactly) to its own — landing on the
@@ -1087,7 +937,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     if (here) sayOnPerch(GG_LINE);
     else nextLine = GG_LINE;
   });
-  /** Sam out on the page after the landing (src/game/journey.ts): loaded on his first landing, never before. */
+  /** Sam out on the page after the landing (src/page/journey.ts): loaded on his first landing, never before. */
   let journey: Promise<void> | null = null;
   const updatePerch = () => {
     if (!perch) return;
@@ -1098,7 +948,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       perchFrame = '';
       if (landed) {
         perch.root.dispatchEvent(new Event('landed'));
-        journey ??= import('./journey')
+        journey ??= import('../page/journey')
           .then((m) =>
             m.startJourney({ perch, sheets: assets.sam, perchIdle, paused: () => paused || root.classList.contains('is-paused') || !!regDialog?.open }),
           )

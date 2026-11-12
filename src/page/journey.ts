@@ -2,7 +2,7 @@
  * Sam out on the page, once he has broken out of the game and landed on the Register window.
  *
  * Wide screens: Vega's beanstalk grows from the footer's field up past the top of the page
- * (src/game/stalk.ts). Sam stays on the Register window for as long as he and his bubble have room there under
+ * (src/page/stalk.ts). Sam stays on the Register window for as long as he and his bubble have room there under
  * the nav. Once its title bar comes nearer the nav than that, he jumps onto the stalk and climbs toward a line a
  * little above the middle of the screen (LINE) wherever the page goes: down as it scrolls down, up as it scrolls up. He has his own pace (CLIMB_PACE): a fast scroll leaves him behind and he
  * catches up, his climb's frames following his own movement. Near the end of the page he climbs down to the
@@ -20,8 +20,8 @@
  * sprite frames step. One Sam: the perch's canvas on the Register window, or this one, never both.
  */
 import { drawCell, setAway, type Perch } from './landing';
-import { CLIMB_FEET, FOOT_SINK, loadPageSheets, RUN_FPS_MAX, SAM_CELL, STRIDE, type SamSheets } from './sam';
-import type { Strip } from './sprites';
+import { CLIMB_FEET, FOOT_SINK, loadPageSheets, RUN_FPS_MAX, SAM_CELL, STRIDE, type SamSheets } from '../game/sam';
+import type { Strip } from '../game/sprites';
 import { footerGroundY, queryFooterScene, samK } from './footer';
 import { loadStalkArt, Stalk } from './stalk';
 import { startSky } from './sky';
@@ -174,7 +174,7 @@ export async function startJourney(o: JourneyOptions): Promise<void> {
   let gripOffset = 0;
   /** On the ground: his cell's left, where he is walking to, when he began smoking. */
   let ground = { x: 0, goal: 0, smokeAt: -1 };
-  /** His dog in the field (src/game/dog.ts): woken whenever he moves, so it comes and goes with him. */
+  /** His dog in the field (src/page/dog.ts): woken whenever he moves, so it comes and goes with him. */
   let dog: { wake(): void } | null = null;
   let climbOdo = 0;
   let runOdo = 0;

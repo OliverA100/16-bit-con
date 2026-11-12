@@ -2,7 +2,7 @@
 /**
  * Level not found: Sam on the right ledge of a cloud adrift in the sky, looking out at a level that never
  * loaded, drifting off and back on another cloud. The text over the sky; behind it one canvas of Vega's
- * clouds at the page's Sam scale (src/game/lost.ts). Without JS the sky, the text and the cloud bank
+ * clouds at the page's Sam scale (src/page/lost.ts). Without JS the sky, the text and the cloud bank
  * (a CSS background) still show.
  */
 import Base from '../layouts/Base.astro';
@@ -34,7 +34,7 @@ import Button from '../components/Button.astro';
 </Base>
 
 <script>
-  import { startLost } from '../game/lost';
+  import { startLost } from '../page/lost';
 
   startLost().catch((err) => console.error('[404] the sky did not load', err));
 </script>

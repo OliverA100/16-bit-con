@@ -4,7 +4,7 @@
  *
  * Things that appear step: the form steps out (2 steps), the window's height steps to its new size (4), the
  * success content and the ticket step in (4); then `register:done` goes out on the window, so Sam jumps and
- * Sam types his new line (src/game/index.ts, src/game/journey.ts). With reduced motion it simply swaps.
+ * Sam types his new line (src/game/index.ts, src/page/journey.ts). With reduced motion it simply swaps.
  * Back to the form runs the same way round.
  */
 import type { Registration, RegisterFormApi } from './form';

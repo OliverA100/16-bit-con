@@ -16,7 +16,7 @@
  * whole device px, and nothing moves while the tab is hidden or the Register dialog is open.
  */
 import { sprites } from '../data/sprites.manifest';
-import { loadImage } from './sprites';
+import { loadImage } from '../game/sprites';
 import { queryFooterScene, samK } from './footer';
 import { mulberry32 } from '../lib/math';
 import { around, pingpong, snap } from '../lib/drift';

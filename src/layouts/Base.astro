@@ -129,7 +129,7 @@ const {
             <a href="https://vega.io/16-bit-con">vega.io/16-bit-con</a>
           </p>
         </div>
-        <!-- Vega's golden evening field under the text, at Sam's scale (src/game/footer.ts); Sam ends up on its path. -->
+        <!-- Vega's golden evening field under the text, at Sam's scale (src/page/footer.ts); Sam ends up on its path. -->
         <div class="site-footer__scene" aria-hidden="true" data-footer-scene>
           <canvas class="site-footer__back" data-footer-back></canvas>
           <canvas class="site-footer__front" data-footer-front></canvas>
@@ -147,7 +147,7 @@ const {
 </script>
 
 <script>
-  import { startFooter } from '../game/footer';
+  import { startFooter } from '../page/footer';
 
   startFooter().catch((err) => console.error('[footer] the field did not load', err));
 </script>
@@ -158,7 +158,7 @@ const {
   }
 
   /* No z-index here: the field's two canvases take part in the page's own stacking, so the beanstalk's
-     foot (src/game/stalk.ts) stands between the hills and the grass, and Sam in front of both. */
+     foot (src/page/stalk.ts) stands between the hills and the grass, and Sam in front of both. */
   .site-footer {
     position: relative;
   }
@@ -172,7 +172,7 @@ const {
   }
 
   /* The field whole: 230 art rows at Sam's scale — the daisies' heads, the clouds, the golden hills and all of
-     the meadow (its surface, the ground line, 45 rows over the bottom: src/game/footer.ts). The art in this
+     the meadow (its surface, the ground line, 45 rows over the bottom: src/page/footer.ts). The art in this
      band only, the text's clear zone above it. */
   .site-footer__scene {
     position: relative;

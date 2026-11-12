@@ -7,8 +7,8 @@
  */
 import { sprites } from '../data/sprites.manifest';
 import { drawCell } from './landing';
-import { FOOT_SINK, SAM_CELL } from './sam';
-import { loadStrip } from './sprites';
+import { FOOT_SINK, SAM_CELL } from '../game/sam';
+import { loadStrip } from '../game/sprites';
 import { footerGroundY, queryFooterScene, samK } from './footer';
 
 /** Art px a second trotting; art px of trot per frame of the walk's cycle. */

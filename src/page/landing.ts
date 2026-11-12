@@ -4,9 +4,9 @@
  * one 60 × 60 cell on a canvas the page sizes to whole device px per art px; idling once he is there.
  */
 import { sprites } from '../data/sprites.manifest';
-import { remap, SAM_BRAND_MAP } from './palette';
-import { IDLE_FPS } from './sam';
-import { loadImage, makeStrip, type Strip } from './sprites';
+import { remap, SAM_BRAND_MAP } from '../game/palette';
+import { IDLE_FPS } from '../game/sam';
+import { loadImage, makeStrip, type Strip } from '../game/sprites';
 
 /** The idle loop's pace, ms a frame (as in the game). */
 const IDLE_MS = 1000 / IDLE_FPS;
@@ -84,7 +84,7 @@ export function drawCell(canvas: HTMLCanvasElement, strip: Strip, frame: number,
 }
 
 /**
- * Sam away from the Register window (out on the page: src/game/journey.ts): his perch and Sam's
+ * Sam away from the Register window (out on the page: src/page/journey.ts): his perch and Sam's
  * bubble hide, so there is only ever one Sam; back on it, both return ('returned': the line types again).
  */
 export function setAway(perch: Perch, away: boolean): void {
@@ -113,7 +113,7 @@ export function idleOnPerch(perch: Perch, idle: Strip, landed: () => boolean): v
       timer = 0;
       return;
     }
-    // hopping (src/game/journey.ts) draws its own frames; the idle picks up again after
+    // hopping (src/page/journey.ts) draws its own frames; the idle picks up again after
     if (perch.root.classList.contains('is-hopping')) {
       frame = -1;
       timer = window.setTimeout(tick, IDLE_MS);

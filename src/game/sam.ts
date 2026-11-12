@@ -24,7 +24,7 @@ export async function loadSamSheets(): Promise<SamSheets> {
 }
 
 /**
- * The two sheets Sam needs only once he is out on the page (src/game/journey.ts): climbing the beanstalk
+ * The two sheets Sam needs only once he is out on the page (src/page/journey.ts): climbing the beanstalk
  * and smoking on the footer's ground, through the same brand map so all five sheets are one Sam.
  */
 export interface PageSheets {

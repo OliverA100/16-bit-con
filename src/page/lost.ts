@@ -17,8 +17,8 @@
 import { sprites, CUMULUS_LOBES } from '../data/sprites.manifest';
 import { frameAt, img, samStrip, stateKey, tileX, wrap, type Drawable, type Strip } from '../schedule/kit';
 import { samK } from './footer';
-import { cropImage, patchTileSeam } from './palette';
-import { FOOT_SINK, IDLE_FPS, SAM_CELL } from './sam';
+import { cropImage, patchTileSeam } from '../game/palette';
+import { FOOT_SINK, IDLE_FPS, SAM_CELL } from '../game/sam';
 import { reducedMotion } from '../lib/reduced-motion';
 import { around, snap } from '../lib/drift';
 

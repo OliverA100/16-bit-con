@@ -42,13 +42,27 @@ export const BREAKOUT = {
   land: [0.81, 1],
 } as const;
 export const CRACK_STAGES = 6;
-const CRACK_STEP = (BREAKOUT.cracks[1] - BREAKOUT.cracks[0]) / CRACK_STAGES;
+export const CRACK_STEP = (BREAKOUT.cracks[1] - BREAKOUT.cracks[0]) / CRACK_STAGES;
 
 /** The crack stage at q: 0 before the cracks, 1–6 through them (a stage shows as soon as q passes the hit before it). */
 export function crackStage(q: number): number {
   if (q <= BREAKOUT.cracks[0]) return 0;
   return Math.min(CRACK_STAGES, Math.ceil((q - BREAKOUT.cracks[0]) / CRACK_STEP - 1e-6));
 }
+
+/** The hits it takes: one per crack (six), and one more that breaks the glass. */
+export const HITS = CRACK_STAGES + 1;
+/** Where the glass rests with all six cracks: the middle of the last crack's stretch. */
+export const LAST_CRACK = BREAKOUT.cracks[0] + (CRACK_STAGES - 0.5) * CRACK_STEP;
+/**
+ * Where a hit takes the breakout from q: one crack further, to the middle of its stretch, all six of them;
+ * with all six showing, the next hit breaks the glass (null). Every hit shows something: before, the sixth
+ * hit both made the last crack and set off the burst.
+ */
+export const hitNext = (q: number): number | null => {
+  const next = crackStage(q) + 1;
+  return next > CRACK_STAGES ? null : BREAKOUT.cracks[0] + (next - 0.5) * CRACK_STEP;
+};
 
 /** The enter segment's schedule, in p. */
 export const ENTER = {

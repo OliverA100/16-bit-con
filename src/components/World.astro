@@ -171,7 +171,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 <script>
   import { bootWorld, shouldRunWorld } from '../game/index';
   import { queryHero, staticHero } from '../game/hero-dom';
-  import { perchStill, queryPerch } from '../game/landing';
+  import { perchStill, queryPerch } from '../page/landing';
 
   const section = document.querySelector<HTMLElement>('[data-world]');
   // The static page: the game is never offered (no PRESS START), and Sam is already on the Register window.
@@ -217,7 +217,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   /* After the breakout the opening is sky too: its page-colour backgrounds clear, so the page's clouds
-     (src/game/sky.ts, behind everything) drift behind the wordmark and the broken monitor. */
+     (src/page/sky.ts, behind everything) drift behind the wordmark and the broken monitor. */
   :global(:root.is-done) :is(.hero, .hero__stage) {
     background: transparent;
   }

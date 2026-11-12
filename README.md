@@ -36,10 +36,11 @@ npm run og             # regenerate the social image (needs Google Chrome)
 | `src/layouts/Base.astro` | Head, nav, footer, the skip link |
 | `src/components/` | Window, Button, Nav, SectionHeader, RegisterForm, Ticket, ScheduleDrawer, World (the hero and the game's UI), FlyerDialog, Wordmark |
 | `src/styles/` | `tokens.css` (every colour, type role, space, line and duration), `global.css`, `fonts.css` |
-| `src/game/` | The canvas game and Sam's life on the page after it: timeline, world, input, sound, the flyer, the landing, the journey |
+| `src/game/` | The canvas game: timeline, world, input, sound, the flyer |
+| `src/page/` | Sam's life on the page after the breakout: the landing, the journey, the beanstalk, the page's sky, the dog, the footer's field, and the 404's sky |
 | `src/monitor/` | The three.js monitor: model, CRT shader, breakout |
 | `src/schedule/` | The drawer's behaviour, the scene runner and the nine folder scenes |
-| `src/register/` | Validation, the success state, the pass, the calendar file |
+| `src/register/` | Validation, the success state, the pass, the calendar file, the dialog over the game |
 | `src/lib/` | Shared helpers: small maths, cloud drift, the reduced-motion preference |
 | `src/data/` | Sessions, Sam's lines, the sprite manifest, the wordmark's paths, the pixel icons |
 | `scripts/` | The favicon and social image builders |
@@ -77,7 +78,7 @@ npm run og             # regenerate the social image (needs Google Chrome)
 - CI running the type check, the format check and the build on every push.
 - Security headers (a content security policy first).
 - A real endpoint behind the form.
-- The game's main module is still one long file; I would split it further by mode.
+- The game's main module is still long (one closure holds its modes and its frame); I would split it further by mode.
 
 ## Credits
 

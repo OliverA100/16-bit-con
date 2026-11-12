@@ -13,7 +13,7 @@
  * px (Sam's scale, --sam-px), redrawn only when its frame changes (Vega's sway pace, SWAY_FPS).
  */
 import { sprites } from '../data/sprites.manifest';
-import { loadImage } from './sprites';
+import { loadImage } from '../game/sprites';
 import { samK } from './footer';
 import { stemTable, SWAY_FPS } from '../schedule/kit';
 
