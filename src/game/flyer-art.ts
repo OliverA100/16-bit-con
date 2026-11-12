@@ -9,7 +9,7 @@
  * flyer it falls on. That keeps every frame on the palette and crisp at any angle, so the fall can use
  * fine steps of tilt and turn (floating, not ticking).
  *
- * Self-contained (no imports), so the same code renders the review sheet outside the browser.
+ * Self-contained (no imports), so the same code can render the flyer outside the browser.
  */
 export type Rgb = readonly [number, number, number];
 

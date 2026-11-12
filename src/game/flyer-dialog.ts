@@ -71,7 +71,7 @@ export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void; /** 
       if (dialog.open) return;
       shown = true;
       // (no page lock as the Register dialog has: the opening already holds the wheel, touch and keys, and an
-      // overflow lock here moved the pinned page back into the dive on review)
+      // overflow lock here moves the pinned page back into the dive)
       document.documentElement.classList.add('is-reading');
       hooks.onOpen();
       dialog.showModal();

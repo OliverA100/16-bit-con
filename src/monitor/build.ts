@@ -675,7 +675,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   const floorY = -DIMS.feet.h - 0.0005;
   const floorGeo = new PlaneGeometry(4.4, 4.4).rotateX(-Math.PI / 2).translate(0.5, floorY, -0.6);
   const floorMat = new ShadowMaterial({ color: colors.shadow, opacity: 0.42, depthWrite: false, toneMapped: false });
-  // As in the reference, the shadow is strongest where it leaves the monitor and fades as it falls
+  // The shadow is strongest where it leaves the monitor and fades as it falls
   // away: its strength eases off with the distance from the monitor's footprint (FADE, body units).
   floorMat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec2 vFloor;\nvoid main() {').replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFloor = position.xz;');
@@ -738,7 +738,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   return { pivot, body, frame, casing, front, back, recess, screen, glass, daisy, power: powerButton!, floor, contact, remote: remote.group, casters, feet, materials: { plastic, bevel, glass: glassMat } };
 }
 
-/** Proportions measured from the built geometry, for the review table. */
+/** Proportions measured from the built geometry, for checking the model against its spec. */
 export function measure(parts: MonitorParts): Record<string, number> {
   const box = (m: Mesh) => {
     m.geometry.computeBoundingBox();

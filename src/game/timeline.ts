@@ -44,7 +44,7 @@ export class Timeline {
     return this.t * this.W;
   }
 
-  /** A scroll we did not cause: the page is already there, the visual follows. */
+  /** A scroll the game did not cause: the page is already there, the visual follows. */
   setScrollTarget(t: number): void {
     this.tTarget = clamp(t, this.tMin, this.tMax);
     this.source = 'scroll';

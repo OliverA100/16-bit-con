@@ -13,9 +13,9 @@
  *
  * Who moves what: native scroll sets the timeline's target and the visual eases
  * toward it — nothing here ever scrolls the page back. Keys and the d-pad run Sam with real
- * velocity, set the timeline directly, and scroll the page to match; a hit on the glass and the
- * auto-break move the target one step and scroll the page with it. Those are the only scrollTo
- * calls. A scroll we did not cause cancels them all for 150 ms. Scroll wins.
+ * velocity, set the timeline directly, and scroll the page to match; a hit on the glass
+ * moves the target one step and scrolls the page with it. Those are the only scrollTo
+ * calls. A scroll the game did not cause cancels them all for 150 ms. Scroll wins.
  *
  * The opening: a Daisy White page with the monitor, the copy and PRESS START lies over
  * the canvas world. Once the page has loaded and gone idle, the monitor's 3D (three.js, its own
@@ -24,7 +24,7 @@
  * camera dives into the screen and lands on the native pose, and the opening hands over to the canvas
  * world beneath it pixel for pixel. This loop draws the game into the screen frame and renders the 3D
  * while the opening shows, and only the canvas world after. PRESS START plays the segment at the
- * reference's pace (segments.ts PLAY: the dive in 770 ms, 970 ms in all).
+ * dive's own pace (segments.ts PLAY: the dive in 770 ms, 970 ms in all).
  */
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -62,9 +62,9 @@ const W = 6000;
 /** The whole run: the field, the city, the night and the dawn at the Javits plaza, the game's last level (world x 0–6000). */
 const T_MAX = 1;
 const X_MAX = T_MAX * W;
-/** A scroll we did not cause suspends keys for this long. */
+/** A scroll the game did not cause suspends keys for this long. */
 const SCROLL_OVERRIDE_MS = 150;
-/** Our own scrollTo echoes back through ScrollTrigger; within this many px it is ours. */
+/** The game's own scrollTo echoes back through ScrollTrigger; within this many px it is the game's. */
 const ECHO_PX = 1.5;
 /**
  * The 3D shows its dark glass this long before it powers on. It takes the poster's place in one frame,
@@ -73,7 +73,7 @@ const ECHO_PX = 1.5;
  */
 const POWER_DELAY_MS = 200;
 /**
- * The finale's pace, ms per stretch of the breakout: a beat from the sixth hit to the burst; Sam's jump
+ * The finale's pace, ms per stretch of the breakout: a beat from the last hit to the burst; Sam's jump
  * up out of the screen to its top (the leap, src/monitor/breakout.ts); his fall from there onto the
  * Register window (the landing: the pin lets go with the hero as it is on load, and the page follows him
  * down until the Register window is centred). One jump, airborne ~1.3 s. The glass keeps its own clock
@@ -89,7 +89,7 @@ const GLASS_MS = 1100;
  * pull-back to the monitor no faster than the dive's own pace (segments.ts PLAY) and stops at the glass.
  * The scroll that brought it there never cracks it, however long its momentum runs; once it has rested
  * (SCROLL_REST_MS), a new scroll cracks the glass, at most a crack every CRACK_MIN_MS, and breaks it after
- * the sixth (on review 2026-11-10). Hits crack it at once, any time. The page holds there until Sam has
+ * the sixth. Hits crack it at once, any time. The page holds there until Sam has
  * landed; scroll beyond what has played is absorbed.
  */
 const CRACK_MIN_MS = 150;
@@ -106,7 +106,7 @@ const LAST_CRACK = BREAKOUT.cracks[0] + (CRACK_STAGES - 0.5) * CRACK_STEP;
 /**
  * Where a hit takes the breakout from q: one crack further, to the middle of its stretch, all six of them;
  * with all six showing, the next hit breaks the glass (null). Every hit shows something: before, the sixth
- * hit both made the last crack and set off the burst (on review 2026-11-10).
+ * hit both made the last crack and set off the burst.
  */
 const hitNext = (q: number): number | null => {
   const next = crackStage(q) + 1;
@@ -400,7 +400,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let lastHeroP = 0;
   /**
    * The breakout's finale — the glass bursting, Sam's leap, the landing on the Register window — is an
-   * event, not a camera move: once it starts (the sixth hit, or a scroll past the last crack) it plays to
+   * event, not a camera move: once it starts (the last hit, or a scroll past the last crack) it plays to
    * the end at its own pace, the page held still under it (:root.is-finale), and the scroll never scrubs it.
    */
   let finale = false;
@@ -459,11 +459,11 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const clockNow = () => performance.now();
   let expectedY = Number.NaN;
   /**
-   * PRESS START's play through the enter segment at the reference's pace (segments.ts PLAY): it began
+   * PRESS START's play through the enter segment at the dive's own pace (segments.ts PLAY): it began
    * `from` ms into a play from the top, at t0 on the clock, and ends at y1. A scroll of the user's cancels it.
    */
   let playing: { from: number; y1: number; t0: number } | null = null;
-  /** The breakout's own plays, q from q0 to q1 in ms: the pull-back (→ or Space at the plaza), and the rest after the sixth hit. */
+  /** The breakout's own plays, q from q0 to q1 in ms: the pull-back (→ or Space at the plaza), and the rest after the last hit. */
   let breakPlay: { q0: number; q1: number; ms: number; t0: number; keys?: [number, number][]; floorY?: number } | null = null;
   let scrollOverrideUntil = 0;
   /** A tap or click on the monitor's screen during the cracks (its DOM hit target). */
@@ -502,7 +502,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       anticipatePin: 1,
       invalidateOnRefresh: true,
       onUpdate: (self) => {
-        // Our own scrollTo (keys, d-pad, a hit, the auto-break) echoes back here; anything else is the user, and the user wins.
+        // The game's own scrollTo (keys, d-pad, a hit) echoes back here; anything else is the user, and the user wins.
         if (paused || exiting || finale || storyHeld || Math.abs(window.scrollY - expectedY) <= ECHO_PX) return;
         scrollOverrideUntil = clockNow() + SCROLL_OVERRIDE_MS;
         motion.cancel();
@@ -692,7 +692,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
   // ── The opening: PRESS START, the monitor's 3D, the parallax ──────────────
   const d = o.hero;
-  /** PRESS START — or Space / → at the monitor — plays the enter segment at the reference's pace, from where the page is: it scrolls with it. */
+  /** PRESS START — or Space / → at the monitor — plays the enter segment at the dive's own pace, from where the page is: it scrolls with it. */
   const start = () => {
     motion.cancel();
     d?.startButton.blur();
@@ -1437,7 +1437,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     timeline.jumpTo(timeline.tMax);
     // Where he is (the top of his jump, on screen) and where his cell on the title bar is on the page. The
     // page scrolls until the view ends halfway down the form's email field: Sam on the title bar, the form's
-    // first fields under him, the broken monitor still above (on review 2026-11-10); he falls onto it as it
+    // first fields under him, the broken monitor still above; he falls onto it as it
     // arrives, never back up the screen.
     const dpr = window.devicePixelRatio || 1;
     const sprite = hero3d?.samSprite();
@@ -1687,7 +1687,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       window.scrollTo({ top: yOfQ(next), behavior: 'instant' });
       expectedY = window.scrollY;
       // the crack shows the moment it is hit: the picture goes straight there (no ease, and the scroll's
-      // speed limit is not a hit's: on review 2026-11-10 a crack came 224 ms after its click)
+      // speed limit is not a hit's: a crack came 224 ms after its click)
       timeline.drive(xOfQ(next), 0, 'mash');
       lastPicQ = next;
     };
@@ -1869,7 +1869,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       timeline.jumpTo(timeline.tMax);
       finish();
     }
-    // A scroll past the last crack is the sixth hit: the finale takes over from where the picture is. A
+    // A scroll past the last crack is the last hit: the finale takes over from where the picture is. A
     // scroll that has already carried the page into the landing (the Register section rising into view)
     // starts it from where the page is, so the form and the world never disagree.
     if (mode === 'play' && wantBreakout && !finale && !exiting && !paused && !zoom) {
@@ -1906,8 +1906,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     lastHeroP = heroP;
     // While catching up the visual still follows the ease, so Sam faces the way he actually moves. He runs
     // whenever the world he is drawn in moves through the run — by the picture, not by where the scroll is
-    // headed: a fast scroll's target can be past the plaza while the picture still runs (on review
-    // 2026-11-10 he stood still there with the world sliding under him).
+    // headed: a fast scroll's target can be past the plaza while the picture still runs
+    // (he would stand still there with the world sliding under him).
     sam.update(dt, timeline.t > 0 && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
     // The little puffs he kicks up running (on the ground only), and a burst as he lands a jump.
     const onGround = !sam.airborne;
@@ -1936,7 +1936,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (d) {
         // The copy goes with the dive and comes back with a zoom out; through the breakout it stays away,
         // clear of Sam's jump and fall, and fades back in its own place round the monitor (the hero as on
-        // load) only once everything has settled after the landing (on review 2026-11-10 it came in with the
+        // load) only once everything has settled after the landing (it came in with the
         // burst, then during the fall: in the way both times). PRESS START: never after the breakout, nor
         // through it in the game; on the page it shows over the monitor wherever the game was left.
         const rawOut =
@@ -2093,7 +2093,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
       o.hint?.classList.toggle('is-visible', inGame && !openingHolds() && t < 0.14);
       // Sam: each line is said once, as he passes it; lines queue, each is typed out in full and stays up long
-      // enough to read, however fast the run goes (on review a line went before it was typed). Screen readers get
+      // enough to read, however fast the run goes (a line went before it was typed). Screen readers get
       // each line whole.
       // The breakout has begun: the run's lines are over (one still up, or waiting, goes), the monitor's prompt speaks.
       if (inBreakout && (samLine || samQueue.length)) {

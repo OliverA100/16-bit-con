@@ -145,7 +145,7 @@ const FIELD_TREES = [600, 900, 1250, 1600, 1900];
 const MID_TREES = [260, 1000, 1760];
 /**
  * The street, world x (left edges), through the afternoon, the night and into the dawn, placed by hand on an
- * uneven rhythm, as a street grows (on review: nothing evenly spaced): planter trees, now and then two close
+ * uneven rhythm, as a street grows (nothing evenly spaced): planter trees, now and then two close
  * together; plants, sometimes a pair; and New York's own life on the sidewalk — a mole on the phone, the dog's
  * walk, a chess game, ping-pong at an outdoor table, a mole watering a tree, a slice of pizza at night, a
  * barking dog, the closed subway, another call. Every thing at least STREET_GAP from the next (checked in dev:

@@ -53,7 +53,7 @@ const LIE_KEYS: [number, number][] = [
 ];
 /**
  * Drag: the descent's multiplier, upright (quicker) to flat (held up by the air). Kept close, with the
- * swing's own rate, so the speed stays within ~60–140 px/s: no part rushes, none hangs too long (on review).
+ * swing's own rate, so the speed stays within ~60–140 px/s: no part rushes, none hangs too long.
  */
 const DRAG: [number, number] = [1.15, 0.9];
 

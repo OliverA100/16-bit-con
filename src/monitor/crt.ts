@@ -288,13 +288,13 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
 /** The broken tube's static: a new frame this many times a second (each held ~1/18 s, as an untuned set snaps). */
 export const STATIC_RATE = 18;
 
-/** One scanline every this many device px of the screen at rest (the reference shows about 4). */
+/** One scanline every this many device px of the screen at rest (about 4 reads as a tube of this size). */
 export const SCAN_PX = 4;
 
 /**
  * The sizes set in device px of the screen at rest (w × h device px): a dark gap every 4 px, an
  * RGB triad every 3 px and the static's 2 px cells — counts across the tube, so they grow with the zoom as a real tube's would
- * (the reference's lines grow the same way) — and the sizes tuneOnScreen holds.
+ * (a tube's lines grow the same way) — and the sizes tuneOnScreen holds.
  */
 export function tuneAtRest(crt: CrtMaterial, w: number, h: number): void {
   const u = crt.uniforms;
@@ -312,7 +312,7 @@ const ABERR_MAX_PX = 3;
  * A ~6 px bloom and a 1 px grain, for a screen now w × h px (px of the canvas at rest; restW its width
  * at rest). Called through the zoom with the screen's size on the page, these keep their size on the
  * page — grown with the tube, the 8-tap bloom would ghost — while the convergence error grows with
- * the tube as the reference's does, up to ABERR_MAX_PX on the page.
+ * the tube as a real tube does, up to ABERR_MAX_PX on the page.
  */
 export function tuneOnScreen(crt: CrtMaterial, w: number, h: number, restW = w): void {
   const u = crt.uniforms;

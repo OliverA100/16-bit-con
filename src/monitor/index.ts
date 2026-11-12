@@ -6,10 +6,9 @@
  * sRGB out, antialias, device pixel ratio capped at 2.
  *
  * Shadows: one shadow-casting light, high above and a little in front, from the key light's side, adds
- * no light of its own (the plastic's shading is the key's, swept against the reference) and casts one
+ * no light of its own (the plastic's shading is the key's) and casts one
  * soft shadow (VSM, a 512² map blurred wide, its camera fitted tight round the monitor, the controller
- * and the cable, the only casters) onto a ShadowMaterial floor: short, back and to the right as in the
- * reference, so it stays inside a phone's width (anything behind the monitor lands right of it on the
+ * and the cable, the only casters) onto a ShadowMaterial floor: short, back and to the right so it stays inside a phone's width (anything behind the monitor lands right of it on the
  * page). The map is redrawn only when asked (renderer.shadowMap.needsUpdate): nothing moves but the
  * monitor's turn, so the hero redraws it while the monitor turns, and never in the dive.
  *
@@ -181,7 +180,7 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
   room.dispose();
   // A dim room for the plastic, so the clearcoat carries highlights rather than a white sheen and the
   // key light shapes the casing (front lit, the side falling into orange). Exposure, room and key were
-  // swept against a reference image's front and side colours.
+  // swept until the front reads lit and the side falls into orange.
   scene.environment = env;
   scene.environmentIntensity = 0.32;
   yield Promise.all([daisyLoad, logoLoad]);

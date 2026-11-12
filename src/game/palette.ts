@@ -32,7 +32,7 @@ export const SAM_BRAND_MAP: ColorMap = {
   '#BD8A51': '#C09564', // hands (run / jump)
   '#C58F53': '#C09564', // hands (idle)
   '#000000': '#1A0505', // outline
-  // the two odd ones out, measured 2026-11-11, so all five page sheets (idle, run, jump, smoking, climb) match
+  // the two odd ones out, so all five page sheets (idle, run, jump, smoking, climb) match
   '#77A50E': '#097FCA', // smoking: four lens pixels left green → lens blue
   '#FF4646': '#E34D56', // climb: its brighter nose → the nose pink of the other four
 };

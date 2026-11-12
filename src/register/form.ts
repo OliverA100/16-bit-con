@@ -1,5 +1,5 @@
 /**
- * The Register form's behaviour: validation with our own messages (the form is `novalidate`, so every
+ * The Register form's behaviour: validation with the form's own messages (the form is `novalidate`, so every
  * browser looks the same), the submit's short "Registering" beat, and the swap to the success state.
  *
  * When a field is checked:

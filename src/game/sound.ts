@@ -1,6 +1,6 @@
 /**
  * The game's sound, Web Audio only. Enter, exit, static and the flyer's paper sounds are synthesised here; the cracks and the
- * shatter are the user's files in public/sounds/, never re-encoded (two are levelled and faded here, FILE_TRIM).
+ * shatter are recordings in public/sounds/, never re-encoded (two are levelled and faded here, FILE_TRIM).
  *
  * Nothing exists before unlock(), which PRESS START's click calls inside its gesture: until then every
  * call is a no-op. Every sound is a voice — its own gain into the master, which runs through a limiter —
@@ -83,18 +83,17 @@ const FILE_TRIM: Partial<Record<FileName, { db: number; fade: number }>> = {
   'glass-1': { db: 11.3, fade: 0.03 },
   'glass-3': { db: 10.6, fade: 0.03 },
 };
-/** A crack "cut to fit": it plays this long (s, real time) and then fades over CUT_FIT_FADE, so it ends as the next auto hit lands. */
+/** A crack "cut to fit": it plays this long (s, real time) and then fades over CUT_FIT_FADE, so it ends as the next hit can land. */
 export const CUT_FIT = 0.32;
 const CUT_FIT_FADE = 0.06;
 /**
  * The crack for each stage, 1–6, and whether it is cut to fit. The new crack length per stage,
  * measured on the pattern (src/monitor/breakout.ts makePattern) at five impacts across the screen:
  * 3.5 % · 5.5 % · 13 % · 13.5 % · 14.5 % · 50 % (stage 6 is the last ring, the rim and the rays' ends).
- * Set by ear (2026-11-11), picked from six files and then ordered: crack-4 (one tiny tick) starts it,
- * crack-3 (a run of ticks, the user's favourite) on 2 and 4, glass-1 (a dense, spreading crackle) on 3
+ * Picked by ear from six files and then ordered: crack-4 (one tiny tick) starts it,
+ * crack-3 (a run of ticks) on 2 and 4, glass-1 (a dense, spreading crackle) on 3
  * and 6, glass-3 (spaced ticks) on 5. glass-1 and glass-3 run ~0.5 s, longer than the 380 ms between
- * auto hits, so on 3 and 5 they are cut to fit; on 6 glass-1 plays whole into the beat before the shatter.
- * crack-1 (on 2, 3 and 5 before) and a third new file, a creak, were tried and not kept; crack-2 went earlier.
+ * quick hits, so on 3 and 5 they are cut to fit; on 6 glass-1 plays whole into the beat before the shatter.
  */
 export const CRACK_STAGES: readonly { file: FileName; cut: boolean }[] = [
   { file: 'crack-4', cut: false },

@@ -453,8 +453,7 @@ void main() {
  * even face-on, as bright patches, and the key light leaves a hot glint. The broken edges, and a thin
  * line along each face's outline, are light caught in the break: always lighter than what is behind,
  * never dark. Both faces are drawn. Premultiplied: the colour is the light the glass sends back, alpha
- * what it hides. (Tried on review, not kept: a rimless lens's recipe — a dark studio with bright panels,
- * reflections raising the opacity, one layer.)
+ * what it hides.
  */
 const glassVertex = /* glsl */ `
 attribute vec2 aLocal;
@@ -1116,7 +1115,7 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       const d1 = d0 / Math.max(1, scale / Math.max(1e-3, there));
       // One jump, like a thrown ball: out through the glass and up toward the viewer, his speed falling
       // evenly (a parabola) to the top of the jump as the leap ends — the one moment he is at rest, where
-      // the page takes him over and he falls on to the Register window. (On review 2026-11-10 a hop up and
+      // the page takes him over and he falls on to the Register window. (a hop up and
       // back down, then a stop in mid-air, then a second hop read as unnatural.)
       const e = leap * (2 - leap);
       const d = Math.exp(Math.log(d0) + (Math.log(d1) - Math.log(d0)) * e);

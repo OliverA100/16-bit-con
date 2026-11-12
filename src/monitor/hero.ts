@@ -4,7 +4,7 @@
  * screen. The page's one loop calls enter(p) and render() each frame while the monitor is on screen;
  * nothing here owns a requestAnimationFrame, and nothing renders while the levels play.
  *
- * Power-on, on the page's clock from powerOn(), timed on the reference video: dark glass with its
+ * Power-on, on the page's clock from powerOn(), timed frame by frame: dark glass with its
  * reflection → a thin, faint line grows from a point at the centre to the full width (170 ms) → it
  * brightens and thickens (40 ms) → the picture opens vertically from it at its normal brightness
  * (170 ms, gathering speed) — no white field, no flash → PRESS START 70 ms later. The picture's
@@ -12,11 +12,11 @@
  *
  * The zoom (src/game/segments.ts ENTER, DIVE): the camera dives from the rest pose to the native pose
  * — where one texel of the game's frame is exactly k device px on the canvas world's grid — along the
- * reference's measured curve, turning straight-on on the way. The tube keeps its whole look —
+ * dive's measured curve, turning straight-on on the way. The tube keeps its whole look —
  * curvature, bulge, scanlines growing with the screen, every effect — until its picture all but fills
- * the view (as in the reference, on review 2026-11-09); then its curvature and its vintage look flatten
+ * the view; then its curvature and its vintage look flatten
  * together over ~125 ms while the bezel's last strips slide out, and the camera's last bit of zoom plays
- * on the flat picture (on review 2026-11-10: a ~30 ms cut read as too fast). The glass's reflection goes
+ * on the flat picture (a cut of ~30 ms reads as too fast). The glass's reflection goes
  * early. At the landing
  * the screen shows the game's pixels exactly and the page can hand over to the canvas world without a
  * jump. No brightness flash.
@@ -38,12 +38,10 @@ import { reducedMotion } from '../lib/reduced-motion';
  */
 export const POWER = { grow: 170, brighten: 40, open: 170, ready: 70, faint: 0.45, bright: 1.6, thin: 0.0025, thick: 0.007 } as const;
 /**
- * The turn toward the pointer, degrees, and how it chases the pointer: slow and heavy, like the reference
- * site's monitor. Two damped follows in a row, each frame-rate independent (x += (to − x)(1 − e^(−dt/τ))):
+ * The turn toward the pointer, degrees, and how it chases the pointer: slow and heavy, as a monitor this size would turn. Two damped follows in a row, each frame-rate independent (x += (to − x)(1 − e^(−dt/τ))):
  * the aim eases toward the pointer (`lead`, s), and the turn follows the aim (`tau`, s) — so it eases in
- * and out, with no overshoot. Measured against the reference (a jump across the page, 2026-11-10): its
- * monitor swings about ±11° to our ±8°, so our time constants are its fit (0.08 s and 0.32 s) scaled by
- * 8 / 11, for the same speed in degrees a second over our smaller range. `maxDt` keeps a long frame (a
+ * and out, with no overshoot. The time constants (0.08 s and 0.32 s for a swing of ±11°) are scaled by
+ * 8 / 11 for this monitor's ±8°, so the speed in degrees a second is the same. `maxDt` keeps a long frame (a
  * tab switch) from jolting it.
  */
 const PARALLAX = { yaw: 8, pitch: 4, lead: 0.06, tau: 0.24, maxDt: 1 / 30 } as const;
@@ -140,7 +138,7 @@ export interface Hero {
 }
 
 const DEG = Math.PI / 180;
-/** The opening gathers speed a little, as the reference's band does. */
+/** The opening gathers speed a little, as a tube's band does. */
 const easeIn = (x: number) => clamp01(x) ** 1.2;
 type Pt = [number, number];
 /** Is (x, y) inside the convex quadrilateral q (either winding)? */
@@ -265,7 +263,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   /** How flat the tube is at enter progress q (0 its whole look, 1 flat): eased in and out over ENTER.flatten.length. */
   const flatAt = (q: number): number => smooth(q, [flatP, flatP + ENTER.flatten.length]);
 
-  /** The camera at enter progress q: rest → native along the reference's dive, the distance in log space, turning straight-on. */
+  /** The camera at enter progress q: rest → native along the dive's curve, the distance in log space, turning straight-on. */
   const poseAt = (q: number, out: Pose): Pose => {
     if (!rest || !native) return out;
     const e = diveAt(q);
@@ -285,7 +283,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
   /**
    * Where on the way in the screen's picture first nearly covers the view (p): the view, less a strip
    * of ENTER.fillInset on each side, inside the screen's outline, the monitor square to the world (the
-   * parallax has settled long before). The bezel's last strips slide out after it, as in the reference.
+   * parallax has settled long before). The bezel's last strips slide out after it.
    */
   const fillAt = (): number => {
     if (!lay || !rest || !native) return ENTER.fillBy;
@@ -449,7 +447,7 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
         const lineEnd = POWER.grow + POWER.brighten;
         if (e < lineEnd) {
           phase = 'line';
-          // the line grows at an even pace, as in the reference
+          // the line grows at an even pace
           lineW = clamp01(e / POWER.grow);
           const b = clamp01((e - POWER.grow) / POWER.brighten);
           line = POWER.faint + (POWER.bright - POWER.faint) * b;

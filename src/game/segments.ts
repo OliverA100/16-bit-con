@@ -57,7 +57,7 @@ export const ENTER = {
   copyOut: [0, 0.12],
   /** The parallax turn settles to nothing. */
   parallaxOut: [0, 0.3],
-  /** The camera, from rest to the native pose along the reference's dive (DIVE; it lands at the end and holds). */
+  /** The camera, from rest to the native pose along the dive's curve (DIVE; it lands at the end and holds). */
   camera: [0, 0.55],
   /** The turn to straight-on. */
   turn: [0, 0.36],
@@ -67,15 +67,15 @@ export const ENTER = {
    * (fillInset; where that falls depends on the viewport, and the monitor finds it, src/monitor/hero.ts).
    * From `lead` before that point the curvature and the vintage look flatten together, easing in and
    * out, over `length` of p (~125 ms at PRESS START's pace), and the camera's last bit of zoom plays on
-   * the flat picture. On review (2026-11-10): the first build cut it all in ~30 ms, as in the reference,
+   * the flat picture. The first build cut it all in ~30 ms,
    * which read as too fast; stretched to the landing, the zoom had ended before the flattening had.
    */
   flatten: { lead: 0.02, length: 0.09 },
-  /** "Nearly fills": the bezel shows in strips no wider than this share of the view on each side, as at the reference's cut. */
+  /** "Nearly fills": the bezel shows in strips no wider than this share of the view on each side. */
   fillInset: 0.03,
   /** Whatever the viewport, the fill is taken by here, so the flattening is always over before the landing. */
   fillBy: 0.43,
-  /** The glass's reflection and the key light's highlight on it go as the camera leaves the rest pose: close up they blow out the picture, and the reference shows none. */
+  /** The glass's reflection and the key light's highlight on it go as the camera leaves the rest pose: close up they blow out the picture. */
   glass: [0, 0.3],
   /** The 3D hands over to the canvas world: only the top layer fades, the canvas under it is opaque. */
   handover: [0.55, 0.66],
@@ -125,14 +125,12 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (x:
 }
 
 /**
- * The reference's dive: its zoom in log scale over its duration, both 0–1, measured frame by frame on
- * the reference video (the screen's width between the bezels, then the strips' width) and fitted
- * (rms 0.011). Fast from the start, then a long soft approach: 36 % of the way in a quarter of the
- * time, 97 % by the reference's cut, the bezel's last strips sliding out after it.
+ * The dive: its zoom in log scale over its duration, both 0–1, a fitted curve (rms 0.011). Fast from the start, then a long soft approach: 36 % of the way in a quarter of the
+ * time, 97 % by the cut, the bezel's last strips sliding out after it.
  */
 export const DIVE = cubicBezier(0.435, 0.27, 0.165, 1);
 
-/** PRESS START plays the enter segment at the reference's pace: the dive (to ENTER.camera[1]) in 770 ms, the rest in 200 ms. */
+/** PRESS START plays the enter segment at the dive's own pace: the dive (to ENTER.camera[1]) in 770 ms, the rest in 200 ms. */
 export const PLAY = { dive: 770, rest: 200 } as const;
 /** The enter progress a play from the top has reached after `ms`. */
 export function playP(ms: number): number {

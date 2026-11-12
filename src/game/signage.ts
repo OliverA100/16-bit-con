@@ -279,7 +279,7 @@ export function facadeWithoutSigns(facade: HTMLImageElement): HTMLCanvasElement 
 }
 
 /**
- * Depth for the facade, at load (our own NEW art): the glass at street level is a step darker, in the
+ * Depth for the facade, at load (new art, drawn for this page): the glass at street level is a step darker, in the
  * building's shade (Blue 300 → 500, 500 → 700: one solid band, never a dither; the grid and its glints kept),
  * and a soft shadow grounds its base; the entrance is Vega's own lobby front (the careers game's entrance
  * doors, closed, halved and two merged: javits-doors) over the flat doors, centred on the entrance column,
