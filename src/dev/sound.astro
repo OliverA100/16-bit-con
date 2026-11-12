@@ -27,6 +27,14 @@ const SOUNDS: [string, string, string, boolean][] = [
         <Button variant="ghost" data-play="static">Static</Button>
         <Button variant="ghost" data-play="power-off">Power off</Button>
         <Button variant="ghost" data-play="power-on">Power on</Button>
+      </div>
+      <div class="dev-sound__row">
+        <Button variant="ghost" data-play="flutter">Flutter</Button>
+        <Button variant="ghost" data-play="land">Land</Button>
+        <Button variant="ghost" data-play="pickup">Pickup</Button>
+        <Button variant="ghost" data-play="open">Flyer open</Button>
+        <Button variant="ghost" data-play="close">Flyer close</Button>
+        <Button variant="ghost" data-play="flyer">The whole flyer</Button>
         <span class="dev-sound__spacer"></span>
         <Button variant="ghost" data-stop>Stop all</Button>
       </div>
@@ -144,6 +152,17 @@ const SOUNDS: [string, string, string, boolean][] = [
         ['staticFade', 'Fade', 0.2, 6, 0.05, 's'],
       ],
     ],
+    [
+      'Flyer',
+      [
+        ['flutterLevel', 'Flutter level', 0, 0.6, 0.005, ''],
+        ['flutterHz', 'Flutter band', 400, 6000, 50, 'Hz'],
+        ['landLevel', 'Land level', 0, 0.6, 0.005, ''],
+        ['pickupLevel', 'Pickup level', 0, 0.6, 0.005, ''],
+        ['openLevel', 'Open level', 0, 0.6, 0.005, ''],
+        ['closeLevel', 'Close level', 0, 0.6, 0.005, ''],
+      ],
+    ],
   ];
 
   const status = document.querySelector<HTMLElement>('[data-status]')!;
@@ -196,6 +215,26 @@ const SOUNDS: [string, string, string, boolean][] = [
     else if (name === 'static') sound.static(true);
     else if (name === 'power-off') sound.power(-1);
     else if (name === 'power-on') sound.power(1);
+    else if (name === 'flutter') sound.flutter(1);
+    else if (name === 'land') sound.land();
+    else if (name === 'pickup') sound.pickup();
+    else if (name === 'open') sound.paperOpen(260);
+    else if (name === 'close') sound.paperClose(150);
+    else if (name === 'flyer') flyerRun();
+  };
+  /**
+   * The flyer as the game plays it: a flutter at each end of a swing as it falls (3.9 s, the swings every
+   * ~0.71 s, smaller near the ground), the landing, the walk over, the pickup, the flyer opening; then closed.
+   */
+  const flyerRun = () => {
+    const at = (ms: number, fn: () => void) => window.setTimeout(fn, ms);
+    const fall = 3900;
+    const half = fall / 2.75 / 2;
+    for (let t = half / 2; t < fall; t += half) at(t, () => sound.flutter(1 - 0.8 * (t / fall)));
+    at(fall + 40, () => sound.land());
+    at(fall + 1300, () => sound.pickup());
+    at(fall + 1560, () => sound.paperOpen(260));
+    at(fall + 3600, () => sound.paperClose(150));
   };
   for (const b of document.querySelectorAll<HTMLElement>('[data-play]')) b.addEventListener('click', go(() => play(b.dataset.play!)));
   document.querySelector('[data-stop]')!.addEventListener('click', () => sound.stopAll());

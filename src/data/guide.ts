@@ -3,18 +3,24 @@
  * to go, has to find a way to New York, runs there day and night, arrives at the Javits Center, finds it is
  * made of pixels — he is still inside the game, the real con is out there — and decides to break out.
  *
- * Each line is said once, as Sam passes `at` (timeline t; 0 is after the flyer is closed). Lines queue: each
+ * Each line is said as Sam passes `at` (timeline t; 0 is after the flyer is closed), and again if he runs back
+ * before it and passes it once more. Lines queue: each
  * one is typed out in full and stays up long enough to read, however fast the run goes (src/game/index.ts).
  * `key` lines survive a short jump past them (Skip lands just before the twist, which still plays in full).
- * The run's end waits for the last line (`end`) to be read before the breakout can start: Sam's decision.
+ * Lines keep up with Sam: one he has run well past while it waited is dropped, so a fast scroll never leaves
+ * the bubble behind him. The twist (`twist`) is never dropped and clears what is older as it comes; the run's
+ * end holds only until its last line (`end`) has been typed out, if it has not been already — a few seconds
+ * at most. The breakout's start ends the lines.
  */
 export interface SamLine {
   at: number;
   text: string;
+  /** The twist: never dropped, and nothing older waits in front of it. */
+  twist?: true;
+  /** Sam's decision to break out: the run's end holds until it has been typed out. */
+  end?: true;
   /** Part of the story: still said when the run jumps a little past it. */
   key?: true;
-  /** Sam's decision to break out: the breakout waits until it has been read. */
-  end?: true;
 }
 
 export const samLines: SamLine[] = [
@@ -27,12 +33,12 @@ export const samLines: SamLine[] = [
   { at: 0.3, text: 'There’s the city. Leaving the field.' },
   { at: 0.52, text: 'Glass box down the avenue? That’s the Javits Center.', key: true },
   { at: 0.65, text: 'Sun’s going down. I’m not stopping now.' },
-  { at: 0.77, text: 'Running all night. Worth it.' },
-  { at: 0.86, text: 'Morning. The Javits Center, finally. I made it.', key: true },
-  // the twist and the decision
-  { at: 0.92, text: 'Wait. Why is everything made of pixels?', key: true },
-  { at: 0.95, text: 'This isn’t the real Javits. I’m still inside the game.', key: true },
-  { at: 0.975, text: 'The real 16-Bit Con is out there. I’m breaking out. Help me.', key: true, end: true },
+  { at: 0.74, text: 'Running all night. Worth it.' },
+  // the arrival, the twist and the decision: short, and early enough that all three are typed out before the
+  // run's end even at full speed (≈ 5 s from 0.8), since nothing waits for them there
+  { at: 0.8, text: 'The Javits Center, just ahead. I made it.', key: true },
+  { at: 0.87, text: 'Wait. It’s all pixels. I’m still in the game.', key: true, twist: true },
+  { at: 0.93, text: 'The real 16-Bit Con is out there. Time to break out.', key: true, twist: true, end: true },
 ];
 
 /** Sam's line on the Register window once someone has registered (the booth's number kept with it). */

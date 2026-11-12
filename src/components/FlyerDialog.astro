@@ -30,10 +30,12 @@ import Wordmark from './Wordmark.astro';
 <style>
   /* ── The dialog: centred over the world, no backdrop. Below 64rem (where the HUD would meet it) its top
         sits under the HUD instead. ── */
+  /* Within the small viewport (100svh), as the Register dialog: never under Safari's toolbar when it comes back. */
   .flyer-dialog {
     width: min(23.5rem, 100% - 2 * var(--gutter));
     max-width: none;
-    max-height: calc(100dvh - 2 * var(--space-4));
+    inset-block-end: calc(100dvh - 100svh);
+    max-height: calc(100svh - 2 * var(--space-4));
     margin: auto;
     padding: var(--space-4) var(--space-3) var(--space-2);
     overflow: visible;
@@ -50,7 +52,7 @@ import Wordmark from './Wordmark.astro';
     .flyer-dialog {
       /* under the HUD's right column: Skip, then the Player 1 window (~5rem) */
       margin-top: calc(var(--nav-h) + var(--space-4) + var(--control-h) + var(--space-2) + 5rem + var(--space-2));
-      max-height: calc(100dvh - var(--nav-h) - var(--space-4) - var(--control-h) - var(--space-2) - 5rem - var(--space-4));
+      max-height: calc(100svh - var(--nav-h) - var(--space-4) - var(--control-h) - var(--space-2) - 5rem - var(--space-4));
     }
   }
 

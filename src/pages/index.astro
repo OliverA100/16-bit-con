@@ -156,18 +156,37 @@ import SectionHeader from '../components/SectionHeader.astro';
   }
 
   /* ── Register over the game: the Register window itself, moved in; the page behind holds still ── */
+  /* A scroller from the nav's foot to the bottom of the large viewport (100lvh), the Window in it like the page's
+     own content: it runs on under Safari's toolbar the way the game does, never cut at its edge, and scrolls up
+     out of sight at the nav's foot — as if under the nav, which is the Window's width (Safari draws nothing fixed
+     above its viewport, so it could not go under the clock). Centred there when it fits; the bottom padding lets
+     its end scroll clear of the toolbar even when the toolbar is shown (the small viewport, 100svh). A click
+     beside the Window (on the scroller) closes it, as before. */
   .register-dialog {
-    width: min(36rem, 100% - 2 * var(--gutter));
+    inset: var(--nav-h) 0 auto;
+    width: 100%;
     max-width: none;
-    max-height: calc(100dvh - 2 * var(--space-4));
-    margin: auto;
+    height: calc(100lvh - var(--nav-h));
+    max-height: none;
+    margin: 0;
+    padding: var(--space-2) var(--gutter) calc(var(--space-4) + 100lvh - 100svh);
     overflow: auto;
     overscroll-behavior: contain;
     background: none;
     border: 0;
     color: var(--text);
-    /* room for the window's hard shadow inside the scroll box */
-    padding: 0 var(--space-1) var(--space-1) 0;
+  }
+
+  .register-dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* centred while it fits; once it does not, its top under the nav and the rest below (auto margins go to 0) */
+  .register-dialog :global(#register) {
+    flex: none;
+    width: min(36rem, 100%);
+    margin: auto;
   }
 
   /* No backdrop: the game shows through untouched. It is still a modal (focus trapped, the page inert). */

@@ -1,5 +1,5 @@
 /**
- * The game's sound, Web Audio only. Enter, exit and static are synthesised here; the cracks and the
+ * The game's sound, Web Audio only. Enter, exit, static and the flyer's paper sounds are synthesised here; the cracks and the
  * shatter are the user's files in public/sounds/, never re-encoded (two are levelled and faded here, FILE_TRIM).
  *
  * Nothing exists before unlock(), which PRESS START's click calls inside its gesture: until then every
@@ -58,6 +58,14 @@ export const params = {
   crackleLevel: 0.6,
   staticHold: 1,
   staticFade: 2.5,
+  // the flyer: paper catching air as it swings, a tap as it lands, a crinkle as Sam picks it up, unfolding and folding
+  flutterLevel: 0.1,
+  /** The flutter's band, Hz: where the paper's air sits. */
+  flutterHz: 1800,
+  landLevel: 0.14,
+  pickupLevel: 0.12,
+  openLevel: 0.11,
+  closeLevel: 0.09,
 };
 export type SoundParams = typeof params;
 export const defaults: Readonly<SoundParams> = { ...params };
@@ -751,6 +759,109 @@ function powerOff(v: Voice, at: number): number {
   const buzzCut = (u: number) => expo(p.buzzLo, p.buzzHi, Math.min(1, swell(u * T)));
   rush(v, at, T, 0, 0, band, swell, buzzCut, p.exitWhooshLevel);
   return at + T;
+}
+
+// ── The flyer: paper ─────────────────────────────────────────────────────
+
+/**
+ * Noise through a band-pass whose centre moves from `hz0` to `hz1`, under an envelope `env(u)` (0–1) over
+ * `len` s, at `lvl`: every paper sound is one or a few of these, soft and short.
+ */
+function paperBand(v: Voice, at: number, len: number, hz0: number, hz1: number, q: number, lvl: number, env: (u: number) => number): void {
+  const c = ctx!;
+  const bp = v.node(c.createBiquadFilter());
+  bp.type = 'bandpass';
+  bp.Q.value = q;
+  bp.frequency.value = hz0;
+  curve(bp.frequency, at, len, (u) => expo(hz0, hz1, u));
+  const g = v.node(c.createGain());
+  g.gain.value = 0;
+  curve(g.gain, at, len, (u) => lvl * env(u));
+  noiseSource(v, at, at + len + 0.01).connect(bp).connect(g).connect(v.out);
+}
+
+/** A soft rise and a longer fall, ending at exactly 0: `peak` is where it tops out (share of the length). */
+const puff = (peak: number) => (u: number) => (u < peak ? Math.sin(((u / peak) * Math.PI) / 2) : Math.pow(1 - (u - peak) / (1 - peak), 2));
+
+/**
+ * A crinkle: `n` tiny bright grains (2–5 ms of noise each, high-passed) scattered over `len` s, each its
+ * own size, made once per call into a short buffer.
+ */
+function crinkle(v: Voice, at: number, len: number, n: number, lvl: number): void {
+  const c = ctx!;
+  const sr = c.sampleRate;
+  const b = c.createBuffer(1, Math.ceil(sr * len) + 1, sr);
+  const d = b.getChannelData(0);
+  for (let k = 0; k < n; k++) {
+    // more of them early: the paper gives, then settles
+    const start = Math.floor(Math.pow(Math.random(), 1.4) * (d.length - sr * 0.006));
+    const glen = Math.floor(sr * (0.002 + Math.random() * 0.003));
+    const amp = 0.35 + Math.random() * 0.65;
+    for (let i = 0; i < glen; i++) d[start + i] = d[start + i]! + amp * (Math.random() * 2 - 1) * Math.exp((-4 * i) / glen);
+  }
+  const hp = v.node(c.createBiquadFilter());
+  hp.type = 'highpass';
+  hp.frequency.value = 1800;
+  hp.Q.value = 0.7;
+  const g = v.node(c.createGain());
+  g.gain.value = lvl;
+  const s = v.node(c.createBufferSource());
+  s.buffer = b;
+  s.connect(hp).connect(g).connect(v.out);
+  v.source(s, at, at + len + 0.01);
+}
+
+/** The paper catching air at the end of a swing: a soft "ff", `size` 1 high up, smaller near the ground. */
+export function flutter(size = 1): void {
+  if (!ready('flutter')) return;
+  const at = ctx!.currentTime + 0.005;
+  const v = new Voice('flutter');
+  const lvl = params.flutterLevel * (0.4 + 0.6 * size);
+  const hz = params.flutterHz * (0.9 + Math.random() * 0.2);
+  paperBand(v, at, 0.16, hz * 0.7, hz * 1.25, 1.1, lvl, puff(0.3));
+  log(`flutter ${size.toFixed(2)}`);
+}
+
+/** The flyer settling on the ground: a small dry tap, then the air it pushed out. */
+export function land(): void {
+  if (!ready('land')) return;
+  const at = ctx!.currentTime + 0.005;
+  const v = new Voice('land');
+  paperBand(v, at, 0.03, 1400, 900, 1.6, params.landLevel, (u) => (u < 0.08 ? u / 0.08 : Math.pow(1 - u, 3)));
+  paperBand(v, at + 0.01, 0.12, 2600, 1600, 0.9, params.landLevel * 0.35, puff(0.2));
+  log('land');
+}
+
+/** Sam picks the flyer up: a short crinkle of paper. */
+export function pickup(): void {
+  if (!ready('pickup')) return;
+  const at = ctx!.currentTime + 0.005;
+  const v = new Voice('pickup');
+  crinkle(v, at, 0.2, 9, params.pickupLevel);
+  paperBand(v, at, 0.18, 1500, 2600, 0.9, params.pickupLevel * 0.4, puff(0.4));
+  log('pickup');
+}
+
+/** The flyer opening out of Sam's hands: unfolding (a rising rustle), flat with a little snap. `ms`: the open's length. */
+export function paperOpen(ms = 200): void {
+  if (!ready('paper open')) return;
+  const at = ctx!.currentTime + 0.005;
+  const len = Math.max(0.08, ms / 1000);
+  const v = new Voice('paper open');
+  paperBand(v, at, len + 0.06, 900, 3200, 0.8, params.openLevel, puff(0.7));
+  crinkle(v, at + len * 0.75, 0.08, 4, params.openLevel * 1.4);
+  log(`paper open ${Math.round(len * 1000)}ms`);
+}
+
+/** The flyer folding away: a shorter, falling rustle and a soft tap as it closes. `ms`: the close's length. */
+export function paperClose(ms = 150): void {
+  if (!ready('paper close')) return;
+  const at = ctx!.currentTime + 0.005;
+  const len = Math.max(0.06, ms / 1000);
+  const v = new Voice('paper close');
+  paperBand(v, at, len, 3000, 1000, 0.8, params.closeLevel, puff(0.35));
+  paperBand(v, at + len * 0.85, 0.03, 1300, 900, 1.6, params.closeLevel * 0.9, (u) => (u < 0.1 ? u / 0.1 : Math.pow(1 - u, 3)));
+  log(`paper close ${Math.round(len * 1000)}ms`);
 }
 
 /** Dev only: the static's envelope read back as it runs, until it is 0 and its nodes have ended. */

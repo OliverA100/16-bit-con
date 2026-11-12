@@ -16,24 +16,41 @@ import Wordmark from './Wordmark.astro';
 </div>
 
 <script>
-  // Arriving at /#register from another page (the 404's nav): the form centred on screen, as the click does
-  // here, once the page above it has its height. The browser's own scroll to the hash heads for the form's top
-  // edge; this one takes over from it in the page's own scroll-behavior (a glide, or at once with reduced
-  // motion), so the page glides on to the centre instead of jumping there.
+  /**
+   * The Register window brought into view in the room under the fixed nav: centred there when it fits, else
+   * (a phone, where the form is taller than the screen) its top just under the nav — never under it. In the
+   * page's own scroll-behavior: a glide, or at once with reduced motion. The room is the small viewport (Safari's
+   * toolbar shown), so its bottom never lands under the toolbar either.
+   */
+  const landOnRegister = (target: HTMLElement) => {
+    const nav = document.querySelector('.nav-slot')?.getBoundingClientRect().bottom ?? 0;
+    const gap = 16;
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;top:0;height:100svh;visibility:hidden;pointer-events:none';
+    document.body.append(probe);
+    const room = Math.min(window.innerHeight, probe.getBoundingClientRect().height || window.innerHeight);
+    probe.remove();
+    const r = target.getBoundingClientRect();
+    const free = room - nav - 2 * gap;
+    const at = r.height <= free ? nav + gap + (free - r.height) / 2 : nav + gap;
+    window.scrollTo({ top: window.scrollY + r.top - at });
+    target.focus({ preventScroll: true });
+  };
+
+  // Arriving at /#register from another page (the 404's nav): the form in view as the click brings it here,
+  // once the page above it has its height. The browser's own scroll to the hash heads for the form's top
+  // edge; this one takes over from it, so the page glides on instead of jumping.
   if (location.hash === '#register') {
     const centre = () => {
       const target = document.getElementById('register');
-      if (!target) return;
-      target.scrollIntoView({ block: 'center' });
-      target.focus({ preventScroll: true });
+      if (target) landOnRegister(target);
     };
     if (document.readyState === 'complete') centre();
     else window.addEventListener('load', centre, { once: true });
   }
 
-  // "Register now" centres the Register window on screen (smoothly, or at once with reduced motion: the
-  // page's own scroll-behavior) and moves focus there. In the game it opens the form in a dialog over it
-  // instead (src/game/index.ts).
+  // "Register now" brings the Register window into view under the nav (landOnRegister) and moves focus there.
+  // In the game it opens the form in a dialog over it instead (src/game/index.ts).
   for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-register-link]')) {
     link.addEventListener('click', (e) => {
       const root = document.documentElement;
@@ -46,8 +63,7 @@ import Wordmark from './Wordmark.astro';
       const target = document.getElementById('register');
       if (!target) return;
       e.preventDefault();
-      target.scrollIntoView({ block: 'center' });
-      target.focus({ preventScroll: true });
+      landOnRegister(target);
     });
   }
 </script>
