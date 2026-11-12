@@ -319,7 +319,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     return Math.max(h, window.innerHeight);
   };
   let skirtH = 0;
-  const measureSkirt = () => (isTouch() ? Math.max(0, Math.ceil(largestH() - heldH)) : 0);
+  /** ...and this much further, CSS px: the rows that show under Safari's pill, below the largest viewport. */
+  const SKIRT_BELOW = 96;
+  const measureSkirt = () => (isTouch() ? Math.max(0, Math.ceil(largestH() - heldH)) + SKIRT_BELOW : 0);
   skirtH = measureSkirt();
   let vp = worldBuffer(viewW(), viewH());
   let skirtRows = 0;
@@ -731,8 +733,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   /** The page's colour while the run fills a touch screen (the sky's, behind Safari's clock), or none. */
   let lastTint = '';
   /**
-   * The floor strip: a thin pinned box on the screen's bottom edge, which Safari 26 extends under its bottom bar
-   * as a solid colour. On the body, not in the section: pinned, the section is the box its fixed children are placed
+   * The floor strip: a thin pinned box on the screen's bottom edge. While Safari 26's toolbar is out whole it
+   * fills behind it with one flat colour, this box's (else the page's, the sky's here); with the toolbar tucked
+   * away the strip is hidden, and the scene's own pixels show under the pill (the strips below). On the body, not in the section: pinned, the section is the box its fixed children are placed
    * in (measured on iOS: the strip sat on the section's bottom, not the screen's). Shown only through the run on a touch screen.
    */
   const floorStrip = document.createElement('div');
@@ -745,22 +748,43 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let lastFloor = '';
   let floorReadAt = -Infinity;
   const FLOOR_READ_MS = 400;
-  /** The ground fill's colour at the buffer's bottom row: the commonest of nine samples across it (not a speck). */
+  /** The ground's colour for the strip: the mean of the buffer's bottom row, which drifts as the world passes and never flips between two of a textured ground's tones. */
   const floorColour = () => {
-    const y = buffer.height - 1;
-    const row = bctx.getImageData(0, y, buffer.width, 1).data;
-    const seen = new Map<number, number>();
-    let best = 0;
-    let bestN = 0;
-    for (let i = 1; i <= 9; i++) {
-      const p = Math.floor((i * buffer.width) / 10) * 4;
-      const c = (row[p]! << 16) | (row[p + 1]! << 8) | row[p + 2]!;
-      const n = (seen.get(c) ?? 0) + 1;
-      seen.set(c, n);
-      if (n > bestN) [best, bestN] = [c, n];
+    const row = bctx.getImageData(0, buffer.height - 1, buffer.width, 1).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let p = 0; p < row.length; p += 4) {
+      r += row[p]!;
+      g += row[p + 1]!;
+      b += row[p + 2]!;
     }
-    return `#${best.toString(16).padStart(6, '0')}`;
+    const n = row.length / 4;
+    return `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})`;
   };
+  /**
+   * The scene under Safari's bars. Safari draws nothing pinned outside its viewport, but it does draw the page: so
+   * two strips of the page itself, kept just past the viewport's bottom and top edges by `position: sticky` (placed
+   * by the browser as it scrolls, never a frame late), show the canvas' own pixels, copied in the frame that draws
+   * them. Below: the rows under the bottom edge, pixel for pixel. Above, behind the clock: the top row, one device
+   * row stretched up, so a building carries on up column for column (the page's background bands, further down,
+   * stay under it as the fallback).
+   */
+  const ABOVE = 120;
+  const strip = (css: string) => {
+    const c = document.createElement('canvas');
+    c.setAttribute('aria-hidden', 'true');
+    c.hidden = true;
+    c.style.cssText = `position:sticky;z-index:-1;display:block;width:100%;pointer-events:none;image-rendering:pixelated;${css}`;
+    return c;
+  };
+  const below = strip(`bottom:-${SKIRT_BELOW}px;height:${SKIRT_BELOW}px;margin-top:-${SKIRT_BELOW}px`);
+  const above = strip(`top:-${ABOVE}px;height:${ABOVE}px;margin-bottom:-${ABOVE}px`);
+  above.height = 1;
+  document.body.append(below);
+  document.body.prepend(above);
+  const belowCtx = below.getContext('2d')!;
+  const aboveCtx = above.getContext('2d')!;
   /**
    * The skyline: the page's background through the run on a touch screen, the canvas' top row as vertical bands
    * across the page. Behind Safari's clock it shows the page, which scrolls, so no pixel of the pinned world can be
@@ -2052,10 +2076,32 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         section.classList.toggle('world--bleed', bleed);
         root.style.backgroundColor = tint;
         root.classList.toggle('is-bleeding', bleed);
-        floorStrip.hidden = !tint;
+        below.hidden = above.hidden = !tint;
+        if (!tint) floorStrip.hidden = true;
         if (!tint) {
           root.style.backgroundImage = '';
           lastSkyline = '';
+        }
+      }
+      if (tint) {
+        // Safari's toolbar is out while the window is shorter than the tallest it has been: then it fills behind
+        // the toolbar with the floor strip's colour; tucked away, the strip must go or its colour covers the page
+        const barOut = window.innerHeight < heldH + skirtH - SKIRT_BELOW - 1;
+        if (floorStrip.hidden === barOut) floorStrip.hidden = !barOut;
+      }
+      if (tint && showWorld) {
+        const dpr = window.devicePixelRatio || 1;
+        const w = o.canvas.width;
+        const h = Math.round(SKIRT_BELOW * dpr);
+        if (below.width !== w || below.height !== h) {
+          below.width = w;
+          below.height = h;
+        }
+        belowCtx.drawImage(o.canvas, 0, Math.min(o.canvas.height - h, Math.round(window.innerHeight * dpr)), w, h, 0, 0, w, h);
+        // (not while the flyer crosses the top rows: its colours would stripe up behind the clock)
+        if (!(opening?.phase === 'fall' && now - opening.t0 < 900)) {
+          if (above.width !== w) above.width = w;
+          aboveCtx.drawImage(o.canvas, 0, 0, w, 1, 0, 0, w, 1);
         }
       }
       if (tint && showWorld && now - floorReadAt > FLOOR_READ_MS) {

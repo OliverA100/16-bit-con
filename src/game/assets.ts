@@ -39,7 +39,10 @@ export interface Level1Assets {
    * lower edge and the rock.
    */
   field: Drawable;
-  /** The rock's last rows, to carry the field on down below the band (the monitor's screen frame). */
+  /**
+   * The rock below the band (the monitor's screen frame, and a phone's screen under Safari's bar): its last row,
+   * every column running straight on down. Tiling its rows instead showed as a repeat once this much was on screen.
+   */
   fieldFill: Drawable;
   /** Small grass tufts cut from the same strip: the first slabs of the sidewalk after the field. */
   tufts: Drawable[];
@@ -104,8 +107,6 @@ export const FIELD = {
   /** The band below F: the grass's top rows, then from `lowerFrom` its lower edge and the rock, 48 in all. */
   grassRows: 18,
   lowerFrom: 58,
-  /** The rock carrying on below the band. */
-  fillFrom: 75,
 } as const;
 /** Small tufts on its top line, native (x, y, w, h): cut for the sidewalk's first slabs. */
 const GRASS_TUFTS: [number, number, number, number][] = [
@@ -164,6 +165,13 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
   const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, grassRaw] =
     imgs as [HTMLImageElement, ...HTMLImageElement[]];
   const grass = nativeGrid(grassRaw!, GRASS_SCALE);
+  // the rock's last row, stretched over a tile's worth of rows: every row the same, so the tiling never shows
+  const fieldFill = document.createElement('canvas');
+  fieldFill.width = grass.width;
+  fieldFill.height = 16;
+  const fillCtx = fieldFill.getContext('2d')!;
+  fillCtx.imageSmoothingEnabled = false;
+  fillCtx.drawImage(grass, 0, grass.height - 1, grass.width, 1, 0, 0, grass.width, fieldFill.height);
   const hillsPatched = patchTileSeam(hills!);
   const small = [cloudF!, cloudG!, cloudH!, cloudFaint!];
   const medium = [cloudA!, cloudB!, cloudD!];
@@ -182,7 +190,7 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     treeField: cropImage(tree!, 0, 0, tree!.width, TREE_PLANTER_TOP),
     tree: tree!,
     field: fieldGround(grass),
-    fieldFill: cropImage(grass, 0, FIELD.fillFrom, grass.width, grass.height - FIELD.fillFrom),
+    fieldFill,
     tufts: GRASS_TUFTS.map(([x, y, w, h]) => cropImage(grass, x, y, w, h)),
   };
 }
