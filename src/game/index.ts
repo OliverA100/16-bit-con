@@ -518,8 +518,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     });
   timeline.jumpTo(timeline.tMin);
 
+  // the frame loop's state (the loop itself is at the end): running, and whether it exists yet to be woken
+  let looping = false;
+  let loopReady = false;
   const io = new IntersectionObserver((entries) => {
     input.active = entries.some((e) => e.isIntersecting);
+    wake();
   });
   io.observe(section);
 
@@ -1063,6 +1067,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const RETURN_LINE = 'Come say hi at Booth\u00A0630. I’ll save you a spot.'; // the booth's number kept with it
   /** Sam types a new line on the Register window (the full line for screen readers too). */
   const sayOnPerch = (line: string) => {
+    wake(); // his line types out on the Register window, with the opening perhaps off screen
     if (!landingTyped) return;
     landingLine = line;
     const spoken = landingTyped.parentElement?.querySelector('.sr-only');
@@ -1192,6 +1197,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
    * pinned at the top of the view, so nothing moves) and the camera dives into the screen there.
    */
   const enterPlay = () => {
+    wake();
     if (mode !== 'default' || trigger) return;
     const y0 = Math.max(0, Math.round(window.scrollY));
     endFinale();
@@ -2179,7 +2185,22 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       }
       if (n >= landingLine.length) landingSince = -1;
     }
-    requestAnimationFrame(frame);
+    if (idle()) looping = false;
+    else requestAnimationFrame(frame);
   };
-  requestAnimationFrame(frame);
+  /**
+   * The loop rests when nothing it draws can be seen or can change: the tab hidden, or, outside the game, the
+   * opening scrolled off screen with no landing in flight and no line still typing. In the game it never rests
+   * (the section is pinned on screen). It wakes when the opening comes back on screen, when the tab does, when
+   * the game starts and when Sam has a line to say on the Register window.
+   */
+  const idle = () => document.hidden || (mode !== 'play' && !zoom && !cue && !landing && landingSince < 0 && !input.active);
+  function wake(): void {
+    if (looping || !loopReady) return;
+    looping = true;
+    requestAnimationFrame(frame);
+  }
+  document.addEventListener('visibilitychange', wake);
+  loopReady = true;
+  wake();
 }
