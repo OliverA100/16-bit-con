@@ -7,6 +7,7 @@ import { loadImage, makeStrip, type Drawable, type Strip } from '../game/sprites
 import { patchTileSeam, remap, SAM_BRAND_MAP } from '../game/palette';
 import { sprites } from '../data/sprites.manifest';
 import { wrap } from '../lib/math';
+import { pingpong, snap } from '../lib/drift';
 
 export type { Drawable, Strip };
 
@@ -205,7 +206,7 @@ export function stateKey(...parts: number[]): number {
  */
 export function tileX(ctx: CanvasRenderingContext2D, src: Drawable, sy: number, sh: number, dy: number, w: number, offset = 0, k = 1): void {
   const period = src.width;
-  let x = -Math.round(wrap(offset, period) * k) / k;
+  let x = -snap(wrap(offset, period), k);
   const y = Math.round(dy);
   while (x < w) {
     ctx.drawImage(src, 0, sy, period, sh, x, y, period, sh);
@@ -255,12 +256,6 @@ export interface Cloud {
  */
 export const skyTop = (v: View) => (v.narrow ? v.clear.y : 0);
 
-/** 0 → len → 0 → …: a position that drifts to an end and back, never wrapping. */
-const pingpong = (x: number, len: number) => {
-  if (len <= 0) return 0;
-  const m = wrap(x, 2 * len);
-  return m <= len ? m : 2 * len - m;
-};
 
 /**
  * Clouds drifting slowly to and fro in the sky beside the text (right of it on wide folders, under it on
@@ -272,7 +267,7 @@ const CLOUD_PACE = 2;
 const cloudX = (c: Cloud, t: number, v: View) => {
   const x0 = v.narrow ? 0 : v.clear.x;
   const room = v.w - x0 - c.src.width;
-  return Math.round((x0 + pingpong(c.x * room + c.speed * CLOUD_PACE * t, room)) * v.k) / v.k;
+  return snap(x0 + pingpong(c.x * room + c.speed * CLOUD_PACE * t, room), v.k);
 };
 
 export function drawClouds(ctx: CanvasRenderingContext2D, clouds: Cloud[], t: number, v: View): void {

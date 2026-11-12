@@ -19,6 +19,7 @@ import { Plaza, PLAZA, type PlazaLook } from './plaza';
 import { horizonAt } from './stages';
 import { PLAZA_TIME } from '../data/layers';
 import { clamp01, wrap } from '../lib/math';
+import { around as aroundSpan, snap as snapTo } from '../lib/drift';
 
 /** A rectangle in viewport art px. */
 export interface Rect {
@@ -533,7 +534,7 @@ export class Level1 {
     const { t, camLeft, F, now, range: r, span } = f;
     const a = this.a;
     const tint = (img: Drawable) => this.tints.get(img)!.at(t);
-    const snap = glide ? (v: number) => Math.round(v * k) / k : Math.round;
+    const snap = glide ? (v: number) => snapTo(v, k) : Math.round;
     sctx.save();
     sctx.scale(k, k);
     sctx.imageSmoothingEnabled = false;
@@ -552,7 +553,7 @@ export class Level1 {
     const drift = (s: Seed, p: number) => s.u + s.drift * (now / 1000) - p * camLeft;
     // The clouds wrap over the screen frame's span in every draw, so the viewport and the monitor's
     // screen show each one in the same place.
-    const around = (u: number, w: number, period = span.x1 - span.x0 + w) => span.x0 + wrap(u - span.x0, period) - w;
+    const around = (u: number, w: number, period = span.x1 - span.x0 + w) => aroundSpan(u, span.x0, w, period);
     const cloud = (img: Drawable, x: number, y: number) => {
       if (x < r.x1 && x + img.width > r.x0) sctx.drawImage(img, snap(x), y);
     };

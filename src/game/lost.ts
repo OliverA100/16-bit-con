@@ -20,6 +20,7 @@ import { samK } from './footer';
 import { cropImage, patchTileSeam } from './palette';
 import { FOOT_SINK, IDLE_FPS, SAM_CELL } from './sam';
 import { reducedMotion } from '../lib/reduced-motion';
+import { around, snap } from '../lib/drift';
 
 /** Art rows of the cloud bank over the window's bottom (its first cloud row there), as in the mock. */
 const BANK_SHOW = 105;
@@ -368,9 +369,8 @@ export async function startLost(): Promise<void> {
   const draw = () => {
     const L = layout;
     if (!L) return;
-    const snap = (v: number) => Math.round(v * L.k) / L.k;
     const bankOff = BANK_SPEED * t;
-    const xs = L.clouds.map((c) => snap(wrap(c.x * L.w + c.src.width + c.speed * t, L.w + c.src.width) - c.src.width));
+    const xs = L.clouds.map((c) => snap(around(c.x * L.w + c.src.width + c.speed * t, 0, c.src.width, L.w + c.src.width), L.k));
     // Sam's ride, in device px: its left edge and its row with the bob, both whole device px
     const sc = samCloud(L, t);
     const leg = sc ? L.legs[sc.i]! : null;
@@ -379,7 +379,7 @@ export async function startLost(): Promise<void> {
     const smoke = !!sc && smokes(sc.i);
     const sheet = smoke ? smoking : idle;
     const frame = frameAt(t, smoke ? SMOKE_FPS : IDLE_FPS, sheet.frames);
-    const key = stateKey(L.w, L.h, L.k, L.bankTop, frame, snap(bankOff) * L.k, sc ? sc.i : -1, sx, sy, ...xs.map((x) => x * L.k), ...L.clouds.map((c) => c.row));
+    const key = stateKey(L.w, L.h, L.k, L.bankTop, frame, snap(bankOff, L.k) * L.k, sc ? sc.i : -1, sx, sy, ...xs.map((x) => x * L.k), ...L.clouds.map((c) => c.row));
     if (key === lastKey) return;
     lastKey = key;
     const ctx = canvas.getContext('2d')!;

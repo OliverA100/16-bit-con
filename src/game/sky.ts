@@ -19,6 +19,7 @@ import { sprites } from '../data/sprites.manifest';
 import { loadImage } from './sprites';
 import { queryFooterScene, samK } from './footer';
 import { mulberry32 } from '../lib/math';
+import { around, pingpong, snap } from '../lib/drift';
 
 /**
  * The clouds: how often each turns up (big near ones most, small far ones fewer), the wind's pace for each (art px a second: near
@@ -71,12 +72,6 @@ interface Cloud {
   shown: number;
 }
 
-/** 0 → len → 0 → …: to and fro, never wrapping. */
-const pingpong = (x: number, len: number) => {
-  if (len <= 0) return 0;
-  const m = ((x % (2 * len)) + 2 * len) % (2 * len);
-  return m <= len ? m : 2 * len - m;
-};
 
 
 export async function startSky(paused: () => boolean): Promise<void> {
@@ -157,7 +152,7 @@ export async function startSky(paused: () => boolean): Promise<void> {
       if (placed.some((p) => Math.abs(p.x + p.w / 2 - (x + w / 2)) < (p.w + w) / 2 + GAP_X && Math.abs(p.y + p.h / 2 - (y + h / 2)) < (p.h + h) / 2 + GAP_Y)) continue;
       placed.push({ x, y, w, h });
       const c = make(pick, a);
-      clouds.push({ ...c, x: Math.round(x * dpr) / dpr, y: Math.round(y * dpr) / dpr, depth: spec.depth, v: spec.speed * a * paceShare(pace()), start: rnd() * SPREAD_S, placed: '', shown: -1 });
+      clouds.push({ ...c, x: snap(x, dpr), y: snap(y, dpr), depth: spec.depth, v: spec.speed * a * paceShare(pace()), start: rnd() * SPREAD_S, placed: '', shown: -1 });
     }
 
     // Beside the monitor: each at its height in the opening, to and fro in the room left or right of the opening's
@@ -178,7 +173,7 @@ export async function startSky(paused: () => boolean): Promise<void> {
         const img = images[sd.pick]!;
         const w = img.width * a;
         const h = img.height * a;
-        const y = Math.round((copy.top + sd.at * span - h / 2) * dpr) / dpr;
+        const y = snap(copy.top + sd.at * span - h / 2, dpr);
         const z = zoneAt(y, y + h);
         const lo = sd.side < 0 ? -0.35 * w : (z?.r ?? vw / 2);
         const hi = sd.side < 0 ? (z?.l ?? vw / 2) - w : vw - 0.65 * w;
@@ -198,7 +193,7 @@ export async function startSky(paused: () => boolean): Promise<void> {
     const vh = window.innerHeight;
     const t = (now - t0) / 1000;
     for (const c of clouds) {
-      const y = Math.round((c.y - (c.depth - 1) * (s - (c.y + c.h / 2 - vh / 2))) * dpr) / dpr;
+      const y = snap(c.y - (c.depth - 1) * (s - (c.y + c.h / 2 - vh / 2)), dpr);
       const near = y + c.h > s - 200 && y < s + vh + 200;
       if (!near && !all) continue;
       const u = Math.min(1, Math.max(0, (t - c.start) / GLIDE_S));
@@ -211,12 +206,12 @@ export async function startSky(paused: () => boolean): Promise<void> {
         x = lo + pingpong(c.x - lo + drift, hi - lo);
       } else {
         const period = vw + c.w + OFF * vw;
-        x = ((((c.x + c.w + drift) % period) + period) % period) - c.w;
+        x = around(c.x + c.w + drift, 0, c.w, period);
       }
-      const place = `${Math.round(x * dpr) / dpr},${y}`;
+      const place = `${snap(x, dpr)},${y}`;
       if (place !== c.placed) {
         c.placed = place;
-        c.el.style.transform = `translate(${Math.round(x * dpr) / dpr}px, ${y}px)`;
+        c.el.style.transform = `translate(${snap(x, dpr)}px, ${y}px)`;
       }
       // fading in on the 16-bit steps (eighths), then fully there
       const shown = Math.round(ease * 8) / 8;
