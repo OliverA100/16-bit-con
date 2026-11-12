@@ -47,6 +47,11 @@ export const params = {
   shatterBody: 0,
   /** The shatter file's pitch, semitones (lower is also a touch longer, as a slower playback is). */
   shatterPitch: -2,
+  // the monitor's power button: enter's and exit's own sound, shorter
+  /** The power sounds' level next to enter and exit (1: the same). */
+  powerLevel: 1,
+  /** How long they ring on after the picture has opened or gone, s. */
+  powerTail: 0.25,
   // static
   staticLevel: 0.22,
   humLevel: 0.25,
@@ -680,6 +685,73 @@ function staticSynth(): Voice {
   return v;
 }
 export { playStatic as static };
+
+// ── The power button ──────────────────────────────────────────────────────
+
+/**
+ * The picture's own timing (src/monitor/hero.ts POWER), s: on, the line grows (0.17), brightens (0.04)
+ * and the picture opens from it (0.17); off runs that backwards — the picture squashes into the line,
+ * the line dims, then shrinks to a point (0.38 in all).
+ */
+const POWER_T = { grow: 0.17, brighten: 0.04, open: 0.17 } as const;
+const POWER_ALL = POWER_T.grow + POWER_T.brighten + POWER_T.open;
+let powerVoice: Voice | null = null;
+
+/**
+ * The monitor switched on (dir 1) or off (−1) by its power button — only ever on a click, never the
+ * power-on at load. A new press ends the last one's sound; switching off also ends the broken tube's
+ * static, as its picture squashes into the line.
+ */
+export function power(dir: 1 | -1): Voice | null {
+  const what = dir > 0 ? 'power on' : 'power off';
+  if (!ready(what)) return null;
+  const c = ctx!;
+  powerVoice?.stop();
+  if (dir < 0) for (const v of voices) if (v.name === 'static') v.stop(POWER_T.open);
+  const v = new Voice(what);
+  powerVoice = v;
+  v.out.gain.value = params.powerLevel;
+  const at = c.currentTime + 0.005;
+  const end = dir > 0 ? powerOn(v, at) : powerOff(v, at);
+  log(`${what}, ${Math.round((end - at) * 1000)}ms`);
+  return v;
+}
+
+/**
+ * On: a short enter — the click, the quiet thump and the whoosh with the buzz under it, rising to its
+ * peak as the picture has opened (its band climbing with it) and falling away over powerTail. Returns the end.
+ */
+function powerOn(v: Voice, at: number): number {
+  const p = params;
+  const g = POWER_ALL;
+  const T = g + Math.max(0, p.powerTail);
+  click(v, at);
+  thump(v, at, p.thumpHz, p.thumpEnd, p.thumpTime, p.thumpLevel);
+  // as enter: up to the peak, then a long fall that eases out (a raised cosine)
+  const swell = (t: number) => (t <= g ? Math.pow(t / g, 2) : 0.5 * (1 + Math.cos(Math.PI * Math.min(1, (t - g) / Math.max(1e-3, T - g)))));
+  rush(v, at, T, g, 0, (u) => expo(p.whooshLo, p.whooshHi, (u * T) / g), swell);
+  return at + T;
+}
+
+/**
+ * Off: a short exit — no click or thump, the whoosh and the buzz following the picture as it goes: at
+ * their loudest and brightest as it starts to squash (it moves fastest then), dulling and dying as the
+ * line shrinks to a point, then ringing on over powerTail. Returns the end.
+ */
+function powerOff(v: Voice, at: number): number {
+  const p = params;
+  const move = POWER_ALL;
+  const T = move + Math.max(0, p.powerTail);
+  const peak = 0.03;
+  // in fast, then down with the picture (most of the way by the line), then the tail's raised cosine
+  const level = (t: number) => (t < peak ? t / peak : Math.pow(1 - ((t - peak) / (move - peak)) * 0.85, 2));
+  const endLevel = level(move);
+  const swell = (t: number) => (t <= move ? level(t) : endLevel * 0.5 * (1 + Math.cos(Math.PI * Math.min(1, (t - move) / Math.max(1e-3, T - move)))));
+  const band = (u: number) => expo(p.whooshLo, p.whooshHi, 1 - Math.min(1, (u * T) / move));
+  const buzzCut = (u: number) => expo(p.buzzLo, p.buzzHi, Math.min(1, swell(u * T)));
+  rush(v, at, T, 0, 0, band, swell, buzzCut, p.exitWhooshLevel);
+  return at + T;
+}
 
 /** Dev only: the static's envelope read back as it runs, until it is 0 and its nodes have ended. */
 function watchGain(env: GainNode, t0: number, end: number, v: Voice): void {

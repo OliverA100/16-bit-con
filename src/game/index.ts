@@ -875,10 +875,18 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       hero3d.powerOn(now);
     }
     powerButton.setAttribute('aria-pressed', String(!powerSwitchedOff));
+    // the visitor's own press, so it may sound even before START (the context is usually made already, on the press)
+    sound.unlock();
+    sound.power(powerSwitchedOff ? -1 : 1);
   });
   // The 3D button goes down with the pointer or the key and comes back up on release.
   if (powerButton) {
-    const press = (down: boolean) => hero3d?.pressPower(clockNow(), down);
+    // Going down also makes the sound's context (a press is a gesture the browser allows it on): that takes
+    // ~100 ms the first time, spent here rather than on the click, so the switch's sound starts with its picture.
+    const press = (down: boolean) => {
+      hero3d?.pressPower(clockNow(), down);
+      if (down && mode !== 'play' && !landing) sound.unlock();
+    };
     powerButton.addEventListener('pointerdown', () => press(true));
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave', 'blur'] as const) powerButton.addEventListener(ev, () => press(false));
     powerButton.addEventListener('keydown', (e) => {

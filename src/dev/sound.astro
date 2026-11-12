@@ -25,6 +25,8 @@ const SOUNDS: [string, string, string, boolean][] = [
         <Button variant="ghost" data-play="exit">Exit</Button>
         <Button variant="ghost" data-play="shatter">Shatter</Button>
         <Button variant="ghost" data-play="static">Static</Button>
+        <Button variant="ghost" data-play="power-off">Power off</Button>
+        <Button variant="ghost" data-play="power-on">Power on</Button>
         <span class="dev-sound__spacer"></span>
         <Button variant="ghost" data-stop>Stop all</Button>
       </div>
@@ -126,6 +128,13 @@ const SOUNDS: [string, string, string, boolean][] = [
       ],
     ],
     [
+      'Power button',
+      [
+        ['powerLevel', 'Level (1 = as enter/exit)', 0, 1.5, 0.01, ''],
+        ['powerTail', 'Tail', 0, 1, 0.05, 's'],
+      ],
+    ],
+    [
       'Static',
       [
         ['staticLevel', 'Level', 0, 1, 0.01, ''],
@@ -147,7 +156,7 @@ const SOUNDS: [string, string, string, boolean][] = [
   for (const [title, sliders] of GROUPS) {
     const group = document.createElement('details');
     group.className = 'dev-sound__fold';
-    group.open = title === 'Cracks';
+    group.open = title === 'Power button';
     const summary = document.createElement('summary');
     summary.className = 'mono dev-sound__heading';
     summary.textContent = title;
@@ -185,6 +194,8 @@ const SOUNDS: [string, string, string, boolean][] = [
     else if (name === 'exit') sound.exit(playMs(1));
     else if (name === 'shatter') sound.shatter();
     else if (name === 'static') sound.static(true);
+    else if (name === 'power-off') sound.power(-1);
+    else if (name === 'power-on') sound.power(1);
   };
   for (const b of document.querySelectorAll<HTMLElement>('[data-play]')) b.addEventListener('click', go(() => play(b.dataset.play!)));
   document.querySelector('[data-stop]')!.addEventListener('click', () => sound.stopAll());
