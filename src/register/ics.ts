@@ -5,7 +5,11 @@
 import { PASSES, type PassId } from './ticket-data';
 
 /** Escape a TEXT value (RFC 5545 §3.3.11). */
-const text = (s: string) => s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const text = (s: string) =>
+  s
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/([,;])/g, '\\$1');
 
 /** Fold a content line at 75 octets (UTF-8), continuing with a space (RFC 5545 §3.1). */
 function fold(line: string): string {
@@ -22,7 +26,11 @@ function fold(line: string): string {
   return out.join('\r\n ');
 }
 
-const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const stamp = (d: Date) =>
+  d
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '');
 
 export function icsFor(pass: PassId, player: string, code: string, now = new Date()): string {
   const p = PASSES[pass];

@@ -49,7 +49,6 @@ import { CENTRE, CHIN, DIMS, faceRise, OPENING_Y, ROW2_Y, SLOT_Y, scaleAt } from
 
 export { CENTRE, CHIN, DIMS, OPENING_Y, SCREEN_ASPECT, SLOT_Y } from './spec';
 
-
 interface OutlinePt {
   x: number;
   y: number;
@@ -135,7 +134,8 @@ function sweep(
 
 /** A flat cap from an outline (deduplicated) with optional holes, at depth z, facing +z or −z, tapered about (0, pivotY). */
 function cap(outer: Vector2[], holes: Vector2[][], z: number, facing: 1 | -1, pivotY = 0): BufferGeometry {
-  const dedupe = (pts: Vector2[]) => pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]!) > 1e-9).filter((p, i, a) => i < a.length - 1 || p.distanceTo(a[0]!) > 1e-9);
+  const dedupe = (pts: Vector2[]) =>
+    pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]!) > 1e-9).filter((p, i, a) => i < a.length - 1 || p.distanceTo(a[0]!) > 1e-9);
   const shape = new Shape(dedupe(outer));
   for (const h of holes) shape.holes.push(new Path(dedupe(h)));
   const g = new ShapeGeometry(shape, 24);
@@ -174,7 +174,7 @@ function roughnessNoise(base: number, amp: number): DataTexture {
   const size = 64;
   const data = new Uint8Array(size * size * 4);
   let seed = 1234567;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const coarse = Array.from({ length: 9 * 9 }, rnd);
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
@@ -232,7 +232,11 @@ interface Blob {
  * on a transparent plane (the floor stays the page's own Daisy White). The shadow proper is cast
  * (src/monitor/index.ts); this keeps the monitor grounded where it meets the floor.
  */
-function contactTexture(rect: { x0: number; x1: number; z0: number; z1: number }, blobs: Blob[], lines: { pts: [number, number][]; width: number; alpha: number }[] = []): CanvasTexture {
+function contactTexture(
+  rect: { x0: number; x1: number; z0: number; z1: number },
+  blobs: Blob[],
+  lines: { pts: [number, number][]; width: number; alpha: number }[] = [],
+): CanvasTexture {
   const S = 256;
   const c = document.createElement('canvas');
   c.width = c.height = S;
@@ -375,7 +379,8 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   const frameOutline = roundedRect(0, H / 2, W, H, F.r, 12);
   const frameRings: { z: number; push: number; v: number }[] = [];
   for (let i = 0; i <= edgeSeg; i++) frameRings.push({ z: -F.lip * (1 - Math.cos(quarter(i))), push: -F.lip * (1 - Math.sin(quarter(i))), v: 0 });
-  for (let i = 0; i <= edgeSeg; i++) frameRings.push({ z: -(F.depth - F.back) - F.back * Math.sin(quarter(i)), push: -F.back * (1 - Math.cos(quarter(i))), v: 0 });
+  for (let i = 0; i <= edgeSeg; i++)
+    frameRings.push({ z: -(F.depth - F.back) - F.back * Math.sin(quarter(i)), push: -F.back * (1 - Math.cos(quarter(i))), v: 0 });
   frameRings.forEach((r) => (r.v = -r.z / DEPTH));
   const frame = new Mesh(sweep(frameOutline, frameRings, 'out'), plastic);
 
@@ -412,8 +417,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   bodyRings.sort((a, b) => b.z - a.z);
   for (let i = 0; i <= edgeSeg; i++) bodyRings.push({ z: -(DEPTH - R) - R * Math.sin(quarter(i)), push: -R * (1 - Math.cos(quarter(i))), v: 0 });
   bodyRings.forEach((r) => (r.v = -r.z / DEPTH));
-  const ventDeep = (p: OutlinePt, ri: number) =>
-    deepZ.has(bodyRings[ri]!.z) && p.nx === -1 && p.y > vent.y0 + 1e-6 && p.y < vent.y1 - 1e-6 ? -vent.depth : 0;
+  const ventDeep = (p: OutlinePt, ri: number) => (deepZ.has(bodyRings[ri]!.z) && p.nx === -1 && p.y > vent.y0 + 1e-6 && p.y < vent.y1 - 1e-6 ? -vent.depth : 0);
   const casing = new Mesh(sweep(bodyOutline, bodyRings, 'out', bodyBottom, ventDeep), plastic);
 
   // ── Faces: the frame's front (with the opening, widened by the lip), the step round its back, the body's back ──
@@ -428,7 +432,9 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   const slotOutline = roundedRect(S.x, slotY, S.w, S.h, 0.004, 4);
   // the port: its own outline (src/monitor/mesh.ts portShape), points with outward normals
   const portOutline: OutlinePt[] = (() => {
-    let pts = portShape(P.w, P.h).getPoints(4).map((q) => new Vector2(q.x + B.x, q.y + ROW2_Y));
+    let pts = portShape(P.w, P.h)
+      .getPoints(4)
+      .map((q) => new Vector2(q.x + B.x, q.y + ROW2_Y));
     pts = pts.filter((q, i) => q.distanceTo(pts[(i + 1) % pts.length]!) > 1e-7);
     if (ShapeUtils.isClockWise(pts)) pts.reverse();
     return pts.map((q, i) => {
@@ -517,14 +523,35 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   const lipRing = (x: number, y: number, z: number, w: number, h: number, r: number, lip: number, depth: number) => {
     const shape = new Shape(roundedRect(0, 0, w + 2 * lip, h + 2 * lip, Math.min((h + 2 * lip) / 2 - 0.001, r + lip), 6).map((p) => new Vector2(p.x, p.y)));
     shape.holes.push(new Path(roundedRect(0, 0, w, h, r, 4).map((p) => new Vector2(p.x, p.y))));
-    const m = new Mesh(new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0018, bevelSegments: 3, curveSegments: 8 }), plastic);
+    const m = new Mesh(
+      new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0018, bevelSegments: 3, curveSegments: 8 }),
+      plastic,
+    );
     m.position.set(x, y, z);
     return m;
   };
   /** The pocket behind a hole in the face, from just proud of `top` back to `bottom`: its walls and its back. */
   const pocketOf = (o: OutlinePt[], top: number, bottom: number) => [
-    new Mesh(sweep(o, [{ z: top + 0.004, push: 0, v: 0 }, { z: bottom, push: 0, v: 1 }], 'in'), pocketWall),
-    new Mesh(cap(o.map((p) => new Vector2(p.x, p.y)), [], bottom, 1), pocketBack),
+    new Mesh(
+      sweep(
+        o,
+        [
+          { z: top + 0.004, push: 0, v: 0 },
+          { z: bottom, push: 0, v: 1 },
+        ],
+        'in',
+      ),
+      pocketWall,
+    ),
+    new Mesh(
+      cap(
+        o.map((p) => new Vector2(p.x, p.y)),
+        [],
+        bottom,
+        1,
+      ),
+      pocketBack,
+    ),
   ];
   /** A small raised rounded rectangle (a button, an LED) at (x, y), its back at z. */
   const pad = (x: number, y: number, z: number, w: number, h: number, depth: number, mat: Material) => {
@@ -594,7 +621,10 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
     // a soft raised bezel round the socket, following its outline
     const outer = new Shape(portOutline.map((q) => new Vector2(q.x + q.nx * P.lip - B.x, q.y + q.ny * P.lip - ROW2_Y)));
     outer.holes.push(new Path(portOutline.map((q) => new Vector2(q.x - B.x, q.y - ROW2_Y))));
-    const bezel = new Mesh(new ExtrudeGeometry(outer, { depth: 0.003, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0018, bevelSegments: 3 }), plastic);
+    const bezel = new Mesh(
+      new ExtrudeGeometry(outer, { depth: 0.003, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0018, bevelSegments: 3 }),
+      plastic,
+    );
     bezel.position.set(B.x, ROW2_Y, zPort - 0.0015);
     chin.push(bezel);
   }
@@ -621,10 +651,7 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   const front2 = new LatheGeometry(footProfile(ft.r, ft.h, 0.02), 24);
   const back2 = new LatheGeometry(footProfile(ft.r, ft.h, bodyBottom + 0.02), 24);
   const feetGeo = mergeGeometries(
-    [-1, 1].flatMap((sx) => [
-      front2.clone().translate(sx * ft.x, 0, -ft.zFront),
-      back2.clone().translate(sx * ft.x * scaleAt(-ft.zBack), 0, -ft.zBack),
-    ]),
+    [-1, 1].flatMap((sx) => [front2.clone().translate(sx * ft.x, 0, -ft.zFront), back2.clone().translate(sx * ft.x * scaleAt(-ft.zBack), 0, -ft.zBack)]),
   )!;
   front2.dispose();
   back2.dispose();
@@ -668,7 +695,10 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   }
 
   // ── The controller and its cable, on the floor to the front right ──
-  const remote = buildRemote({ body: colors.plastic, a: colors.remoteA, b: colors.remoteB, letter: colors.remoteLetter, ink: colors.remoteInk, arrow: colors.brand }, logoSvg);
+  const remote = buildRemote(
+    { body: colors.plastic, a: colors.remoteA, b: colors.remoteB, letter: colors.remoteLetter, ink: colors.remoteInk, arrow: colors.brand },
+    logoSvg,
+  );
 
   // ── The floor: a ShadowMaterial plane at the soles, taking the shadow in Outline Black at
   //    the strength the baked shadow had; the contact darkening on it, baked, right where things meet it ──
@@ -678,40 +708,79 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   // The shadow is strongest where it leaves the monitor and fades as it falls
   // away: its strength eases off with the distance from the monitor's footprint (FADE, body units).
   floorMat.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec2 vFloor;\nvoid main() {').replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFloor = position.xz;');
-    sh.fragmentShader = sh.fragmentShader
+    sh.vertexShader = sh.vertexShader
       .replace('void main() {', 'varying vec2 vFloor;\nvoid main() {')
-      .replace(
-        'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
-        `vec2 q = abs(vFloor - vec2(0.0, ${(-DEPTH / 2).toFixed(4)})) - vec2(${(W / 2).toFixed(4)}, ${(DEPTH / 2).toFixed(4)});
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFloor = position.xz;');
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying vec2 vFloor;\nvoid main() {').replace(
+      'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
+      `vec2 q = abs(vFloor - vec2(0.0, ${(-DEPTH / 2).toFixed(4)})) - vec2(${(W / 2).toFixed(4)}, ${(DEPTH / 2).toFixed(4)});
   float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
   float fade = 1.0 - smoothstep(${FADE[0].toFixed(3)}, ${FADE[1].toFixed(3)}, d);
   gl_FragColor = vec4( color, opacity * fade * ( 1.0 - getShadowMask() ) );`,
-      );
+    );
   };
   floorMat.customProgramCacheKey = () => 'monitor-floor';
   const floor = new Mesh(floorGeo, floorMat);
   floor.receiveShadow = true;
   floor.renderOrder = -2;
   const rect = { x0: -0.75, x1: 1.15, z0: -1.15, z1: 0.6 };
-  const foot = (x: number, z: number): Blob => ({ x, z, rx: ft.r * 2.6, rz: ft.r * 2.6, stops: [[0, 0.5], [0.45, 0.32], [1, 0]] });
+  const foot = (x: number, z: number): Blob => ({
+    x,
+    z,
+    rx: ft.r * 2.6,
+    rz: ft.r * 2.6,
+    stops: [
+      [0, 0.5],
+      [0.45, 0.32],
+      [1, 0],
+    ],
+  });
   const backX = ft.x * scaleAt(-ft.zBack);
   const contactMat = new MeshBasicMaterial({
     color: colors.shadow,
-    map: contactTexture(rect, [
-      // the body's underside, just above the floor: a darkening within its footprint, leaning to the side
-      // away from the light (none spills onto the lit left)
-      { x: 0.04, z: -DEPTH / 2 - 0.02, rx: 0.44, rz: 0.52, stops: [[0, 0.24], [0.78, 0.18], [1, 0]] },
-      foot(-ft.x, -ft.zFront),
-      foot(ft.x, -ft.zFront),
-      foot(-backX, -ft.zBack),
-      foot(backX, -ft.zBack),
-      // the controller lies on the floor: a tight band all along its underside
-      { x: REMOTE.at[0], z: REMOTE.at[1] - 0.02 * REMOTE.scale, rx: 0.27 * REMOTE.scale, rz: 0.13 * REMOTE.scale, turn: -REMOTE.turn, stops: [[0, 0.36], [0.7, 0.24], [1, 0]] },
-    ], [
-      // the cable, where it lies on the floor
-      { pts: remote.cable.filter((q) => q.y < -DIMS.feet.h + REMOTE.cable.r * 1.6).map((q) => [q.x, q.z] as [number, number]), width: REMOTE.cable.r * 3, alpha: 0.42 },
-    ]),
+    map: contactTexture(
+      rect,
+      [
+        // the body's underside, just above the floor: a darkening within its footprint, leaning to the side
+        // away from the light (none spills onto the lit left)
+        {
+          x: 0.04,
+          z: -DEPTH / 2 - 0.02,
+          rx: 0.44,
+          rz: 0.52,
+          stops: [
+            [0, 0.24],
+            [0.78, 0.18],
+            [1, 0],
+          ],
+        },
+        foot(-ft.x, -ft.zFront),
+        foot(ft.x, -ft.zFront),
+        foot(-backX, -ft.zBack),
+        foot(backX, -ft.zBack),
+        // the controller lies on the floor: a tight band all along its underside
+        {
+          x: REMOTE.at[0],
+          z: REMOTE.at[1] - 0.02 * REMOTE.scale,
+          rx: 0.27 * REMOTE.scale,
+          rz: 0.13 * REMOTE.scale,
+          turn: -REMOTE.turn,
+          stops: [
+            [0, 0.36],
+            [0.7, 0.24],
+            [1, 0],
+          ],
+        },
+      ],
+      [
+        // the cable, where it lies on the floor
+        {
+          pts: remote.cable.filter((q) => q.y < -DIMS.feet.h + REMOTE.cable.r * 1.6).map((q) => [q.x, q.z] as [number, number]),
+          width: REMOTE.cable.r * 3,
+          alpha: 0.42,
+        },
+      ],
+    ),
     transparent: true,
     depthWrite: false,
     toneMapped: false,
@@ -735,7 +804,25 @@ export function buildMonitor(colors: MonitorColors, screenMaterial: Material, da
   body.position.set(-CENTRE.x, -CENTRE.y, -CENTRE.z);
   const pivot = new Group();
   pivot.add(body);
-  return { pivot, body, frame, casing, front, back, recess, screen, glass, daisy, power: powerButton!, floor, contact, remote: remote.group, casters, feet, materials: { plastic, bevel, glass: glassMat } };
+  return {
+    pivot,
+    body,
+    frame,
+    casing,
+    front,
+    back,
+    recess,
+    screen,
+    glass,
+    daisy,
+    power: powerButton!,
+    floor,
+    contact,
+    remote: remote.group,
+    casters,
+    feet,
+    materials: { plastic, bevel, glass: glassMat },
+  };
 }
 
 /** Proportions measured from the built geometry, for checking the model against its spec. */

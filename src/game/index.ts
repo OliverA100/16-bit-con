@@ -1099,7 +1099,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       if (landed) {
         perch.root.dispatchEvent(new Event('landed'));
         journey ??= import('./journey')
-          .then((m) => m.startJourney({ perch, sheets: assets.sam, perchIdle, paused: () => paused || root.classList.contains('is-paused') || !!regDialog?.open }))
+          .then((m) =>
+            m.startJourney({ perch, sheets: assets.sam, perchIdle, paused: () => paused || root.classList.contains('is-paused') || !!regDialog?.open }),
+          )
           .catch((err) => {
             console.error('[journey] Sam stays on the Register window', err);
           });
@@ -1153,7 +1155,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       c.style.transform = `translate(${x - x0}px, ${y - y0}px) scale(${scale / vp.k})`;
     }
   };
-
 
   // ── The two modes ───────────────────────────────────────────────────────
   const announce = (message: string) => {
@@ -1344,7 +1345,6 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     finale = false;
     root.classList.remove('is-finale');
   };
-
 
   /**
    * Exit game or Esc: the spot is saved, the game's UI goes, and the camera pulls back out of the screen
@@ -1807,8 +1807,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     //    glass; once that scroll has rested, a new one grows it on through the cracks to the break, and
     //    hits move it any time. Scroll beyond it is absorbed.
     // (A scrollbar drag or End straight past the whole pin is a deliberate skip: the end check lands Sam.)
-    const gateOn =
-      mode === 'play' && wantBreakout && !finale && !exiting && !paused && !zoom && !!trigger && window.scrollY < trigger.end - 1;
+    const gateOn = mode === 'play' && wantBreakout && !finale && !exiting && !paused && !zoom && !!trigger && window.scrollY < trigger.end - 1;
     setGateWheel(gateOn && window.scrollY > gateY() - 2.5 * window.innerHeight);
     if (gateOn) {
       const qPage = qOf((window.scrollY - pinTop() - DE) / DW);

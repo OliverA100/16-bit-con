@@ -10,8 +10,7 @@ const AIR_CONTROL = 0.75; // in the air he still steers, a little less sharply
 const SKID_MS = 90;
 const SKID_MIN = 0.35 * RUN_SPEED; // reversing slower than this just turns
 
-const approach = (v: number, target: number, maxDelta: number) =>
-  v < target ? Math.min(target, v + maxDelta) : Math.max(target, v - maxDelta);
+const approach = (v: number, target: number, maxDelta: number) => (v < target ? Math.min(target, v + maxDelta) : Math.max(target, v - maxDelta));
 
 export class Motion {
   /** Sam's own horizontal velocity, world px/s, signed. */

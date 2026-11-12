@@ -119,7 +119,14 @@ export interface JourneyOptions {
 
 const pageRect = (el: Element) => {
   const r = el.getBoundingClientRect();
-  return { left: r.left + window.scrollX, top: r.top + window.scrollY, right: r.right + window.scrollX, bottom: r.bottom + window.scrollY, width: r.width, height: r.height };
+  return {
+    left: r.left + window.scrollX,
+    top: r.top + window.scrollY,
+    right: r.right + window.scrollX,
+    bottom: r.bottom + window.scrollY,
+    width: r.width,
+    height: r.height,
+  };
 };
 
 export async function startJourney(o: JourneyOptions): Promise<void> {
@@ -141,7 +148,14 @@ export async function startJourney(o: JourneyOptions): Promise<void> {
   const hit = document.createElement('div');
   el.append(canvas, hit);
   Object.assign(el.style, { position: 'absolute', left: '0', top: '0', zIndex: '6', pointerEvents: 'none', display: 'none', willChange: 'transform' });
-  Object.assign(hit.style, { position: 'absolute', left: `${(10 / 60) * 100}%`, top: `${(9 / 60) * 100}%`, width: `${(18 / 60) * 100}%`, height: `${(44 / 60) * 100}%`, pointerEvents: 'none' });
+  Object.assign(hit.style, {
+    position: 'absolute',
+    left: `${(10 / 60) * 100}%`,
+    top: `${(9 / 60) * 100}%`,
+    width: `${(18 / 60) * 100}%`,
+    height: `${(44 / 60) * 100}%`,
+    pointerEvents: 'none',
+  });
   Object.assign(canvas.style, { display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated' });
   document.body.append(el);
   const style = document.createElement('style');
@@ -393,7 +407,12 @@ export async function startJourney(o: JourneyOptions): Promise<void> {
       // the page at rest with the drawer's edge near: he climbs to the nearest point of it and jumps over
       const e = geo.edge;
       const line = lineFeet(s);
-      const rest = z === 'stalk' && !!e && now - lastScrollAt >= REST_MS && Math.abs(clamp(line, e.top, e.bottom) - line) <= NEAR * geo.vh && Math.abs(s - leftWallAt) >= REGRIP * geo.vh;
+      const rest =
+        z === 'stalk' &&
+        !!e &&
+        now - lastScrollAt >= REST_MS &&
+        Math.abs(clamp(line, e.top, e.bottom) - line) <= NEAR * geo.vh &&
+        Math.abs(s - leftWallAt) >= REGRIP * geo.vh;
       const goal = z === 'window' ? geo.R : z === 'ground' ? hopFeet() : rest ? clamp(line, e!.top, e!.bottom) : line;
       moving = climb(goal, dt);
       if (!moving && z === 'window') launch('window', y, now);

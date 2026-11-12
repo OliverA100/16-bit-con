@@ -5,7 +5,23 @@
  * under the clouds and back down, again and again.
  */
 import { sprites } from '../../data/sprites.manifest';
-import { backdrop, CLIMB_HANDS, img, layer, put, samStrip, skyTop, stateKey, stemTable, strip, SWAY_FPS, frameAt, wrap, type SceneModule, type View } from '../kit';
+import {
+  backdrop,
+  CLIMB_HANDS,
+  img,
+  layer,
+  put,
+  samStrip,
+  skyTop,
+  stateKey,
+  stemTable,
+  strip,
+  SWAY_FPS,
+  frameAt,
+  wrap,
+  type SceneModule,
+  type View,
+} from '../kit';
 
 const files = [sprites.canyonBeanstalk.file, sprites.beanstalkSway.file, sprites.samClimb.file, sprites.cloudB.file, sprites.cloudG.file, sprites.cloudH.file];
 

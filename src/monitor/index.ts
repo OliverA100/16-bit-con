@@ -392,7 +392,10 @@ function* steps(canvas: HTMLCanvasElement, context: WebGL2RenderingContext): Gen
       camera.updateMatrixWorld();
     },
     screenSize() {
-      const s = project(corners.map(([u, v]) => monitor.screenPoint(u, v)), 'world');
+      const s = project(
+        corners.map(([u, v]) => monitor.screenPoint(u, v)),
+        'world',
+      );
       return { w: s.x1 - s.x0, h: s.y1 - s.y0 };
     },
     frame(view, slot) {

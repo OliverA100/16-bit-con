@@ -51,7 +51,16 @@ export async function startDog(o: DogOptions): Promise<{ wake(): void } | null> 
   el.append(canvas);
   // A band as wide as the page that clips what it holds, like the page's sky: the dog trots in from past the
   // right edge, and a box out there on its own would make the page wider than the screen.
-  Object.assign(el.style, { position: 'absolute', left: '0', top: '0', width: '100%', overflow: 'hidden', zIndex: '6', pointerEvents: 'none', display: 'none' });
+  Object.assign(el.style, {
+    position: 'absolute',
+    left: '0',
+    top: '0',
+    width: '100%',
+    overflow: 'hidden',
+    zIndex: '6',
+    pointerEvents: 'none',
+    display: 'none',
+  });
   Object.assign(canvas.style, { display: 'block', imageRendering: 'pixelated' });
   document.body.append(el);
 

@@ -11,9 +11,7 @@ export type ColorMap = Record<string, string>;
  * brown dog stays a dimmer brown, never a grey).
  */
 export type NightSpec =
-  | { map: ColorMap }
-  | { rank: { targets: string[]; weights?: number[]; roles?: ColorMap } }
-  | { shade: { toward: string; amount: number; roles?: ColorMap } };
+  { map: ColorMap } | { rank: { targets: string[]; weights?: number[]; roles?: ColorMap } } | { shade: { toward: string; amount: number; roles?: ColorMap } };
 
 export const pack = (r: number, g: number, b: number) => (r << 16) | (g << 8) | b;
 export const hexOf = (p: number) => `#${p.toString(16).padStart(6, '0').toUpperCase()}`;
@@ -182,7 +180,10 @@ export function windowSprites(ws: LitWindow[], lit: [number, number, number]): {
   const boxes = new Int32Array(ws.length * 4);
   const pixels: Uint8ClampedArray[] = [];
   ws.forEach((win, i) => {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    let x0 = Infinity,
+      y0 = Infinity,
+      x1 = -Infinity,
+      y1 = -Infinity;
     for (const r of win.runs) {
       if (r.x0 < x0) x0 = r.x0;
       if (r.x1 > x1) x1 = r.x1;

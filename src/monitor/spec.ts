@@ -39,7 +39,18 @@ export const DIMS = {
    * power button.
    */
   chin: { top: 0.62, bottom: 0.25 },
-  slot: { x: -0.13, w: 0.27, h: 0.026, dy: 0.008, lip: 0.011, lipDepth: 0.005, deep: 0.03, flap: 0.008, eject: { w: 0.034, h: 0.012 }, led: { w: 0.018, h: 0.006 } },
+  slot: {
+    x: -0.13,
+    w: 0.27,
+    h: 0.026,
+    dy: 0.008,
+    lip: 0.011,
+    lipDepth: 0.005,
+    deep: 0.03,
+    flap: 0.008,
+    eject: { w: 0.034, h: 0.012 },
+    led: { w: 0.018, h: 0.006 },
+  },
   /** The power button: its x, radius and height. */
   button: { x: 0.27, r: 0.024, h: 0.01 },
   /** The controller's port, under the power button: its opening, a pocket `deep`. */

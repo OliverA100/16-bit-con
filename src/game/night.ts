@@ -83,15 +83,21 @@ class NightJobs {
       // createImageBitmap is async and off-thread; chaining keeps the posting order = the queue order.
       this.chain = this.chain.then(async () => {
         const bitmap = await createImageBitmap(job.src);
-        const msg = job.kind === 'night' ? { id, kind: 'night', bitmap, spec: job.spec } : { id, kind: 'lights', bitmap, glass: job.glass, wrap: job.wrap, lit: job.lit };
+        const msg =
+          job.kind === 'night' ? { id, kind: 'night', bitmap, spec: job.spec } : { id, kind: 'lights', bitmap, glass: job.glass, wrap: job.wrap, lit: job.lit };
         this.worker!.postMessage(msg, [bitmap]);
       });
       return;
     }
-    this.chain = this.chain.then(() => new Promise<void>((resolve) => idle(() => {
-      runHere(job);
-      resolve();
-    })));
+    this.chain = this.chain.then(
+      () =>
+        new Promise<void>((resolve) =>
+          idle(() => {
+            runHere(job);
+            resolve();
+          }),
+        ),
+    );
   }
 }
 
@@ -277,5 +283,4 @@ export class Lights {
     }
     return any ? this.overlay : null;
   }
-
 }

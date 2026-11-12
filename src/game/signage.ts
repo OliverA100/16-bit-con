@@ -30,7 +30,9 @@ const ARCADE_TOP = 48;
  * the nav); the arcade machine's top; the date and the venue; a yellow FREE burst stuck on at the top right.
  */
 export function conPoster(c: CityAssets): HTMLCanvasElement {
-  const [paper, band, rule, ink, burst] = ['--color-paper', '--color-yellow-600', '--color-green-500', '--color-green-900', '--color-yellow-400'].map(readToken) as [string, string, string, string, string];
+  const [paper, band, rule, ink, burst] = ['--color-paper', '--color-yellow-600', '--color-green-500', '--color-green-900', '--color-yellow-400'].map(
+    readToken,
+  ) as [string, string, string, string, string];
   const W = 80;
   const H = 104;
   const cv = canvasOf(W, H);
@@ -83,7 +85,12 @@ export function conPoster(c: CityAssets): HTMLCanvasElement {
 export const AD_POST = 16;
 export const AD_DEPTH = 4;
 export function cityAd(poster: Drawable): HTMLCanvasElement {
-  const [k, g7, g5, cw] = ['--color-outline-black', '--color-grey-700', '--color-grey-500', '--color-cloud-white'].map(readToken) as [string, string, string, string];
+  const [k, g7, g5, cw] = ['--color-outline-black', '--color-grey-700', '--color-grey-500', '--color-cloud-white'].map(readToken) as [
+    string,
+    string,
+    string,
+    string,
+  ];
   const f = 4;
   const d = AD_DEPTH;
   const w = poster.width + 2 * f;
@@ -167,7 +174,9 @@ export const BOOTH_DEPTH = 4;
 /** The daisy in front of Vega's tiles (assets.ts withDaisy: 17 px, centred on the 29 px tiles). */
 const VEGA_DAISY = { x: 0, y: 6, size: 17, gap: 3 } as const;
 export function boothSign(c: CityAssets, compact = false): HTMLCanvasElement {
-  const [k, g7, g5, g9, dw] = ['--color-outline-black', '--color-green-700', '--color-green-500', '--color-green-900', '--color-daisy-white'].map(readToken) as [string, string, string, string, string];
+  const [k, g7, g5, g9, dw] = ['--color-outline-black', '--color-green-700', '--color-green-500', '--color-green-900', '--color-daisy-white'].map(
+    readToken,
+  ) as [string, string, string, string, string];
   const vega = compact ? compactVega(c) : c.vegaSignHorizontal;
   const words = pixelText(c.letters, 'BOOTH 630 →', dw, compact ? 1 : 2);
   const pad = compact ? 5 : 7;
@@ -326,7 +335,12 @@ export function facadeWithDepth(facade: HTMLCanvasElement, doors: HTMLImageEleme
   ctx.drawImage(doors, dx, dy);
   // the canopy over it: a Cloud White slab a little wider than the lobby front, resting on its top frame, with
   // a lit top face and a side receding up and right like the signs, a dark underside and a shadow on the glass
-  const [cw, dw, g5, g7] = ['--color-cloud-white', '--color-daisy-white', '--color-grey-500', '--color-grey-700'].map(readToken) as [string, string, string, string];
+  const [cw, dw, g5, g7] = ['--color-cloud-white', '--color-daisy-white', '--color-grey-500', '--color-grey-700'].map(readToken) as [
+    string,
+    string,
+    string,
+    string,
+  ];
   const C = { x0: dx - 10, x1: dx + fw + 10, bottom: dy, h: 8, depth: 4 };
   const top = C.bottom - C.h;
   ctx.save();

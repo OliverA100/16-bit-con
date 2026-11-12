@@ -1,6 +1,7 @@
 {
   "name": "16-bit-con",
   "version": "0.1.0",
+  "description": "16-Bit Con: a landing page for a retro gaming convention, with a pixel-art game on a 3D monitor. Astro, TypeScript, plain CSS.",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +9,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "astro": "astro",
+    "lint": "astro check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "icons": "node scripts/build-icons.mjs",
     "og": "node scripts/build-og.mjs"
   },
@@ -20,6 +23,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "@types/three": "0.187.0",
+    "prettier": "^3.9.10",
     "typescript": "^5.9.3"
   },
   "engines": {

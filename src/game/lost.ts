@@ -167,7 +167,7 @@ function ride(src: HTMLCanvasElement, feet: { l: number; r: number }, smokeFeet:
   const solid = alphaBox(src, SOLID);
   const peak = solid.y;
   let run: { s: number; e: number; row: number } | null = null;
-  for (let s = 0; s < tops.length; ) {
+  for (let s = 0; s < tops.length;) {
     if (tops[s]! < 0) {
       s++;
       continue;
@@ -379,7 +379,19 @@ export async function startLost(): Promise<void> {
     const smoke = !!sc && smokes(sc.i);
     const sheet = smoke ? smoking : idle;
     const frame = frameAt(t, smoke ? SMOKE_FPS : IDLE_FPS, sheet.frames);
-    const key = stateKey(L.w, L.h, L.k, L.bankTop, frame, snap(bankOff, L.k) * L.k, sc ? sc.i : -1, sx, sy, ...xs.map((x) => x * L.k), ...L.clouds.map((c) => c.row));
+    const key = stateKey(
+      L.w,
+      L.h,
+      L.k,
+      L.bankTop,
+      frame,
+      snap(bankOff, L.k) * L.k,
+      sc ? sc.i : -1,
+      sx,
+      sy,
+      ...xs.map((x) => x * L.k),
+      ...L.clouds.map((c) => c.row),
+    );
     if (key === lastKey) return;
     lastKey = key;
     const ctx = canvas.getContext('2d')!;

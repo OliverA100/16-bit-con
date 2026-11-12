@@ -114,7 +114,6 @@ interface Pattern {
   rim: P2[];
 }
 
-
 const inRect = (p: P2): P2 => [Math.min(ASPECT, Math.max(0, p[0])), Math.min(1, Math.max(0, p[1]))];
 
 /** How far from p along the unit direction d the edge of the screen, inset by m, is. */
@@ -185,7 +184,8 @@ function makePattern(impact: P2): Pattern {
     });
   }
   const edges: Edge[] = [];
-  const edge = (a: number, b: number, stage: number, rim = false, drawn = true) => edges.push({ a, b, stage, path: jagged(pts[a]!, pts[b]!, rnd), rim, drawn }) - 1;
+  const edge = (a: number, b: number, stage: number, rim = false, drawn = true) =>
+    edges.push({ a, b, stage, path: jagged(pts[a]!, pts[b]!, rnd), rim, drawn }) - 1;
   // rays: impact → ring 1 → … → ring L → rim → edge
   const rayEdge: number[][] = rays.map((r, i) => {
     const s = FIRST.has(i) ? 0 : SECOND.has(i) ? 1 : 2;
@@ -207,7 +207,15 @@ function makePattern(impact: P2): Pattern {
   const cells: Pattern['cells'] = [];
   for (let i = 0; i < N; i++) {
     const n = (i + 1) % N;
-    cells.push({ inner: true, loop: [[rayEdge[i]![0]!, true], [ringEdge[1]![i]![0], true], [ringEdge[1]![i]![1], true], [rayEdge[n]![0]!, false]] });
+    cells.push({
+      inner: true,
+      loop: [
+        [rayEdge[i]![0]!, true],
+        [ringEdge[1]![i]![0], true],
+        [ringEdge[1]![i]![1], true],
+        [rayEdge[n]![0]!, false],
+      ],
+    });
     for (let k = 1; k <= L; k++) {
       cells.push({
         inner: k === 1,
@@ -608,7 +616,16 @@ export interface BreakoutParts {
    * how far he has leapt (0–1), the camera, the scale (device px per art px) the leap ends at, whether he
    * shows, and how a world point lands on the page (CSS px) with the device pixel ratio.
    */
-  sam(centre: [number, number] | null, size: number, leap: number, camera: Camera, scale: number, hidden: boolean, toCss: (v: Vector3) => [number, number], dpr: number): void;
+  sam(
+    centre: [number, number] | null,
+    size: number,
+    leap: number,
+    camera: Camera,
+    scale: number,
+    hidden: boolean,
+    toCss: (v: Vector3) => [number, number],
+    dpr: number,
+  ): void;
   /** Sam's 60 × 60 canvas: the caller draws his frame into it and calls samDrawn(). */
   readonly samCanvas: HTMLCanvasElement;
   samDrawn(): void;
@@ -904,7 +921,18 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       // and forward — the nearer the impact, the faster — and fall.
       if (cell.inner && rnd() < FLY.share) {
         const aim = lerp(FLY.aim);
-        shards.push({ mesh, at, axis: spin(), turns: sign() * lerp(FLY.turns), fly: { aim: [out.x * aim, out.y * aim], speed: lerp(FLY.speed) }, t0: 0, p0: at, q0: new Quaternion(), fall: null, splits: false });
+        shards.push({
+          mesh,
+          at,
+          axis: spin(),
+          turns: sign() * lerp(FLY.turns),
+          fly: { aim: [out.x * aim, out.y * aim], speed: lerp(FLY.speed) },
+          t0: 0,
+          p0: at,
+          q0: new Quaternion(),
+          fall: null,
+          splits: false,
+        });
         continue;
       }
       const near = Math.max(0, 1 - away / 0.4);
@@ -913,7 +941,18 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
         out.y * (0.2 + rnd() * 0.8) + 0.2 + rnd() * 0.9 + near * rnd() * 1.4,
         0.5 + rnd() * 1.4 + near * (2 + rnd() * 4.5),
       );
-      const sh: Shard = { mesh, at, axis: spin(), turns: sign() * (5 + rnd() * 12), fly: null, t0: 0, p0: at, q0: new Quaternion(), fall: fall(at, v), splits: false };
+      const sh: Shard = {
+        mesh,
+        at,
+        axis: spin(),
+        turns: sign() * (5 + rnd() * 12),
+        fly: null,
+        t0: 0,
+        p0: at,
+        q0: new Quaternion(),
+        fall: fall(at, v),
+        splits: false,
+      };
       shards.push(sh);
       // a big piece that lands in view breaks again where it hits the floor
       const f = sh.fall!;
@@ -939,7 +978,18 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
         apart.normalize().multiplyScalar(lerp(AGAIN.spread));
         const v2 = f.slideV.clone().multiplyScalar(0.6).add(apart);
         v2.y = lerp(AGAIN.hop);
-        shards.push({ mesh: part.mesh, at: part.at, axis: spin(), turns: sign() * (3 + rnd() * 6), fly: null, t0: f.t1, p0, q0: turned.clone(), fall: fall(p0, v2), splits: false });
+        shards.push({
+          mesh: part.mesh,
+          at: part.at,
+          axis: spin(),
+          turns: sign() * (3 + rnd() * 6),
+          fly: null,
+          t0: f.t1,
+          p0,
+          q0: turned.clone(),
+          fall: fall(p0, v2),
+          splits: false,
+        });
       }
       for (let i = 0; i < AGAIN.grains; i++) {
         const a = rnd() * Math.PI * 2;
@@ -1119,7 +1169,12 @@ export function createBreakout(parts: MonitorParts, crt: CrtMaterial): BreakoutP
       // back down, then a stop in mid-air, then a second hop read as unnatural.)
       const e = leap * (2 - leap);
       const d = Math.exp(Math.log(d0) + (Math.log(d1) - Math.log(d0)) * e);
-      const at = camPos.clone().add(world.clone().sub(camPos).multiplyScalar(d / d0));
+      const at = camPos.clone().add(
+        world
+          .clone()
+          .sub(camPos)
+          .multiplyScalar(d / d0),
+      );
       // His size is his own: nearer, he looks bigger.
       const edge = size * O.h * s0;
       const up = new Vector3(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(tmpQ));

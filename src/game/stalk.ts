@@ -256,10 +256,11 @@ export class Stalk {
   /** Growing: every frame. Grown: the next sway frame, only while the page is shown and not paused. */
   private schedule(): void {
     if (this.growAt >= 0) {
-      if (!this.raf) this.raf = requestAnimationFrame(() => {
-        this.raf = 0;
-        this.update();
-      });
+      if (!this.raf)
+        this.raf = requestAnimationFrame(() => {
+          this.raf = 0;
+          this.update();
+        });
       return;
     }
     if (this.timer || document.hidden || this.paused()) return;

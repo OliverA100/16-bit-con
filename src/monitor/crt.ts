@@ -280,10 +280,14 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
     uTime: { value: 0 },
     uRes: { value: new Vector2(420, 340) },
   };
-  const m = new ShaderMaterial({ uniforms: uniforms as unknown as ShaderMaterial['uniforms'], vertexShader: vertex, fragmentShader: fragment, toneMapped: false });
+  const m = new ShaderMaterial({
+    uniforms: uniforms as unknown as ShaderMaterial['uniforms'],
+    vertexShader: vertex,
+    fragmentShader: fragment,
+    toneMapped: false,
+  });
   return m as CrtMaterial;
 }
-
 
 /** The broken tube's static: a new frame this many times a second (each held ~1/18 s, as an untuned set snaps). */
 export const STATIC_RATE = 18;

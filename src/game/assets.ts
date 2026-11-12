@@ -156,8 +156,10 @@ export async function loadLevel1(onProgress?: (done: number, total: number) => v
     }),
     loadAll(files, onProgress, 4),
   ]);
-  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, grassRaw] =
-    imgs as [HTMLImageElement, ...HTMLImageElement[]];
+  const [coin, cloudF, cloudG, cloudH, cloudFaint, cloudA, cloudB, cloudD, bigCloud, cloudBank, silhouette, hills, bushes, tree, grassRaw] = imgs as [
+    HTMLImageElement,
+    ...HTMLImageElement[],
+  ];
   const grass = nativeGrid(grassRaw!, GRASS_SCALE);
   // the rock's last row, stretched over a tile's worth of rows: every row the same, so the tiling never shows
   const fieldFill = document.createElement('canvas');
@@ -216,8 +218,32 @@ export async function loadCity(): Promise<CityAssets> {
     sprites.letters,
     sprites.entranceDoors,
   ];
-  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, molePhone, dog, javits, chess, pingPong, watering, subwayClosed, pizza, dogBark, vegaSignH, facade, cypress, letters, doors] =
-    await loadAll(files);
+  const [
+    far,
+    towers,
+    mid,
+    near,
+    fence,
+    sidewalk,
+    road,
+    subway,
+    arcade,
+    plant,
+    molePhone,
+    dog,
+    javits,
+    chess,
+    pingPong,
+    watering,
+    subwayClosed,
+    pizza,
+    dogBark,
+    vegaSignH,
+    facade,
+    cypress,
+    letters,
+    doors,
+  ] = await loadAll(files);
   const strip = (img: HTMLImageElement | undefined, fw = 60, fh = 60) => makeStrip(img!, fw, fh);
   // the facade without its little "16" plaque and its flag on a pole (the new signage takes their place)
   const facadeClean = facadeWithDepth(facadeWithoutSigns(facade!), doors!);
@@ -347,4 +373,3 @@ function kerbReturn(sidewalk: HTMLImageElement, road: 'left' | 'right'): HTMLCan
   }
   return c;
 }
-

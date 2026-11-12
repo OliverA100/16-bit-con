@@ -72,8 +72,6 @@ interface Cloud {
   shown: number;
 }
 
-
-
 export async function startSky(paused: () => boolean): Promise<void> {
   const scene = queryFooterScene();
   if (!scene) return;
@@ -98,7 +96,15 @@ export async function startSky(paused: () => boolean): Promise<void> {
     const ctx = el.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, 0, 0);
-    Object.assign(el.style, { position: 'absolute', left: '0', top: '0', width: `${img.width * a}px`, height: `${img.height * a}px`, imageRendering: 'pixelated', opacity: '0' });
+    Object.assign(el.style, {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      width: `${img.width * a}px`,
+      height: `${img.height * a}px`,
+      imageRendering: 'pixelated',
+      opacity: '0',
+    });
     layer.append(el);
     return { el, w: img.width * a, h: img.height * a };
   };
@@ -149,10 +155,20 @@ export async function startSky(paused: () => boolean): Promise<void> {
       const y = rnd() * (bottom - h);
       // over every scroll that shows the opening, its track (it drifts all the way across) stays under the tagline
       if (tagline && Math.min(yAt(y, h, spec.depth, 0), yAt(y, h, spec.depth, heroEnd)) < bandBottom) continue;
-      if (placed.some((p) => Math.abs(p.x + p.w / 2 - (x + w / 2)) < (p.w + w) / 2 + GAP_X && Math.abs(p.y + p.h / 2 - (y + h / 2)) < (p.h + h) / 2 + GAP_Y)) continue;
+      if (placed.some((p) => Math.abs(p.x + p.w / 2 - (x + w / 2)) < (p.w + w) / 2 + GAP_X && Math.abs(p.y + p.h / 2 - (y + h / 2)) < (p.h + h) / 2 + GAP_Y))
+        continue;
       placed.push({ x, y, w, h });
       const c = make(pick, a);
-      clouds.push({ ...c, x: snap(x, dpr), y: snap(y, dpr), depth: spec.depth, v: spec.speed * a * paceShare(pace()), start: rnd() * SPREAD_S, placed: '', shown: -1 });
+      clouds.push({
+        ...c,
+        x: snap(x, dpr),
+        y: snap(y, dpr),
+        depth: spec.depth,
+        v: spec.speed * a * paceShare(pace()),
+        start: rnd() * SPREAD_S,
+        placed: '',
+        shown: -1,
+      });
     }
 
     // Beside the monitor: each at its height in the opening, to and fro in the room left or right of the opening's
@@ -161,7 +177,12 @@ export async function startSky(paused: () => boolean): Promise<void> {
       const zone = [copy, tagline, monitor].filter((r): r is NonNullable<typeof r> => !!r);
       if (monitor) {
         const mw = monitor.right - monitor.left;
-        zone.push({ left: monitor.left - 1.15 * mw, right: monitor.right + 0.45 * mw, top: monitor.top + 0.55 * (monitor.bottom - monitor.top), bottom: tagline.bottom + 24 });
+        zone.push({
+          left: monitor.left - 1.15 * mw,
+          right: monitor.right + 0.45 * mw,
+          top: monitor.top + 0.55 * (monitor.bottom - monitor.top),
+          bottom: tagline.bottom + 24,
+        });
       }
       const zoneAt = (y0: number, y1: number) => {
         const hit = zone.filter((r) => r.top - 12 < y1 && r.bottom + 12 > y0);
@@ -179,7 +200,17 @@ export async function startSky(paused: () => boolean): Promise<void> {
         const hi = sd.side < 0 ? (z?.l ?? vw / 2) - w : vw - 0.65 * w;
         if (hi - lo < 16) continue;
         const c = make(sd.pick, a);
-        clouds.push({ ...c, x: lo + (0.3 + 0.4 * rnd()) * (hi - lo), y, depth: 1, v: spec.speed * a * paceShare(pace()), start: rnd() * SPREAD_S, beside: { lo, hi }, placed: '', shown: -1 });
+        clouds.push({
+          ...c,
+          x: lo + (0.3 + 0.4 * rnd()) * (hi - lo),
+          y,
+          depth: 1,
+          v: spec.speed * a * paceShare(pace()),
+          start: rnd() * SPREAD_S,
+          beside: { lo, hi },
+          placed: '',
+          shown: -1,
+        });
       }
     }
     draw(performance.now(), true);

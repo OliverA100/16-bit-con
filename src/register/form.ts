@@ -150,7 +150,9 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
     submit.setAttribute('aria-disabled', 'true');
     submitText.textContent = 'Registering';
     await new Promise((r) => setTimeout(r, REGISTERING_MS));
-    const picked = radios().find((r) => r.checked)!.closest('.option')!;
+    const picked = radios()
+      .find((r) => r.checked)!
+      .closest('.option')!;
     const registration: Registration = {
       name: input('name').value.trim(),
       email: input('email').value.trim(),

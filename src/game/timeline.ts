@@ -19,7 +19,6 @@ const MIN_CLOSE_SPEED = 60;
 /** Within an art pixel the ease snaps; the camera rounds to whole pixels anyway. */
 const SETTLE_PX = 1;
 
-
 export class Timeline {
   /** Visual position, what the renderer draws. */
   t = 0;
@@ -94,7 +93,6 @@ export class Timeline {
     this.t += move;
     this.speed = (move * this.W) / Math.max(dt, 1e-4);
   }
-
 }
 
 /** Pinned scroll distance for the whole run (px). */

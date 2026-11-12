@@ -111,7 +111,6 @@ const CRACK_GAP = 0.04;
 const CUT = 0.05;
 const STORE_KEY = '16bc-sound';
 
-
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noise: AudioBuffer | null = null;
@@ -455,7 +454,10 @@ function rush(
   const wg = v.node(c.createGain());
   wg.gain.value = 0;
   curve(wg.gain, t0, T, (u) => whoosh * swell(u * T), u0);
-  noiseSource(v, t0, t0 + T * (1 - u0) + 0.01).connect(bp).connect(wg).connect(v.out);
+  noiseSource(v, t0, t0 + T * (1 - u0) + 0.01)
+    .connect(bp)
+    .connect(wg)
+    .connect(v.out);
 
   if (params.buzzLevel <= 0) return;
   const saw = v.node(c.createOscillator());
@@ -464,10 +466,12 @@ function rush(
   const lp = v.node(c.createBiquadFilter());
   lp.type = 'lowpass';
   lp.Q.value = 0.7;
-  const cut = buzzCut ?? ((u: number) => {
-    const t = u * T;
-    return t <= g ? expo(params.buzzLo, params.buzzHi, g > 0 ? t / g : 1) : expo(params.buzzHi, params.buzzLo, (t - g) / Math.max(1e-3, T - g));
-  });
+  const cut =
+    buzzCut ??
+    ((u: number) => {
+      const t = u * T;
+      return t <= g ? expo(params.buzzLo, params.buzzHi, g > 0 ? t / g : 1) : expo(params.buzzHi, params.buzzLo, (t - g) / Math.max(1e-3, T - g));
+    });
   lp.frequency.value = cut(u0);
   curve(lp.frequency, t0, T, cut, u0);
   const bg = v.node(c.createGain());
@@ -523,7 +527,9 @@ export function exit(ms: number, fromMs = 0, path: (tMs: number) => number = (t)
   const speed = new Float32Array(n);
   for (let i = 1; i < n; i++) speed[i] = Math.max(0, cam[i - 1]! - cam[i]!);
   // a little smoothing, so the 5 ms steps never show
-  const smooth = speed.map((_, i) => (speed[Math.max(0, i - 2)]! + speed[Math.max(0, i - 1)]! + speed[i]! + speed[Math.min(n - 1, i + 1)]! + speed[Math.min(n - 1, i + 2)]!) / 5);
+  const smooth = speed.map(
+    (_, i) => (speed[Math.max(0, i - 2)]! + speed[Math.max(0, i - 1)]! + speed[i]! + speed[Math.min(n - 1, i + 1)]! + speed[Math.min(n - 1, i + 2)]!) / 5,
+  );
   const vmax = Math.max(1e-6, ...smooth);
   const at = (arr: Float32Array, t: number) => arr[Math.min(n - 1, Math.max(0, Math.round(t / dt)))]!;
   const level = (t: number) => Math.pow(at(smooth, t) / vmax, 0.7);
@@ -606,7 +612,10 @@ function body(v: Voice, at: number, lvl: number): void {
   const g = v.node(ctx.createGain());
   g.gain.value = 0;
   curve(g.gain, at, len, (u) => lvl * (u * len < 0.004 ? (u * len) / 0.004 : Math.pow(1 - u, 3)));
-  noiseSource(v, at, at + len + 0.01).connect(lp).connect(g).connect(v.out);
+  noiseSource(v, at, at + len + 0.01)
+    .connect(lp)
+    .connect(g)
+    .connect(v.out);
   thump(v, at, 75, 40, 0.25, lvl * 0.6);
 }
 
@@ -753,7 +762,10 @@ function paperBand(v: Voice, at: number, len: number, hz0: number, hz1: number, 
   const g = v.node(c.createGain());
   g.gain.value = 0;
   curve(g.gain, at, len, (u) => lvl * env(u));
-  noiseSource(v, at, at + len + 0.01).connect(bp).connect(g).connect(v.out);
+  noiseSource(v, at, at + len + 0.01)
+    .connect(bp)
+    .connect(g)
+    .connect(v.out);
 }
 
 /** A soft rise and a longer fall, ending at exactly 0: `peak` is where it tops out (share of the length). */

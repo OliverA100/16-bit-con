@@ -155,7 +155,12 @@ const inside = (q: Pt[], x: number, y: number) => {
   return true;
 };
 
-export async function createHero(canvas: HTMLCanvasElement, context: WebGL2RenderingContext, frame: HTMLCanvasElement, pause: () => Promise<void>): Promise<Hero> {
+export async function createHero(
+  canvas: HTMLCanvasElement,
+  context: WebGL2RenderingContext,
+  frame: HTMLCanvasElement,
+  pause: () => Promise<void>,
+): Promise<Hero> {
   const m = await createMonitorAsync(canvas, context, pause);
   const { crt, parts, renderer } = m;
   const u = crt.uniforms;
@@ -293,7 +298,12 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
     const { cssW: W, cssH: H } = lay;
     const ix = W * ENTER.fillInset;
     const iy = H * ENTER.fillInset;
-    const view: Pt[] = [[ix, iy], [W - ix, iy], [W - ix, H - iy], [ix, H - iy]];
+    const view: Pt[] = [
+      [ix, iy],
+      [W - ix, iy],
+      [W - ix, H - iy],
+      [ix, H - iy],
+    ];
     const at = (uu: number, vv: number) => m.toCss(m.screenPoint(uu, vv, p0));
     let found: number = ENTER.fillBy;
     for (let i = 0; i * 0.0025 < ENTER.fillBy; i++) {
@@ -508,7 +518,16 @@ export async function createHero(canvas: HTMLCanvasElement, context: WebGL2Rende
       // ── The breakout: the cracks, the shatter with static behind it, Sam's billboard ──
       bo.set(brk ? brk.stage : 0, brk ? brk.shatter : 0, m.camera);
       const sb = brk?.sam ?? null;
-      bo.sam(sb ? sb.centre : null, sb ? sb.size : 0, sb ? sb.leap : 0, m.camera, sb ? sb.scale : 1, sb ? sb.hidden : true, (v) => m.toCss(v), window.devicePixelRatio || 1);
+      bo.sam(
+        sb ? sb.centre : null,
+        sb ? sb.size : 0,
+        sb ? sb.leap : 0,
+        m.camera,
+        sb ? sb.scale : 1,
+        sb ? sb.hidden : true,
+        (v) => m.toCss(v),
+        window.devicePixelRatio || 1,
+      );
 
       m.render();
       return phase;

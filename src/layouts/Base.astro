@@ -46,7 +46,10 @@ const {
     {fonts.map((font) => <link rel="preload" href={`/fonts/${font}.woff2`} as="font" type="font/woff2" crossorigin />)}
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content={themeColor} />
+    {!noindex && <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />}
     <meta property="og:type" content="website" />
+    {!noindex && <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />}
+    <meta property="og:site_name" content="16-Bit Con" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={new URL('/og.png', Astro.site)} />

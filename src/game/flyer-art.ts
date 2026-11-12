@@ -76,8 +76,7 @@ export function flyerFrame(tiltDeg: number, width: number, k: FlyerInk, lie = 1)
   // Rings from the outside in: 0 on the shape's edge, 1 the next ring, 2 the rest.
   const ring = new Uint8Array(S * S).fill(2);
   for (let y = 0; y < S; y++)
-    for (let x = 0; x < S; x++)
-      if (inside(x, y) && (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1))) ring[y * S + x] = 0;
+    for (let x = 0; x < S; x++) if (inside(x, y) && (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1))) ring[y * S + x] = 0;
   const onEdge = (x: number, y: number) => inside(x, y) && ring[y * S + x] === 0;
   for (let y = 0; y < S; y++)
     for (let x = 0; x < S; x++)

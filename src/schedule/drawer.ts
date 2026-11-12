@@ -134,8 +134,7 @@ export function bootDrawer(drawer: HTMLElement): void {
       f.card.classList.toggle('is-open', isOpen);
       f.tab.setAttribute('aria-expanded', String(isOpen));
       if (isOpen) cancel(f);
-      else if (!f.region.hasAttribute('hidden'))
-        later(f, () => f !== open && f.region.setAttribute('hidden', 'until-found'));
+      else if (!f.region.hasAttribute('hidden')) later(f, () => f !== open && f.region.setAttribute('hidden', 'until-found'));
     }
     drawer.dataset.open = open.id;
     drawer.dataset.day = day.id;
@@ -148,7 +147,8 @@ export function bootDrawer(drawer: HTMLElement): void {
       if (open !== f) return;
       const r = f.region.getBoundingClientRect();
       const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 0;
-      if (r.top - f.tab.offsetHeight < nav || r.bottom > innerHeight) f.region.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+      if (r.top - f.tab.offsetHeight < nav || r.bottom > innerHeight)
+        f.region.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'instant' : 'smooth' });
     }, settleMs(drawer));
   };
 

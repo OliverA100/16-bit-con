@@ -134,9 +134,12 @@ export class SceneRunner {
   /** Build `id` and put its still on every canvas waiting for it. */
   private build(id: SceneId): Promise<Scene> {
     const s = sceneFor(id);
-    s.then((scene) => {
-      for (const slot of this.slots.values()) if (slot.id === id) this.adopt(slot, scene);
-    }, () => {});
+    s.then(
+      (scene) => {
+        for (const slot of this.slots.values()) if (slot.id === id) this.adopt(slot, scene);
+      },
+      () => {},
+    );
     return s;
   }
 

@@ -13,7 +13,24 @@ import { sprites } from '../../data/sprites.manifest';
 import { hexToRgb } from '../../game/palette';
 import { findWindows, indexImage, mapOf, nightImage, windowSprites, type NightSpec } from '../../game/night-core';
 import { nightTokens, rank } from '../../game/night';
-import { backdrop, frameAt, img, layer, put, samStrip, skyTop, standAnim, standStill, stateKey, strip, tileX, wrap, type Drawable, type SceneModule, type View } from '../kit';
+import {
+  backdrop,
+  frameAt,
+  img,
+  layer,
+  put,
+  samStrip,
+  skyTop,
+  standAnim,
+  standStill,
+  stateKey,
+  strip,
+  tileX,
+  wrap,
+  type Drawable,
+  type SceneModule,
+  type View,
+} from '../kit';
 
 const files = [
   sprites.cityFar.file,
@@ -104,7 +121,11 @@ function heights(data: Uint8ClampedArray, w: number, rows: number): number[] {
   const out: number[] = [];
   for (let x = 0; x < w; x++) {
     let top = rows;
-    for (let y = 0; y < rows; y++) if (data[(y * w + x) * 4 + 3]! > 0) { top = y; break; }
+    for (let y = 0; y < rows; y++)
+      if (data[(y * w + x) * 4 + 3]! > 0) {
+        top = y;
+        break;
+      }
     out.push(rows - top);
   }
   return out;
@@ -160,11 +181,38 @@ const scene: SceneModule = {
       BLOCK.w,
       BLOCK.rows,
       GLASS.near,
-      rank([T.n9, T.g7, T.g5], [35, 40, 25], { ...to([...GLASS.near, '#7796DC', '#95ACDC', '#B5D1FF', '#ACC6F2', '#AAC2E0'], T.k), '#E06B4E': T.g7, '#2D4365': T.k }),
+      rank([T.n9, T.g7, T.g5], [35, 40, 25], {
+        ...to([...GLASS.near, '#7796DC', '#95ACDC', '#B5D1FF', '#ACC6F2', '#AAC2E0'], T.k),
+        '#E06B4E': T.g7,
+        '#2D4365': T.k,
+      }),
       T.y4,
       false,
     );
-    const pave = night(sidewalk, 0, sidewalk.width, sidewalk.height, [], { map: { '#E8DECF': T.g5, '#CBC3C7': T.g7, '#CBBFBF': T.g7, '#ACA5A8': T.g7, '#ABA3A3': T.g7, '#BB9147': T.g5, '#767272': T.g7, '#55575B': T.k, '#353535': T.k, '#777B80': T.g7, '#84C5FF': T.g5 } }, T.y4, false).dark;
+    const pave = night(
+      sidewalk,
+      0,
+      sidewalk.width,
+      sidewalk.height,
+      [],
+      {
+        map: {
+          '#E8DECF': T.g5,
+          '#CBC3C7': T.g7,
+          '#CBBFBF': T.g7,
+          '#ACA5A8': T.g7,
+          '#ABA3A3': T.g7,
+          '#BB9147': T.g5,
+          '#767272': T.g7,
+          '#55575B': T.k,
+          '#353535': T.k,
+          '#777B80': T.g7,
+          '#84C5FF': T.g5,
+        },
+      },
+      T.y4,
+      false,
+    ).dark;
     const blockRooms = rooms(blockN.lights, BLOCK.side);
     const farH = heights(farN.data, far.width, FAR.rows);
     const midH = heights(midN.data, mid.width, MID.rows);
@@ -181,19 +229,25 @@ const scene: SceneModule = {
      * parts cut between towers); the street's buildings stand beside the text, or under it on phones.
      */
     let plan: { v: View; far: Band[]; mid: Band[] } | null = null;
-    interface Band { from: number; to: number; top: number; offset: number }
+    interface Band {
+      from: number;
+      to: number;
+      top: number;
+      offset: number;
+    }
     const bands = (v: View) => {
       if (plan?.v === v) return plan;
       const gy = ground(v);
       const x0 = side(v);
       const bx = blockX(v);
       const farTop = Math.max(skyTop(v) + 4, gy - FAR.rows + 10);
-      const farB: Band[] = x0 > 0
-        ? [
-            { from: 0, to: x0, top: Math.max(v.clear.y + 4, farTop), offset: cutAtGap(farH, 40, x0, 0, x0) },
-            { from: x0, to: v.w, top: farTop, offset: cutAtGap(farH, 40, x0, x0, bx) },
-          ]
-        : [{ from: 0, to: v.w, top: farTop, offset: FAR.offset }];
+      const farB: Band[] =
+        x0 > 0
+          ? [
+              { from: 0, to: x0, top: Math.max(v.clear.y + 4, farTop), offset: cutAtGap(farH, 40, x0, 0, x0) },
+              { from: x0, to: v.w, top: farTop, offset: cutAtGap(farH, 40, x0, x0, bx) },
+            ]
+          : [{ from: 0, to: v.w, top: farTop, offset: FAR.offset }];
       // the street's buildings low enough for the skyline's towers to rise over them: beside the text on
       // wide folders, on phones under it, below the skyline's towers, as far as the middle of the street
       const midB: Band[] = v.narrow
@@ -330,7 +384,18 @@ const scene: SceneModule = {
       start: 2,
       still: 30 * LIGHT_EVERY,
       key(t, v) {
-        return stateKey(lit(t, lights(v).length), frameAt(t, 8, sofa.frames), frameAt(t, 3, chess.frames), frameAt(t, 10, pizza.frames), frameAt(t, 2, phone.frames), frameAt(t, 12, pong.frames), frameAt(t, 8, dog.frames), frameAt(t, 8, sam.frames), v.w, v.h);
+        return stateKey(
+          lit(t, lights(v).length),
+          frameAt(t, 8, sofa.frames),
+          frameAt(t, 3, chess.frames),
+          frameAt(t, 10, pizza.frames),
+          frameAt(t, 2, phone.frames),
+          frameAt(t, 12, pong.frames),
+          frameAt(t, 8, dog.frames),
+          frameAt(t, 8, sam.frames),
+          v.w,
+          v.h,
+        );
       },
       draw(ctx, t, v) {
         const gy = ground(v);

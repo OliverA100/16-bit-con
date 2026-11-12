@@ -60,7 +60,6 @@ export interface Frame {
   flyer?: { draw(ctx: CanvasRenderingContext2D, camLeft: number, F: number, sink: number, now: number): void; landed(now: number): boolean } | null;
 }
 
-
 /**
  * The walk into town, as world x — farthest things first, nearest last, no two changes on the
  * same frame. A layer "begins" where its leading edge enters the right edge of the screen when
@@ -260,7 +259,19 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
     '#E06B4E': T.g7,
     '#2D4365': T.k,
   });
-  const pave = { '#E8DECF': T.g5, '#CBC3C7': T.g7, '#CBBFBF': T.g7, '#ACA5A8': T.g7, '#ABA3A3': T.g7, '#BB9147': T.g5, '#767272': T.g7, '#55575B': T.k, '#353535': T.k, '#777B80': T.g7, '#84C5FF': T.g5 };
+  const pave = {
+    '#E8DECF': T.g5,
+    '#CBC3C7': T.g7,
+    '#CBBFBF': T.g7,
+    '#ACA5A8': T.g7,
+    '#ABA3A3': T.g7,
+    '#BB9147': T.g5,
+    '#767272': T.g7,
+    '#55575B': T.k,
+    '#353535': T.k,
+    '#777B80': T.g7,
+    '#84C5FF': T.g5,
+  };
   const greens = { '#224100': T.n9, '#2E5700': T.n9, '#1F3B00': T.n9, '#457D07': T.n7, '#75A70D': T.n7 };
   const strips = new Map<Strip, Stepper>();
   for (const st of [c.molePhone, c.molesChess, c.molesPingPong, c.molePizza, c.dogBark, c.dog]) {
@@ -282,9 +293,27 @@ function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
     subway: new Stepper(c.subway, { map: { ...greens, '#282828': T.k, '#464646': T.g7, '#FFCF3B': T.y1, '#FFF15B': T.y1, '#FFFFFF': T.y1 } }),
     subwayClosed: new Stepper(c.subwayClosed, { map: { ...greens, '#282828': T.k, '#464646': T.g7, '#FFCF3B': T.y1, '#FFF15B': T.y1, '#FFFFFF': T.y1 } }),
     watering: new Stepper(c.moleWatering, shade(T.n9, CHARACTER_SHADE)),
-    arcade: new Stepper(c.arcade, rank([T.k, T.g7], [1, 1], { ...greens, '#5DB3FF': T.y1, '#70A736': T.y4, '#FFCF3B': T.y4, '#FFD11B': T.y4, '#F0A125': T.y4 })),
-    plant: new Stepper(c.plant, rank([T.n9, T.n7], [1, 1], { '#834622': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
-    tree: new Stepper(a.tree, rank([T.n9, T.n7], [1, 1], { '#58311B': T.k, '#834622': T.k, '#AE6228': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 })),
+    arcade: new Stepper(
+      c.arcade,
+      rank([T.k, T.g7], [1, 1], { ...greens, '#5DB3FF': T.y1, '#70A736': T.y4, '#FFCF3B': T.y4, '#FFD11B': T.y4, '#F0A125': T.y4 }),
+    ),
+    plant: new Stepper(
+      c.plant,
+      rank([T.n9, T.n7], [1, 1], { '#834622': T.k, '#ABA3A3': T.g7, '#E2DCDC': T.g5, '#FFFFFF': T.g5, '#FFEDCD': T.g5, '#FFCA05': T.g5 }),
+    ),
+    tree: new Stepper(
+      a.tree,
+      rank([T.n9, T.n7], [1, 1], {
+        '#58311B': T.k,
+        '#834622': T.k,
+        '#AE6228': T.k,
+        '#ABA3A3': T.g7,
+        '#E2DCDC': T.g5,
+        '#FFFFFF': T.g5,
+        '#FFEDCD': T.g5,
+        '#FFCA05': T.g5,
+      }),
+    ),
     strips,
     lights: {
       far: new Lights(c.far, glass.far, T.y1),
@@ -318,11 +347,33 @@ const MID_GAPS: [number, number][] = [
   [518, 728],
 ];
 const TOWER_CLEAR: [number, number][] = [
-  [0, 14], [163, 183], [311, 314], [442, 460], [606, 615], [743, 783], [911, 920], [1008, 1030],
-  [1154, 1166], [1315, 1335], [1463, 1466], [1594, 1612], [1758, 1767], [1895, 1935], [2063, 2072], [2160, 2182],
+  [0, 14],
+  [163, 183],
+  [311, 314],
+  [442, 460],
+  [606, 615],
+  [743, 783],
+  [911, 920],
+  [1008, 1030],
+  [1154, 1166],
+  [1315, 1335],
+  [1463, 1466],
+  [1594, 1612],
+  [1758, 1767],
+  [1895, 1935],
+  [2063, 2072],
+  [2160, 2182],
 ];
 const TOWER_GAPS: [number, number][] = [
-  [615, 911], [1030, 1315], [1335, 1594], [1612, 1895], [314, 606], [460, 743], [183, 442], [783, 1008], [920, 1154],
+  [615, 911],
+  [1030, 1315],
+  [1335, 1594],
+  [1612, 1895],
+  [314, 606],
+  [460, 743],
+  [183, 442],
+  [783, 1008],
+  [920, 1154],
 ];
 
 /**
@@ -422,7 +473,15 @@ function rowClip(
 }
 
 /** A tiled far layer on the screen canvas: positions snap to device pixels, tiles abut exactly (k · width is whole). */
-export function farTiled(ctx: CanvasRenderingContext2D, img: Drawable, scroll: number, y: number, r: Pick<Rect, 'x0' | 'x1'>, snap: (v: number) => number, mirror: boolean): void {
+export function farTiled(
+  ctx: CanvasRenderingContext2D,
+  img: Drawable,
+  scroll: number,
+  y: number,
+  r: Pick<Rect, 'x0' | 'x1'>,
+  snap: (v: number) => number,
+  mirror: boolean,
+): void {
   const w = img.width;
   const first = Math.floor((scroll + r.x0) / w);
   const last = Math.floor((scroll + r.x1) / w);
@@ -511,7 +570,22 @@ export class Level1 {
     n.lights.far.prepare();
     n.near.prepare();
     n.lights.towers.prepare();
-    for (const st of [n.sidewalk, n.kerb, n.road, n.plazaFloor, n.kerbReturn, n.kerbReturnLeft, n.fence, n.subway, n.subwayClosed, n.watering, n.tree, n.plant, n.arcade]) st.prepare();
+    for (const st of [
+      n.sidewalk,
+      n.kerb,
+      n.road,
+      n.plazaFloor,
+      n.kerbReturn,
+      n.kerbReturnLeft,
+      n.fence,
+      n.subway,
+      n.subwayClosed,
+      n.watering,
+      n.tree,
+      n.plant,
+      n.arcade,
+    ])
+      st.prepare();
     for (const st of n.strips.values()) st.prepare();
     n.lights.mid.prepare();
     n.lights.near.prepare();
@@ -604,7 +678,8 @@ export class Level1 {
     const nt = this.night;
     // A layer's palette step: into the night from its NIGHT start, back to day from its DAWN start.
     const toNight = (start: number) => Math.min(NIGHT_STEPS, Math.max(0, Math.floor(((t - start) / NIGHT.span) * NIGHT_STEPS)));
-    const toDay = (start: number | undefined) => (DAWN && start !== undefined ? Math.min(NIGHT_STEPS, Math.max(0, NIGHT_STEPS - Math.floor(((t - start) / DAWN.span) * NIGHT_STEPS))) : NIGHT_STEPS);
+    const toDay = (start: number | undefined) =>
+      DAWN && start !== undefined ? Math.min(NIGHT_STEPS, Math.max(0, NIGHT_STEPS - Math.floor(((t - start) / DAWN.span) * NIGHT_STEPS))) : NIGHT_STEPS;
     const stepOf = (night: number, dawn?: number) => Math.min(toNight(night), toDay(dawn));
     const streetStep = stepOf(NIGHT.street, DAWN?.street);
     // Windows light one by one through the night and, at dawn, go dark one by one.
@@ -637,7 +712,10 @@ export class Level1 {
 
     // ── Hills: full saturation, plain tiling, ending at a tile boundary and scrolling off ──
     const hillsEnd = edgeAt(STACK.hills.p, SEQ.hillsEnd);
-    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, r, { to: end(hillsEnd, STACK.hills.p), phase: wrap(hillsEnd, a.hills.width) });
+    drawTiled(ctx, a.hills, STACK.hills.p * camLeft, F + STACK.hills.bottom - a.hills.height, r, {
+      to: end(hillsEnd, STACK.hills.p),
+      phase: wrap(hillsEnd, a.hills.width),
+    });
 
     // ── The far city and the towers scroll in on the horizon, each at its own speed; the plain in
     //    front of them hides where their art ends ──
@@ -673,7 +751,12 @@ export class Level1 {
       const farLit = nt && lit(nt.lights.far, LIGHTS.far, LIGHTS_OUT.far);
       if (farLit) drawTiled(ctx, farLit, STACK.cityFar.p * camLeft, farY, r, farOpts);
       cityOnly(() => {
-        place(nt ? nt.javits.at(stepOf(NIGHT.towers, DAWN?.towers)) : c.javits, STACK.javits.p, centreAt(STACK.javits.p) - c.javits.width / 2, F + STACK.cityFar.bottom);
+        place(
+          nt ? nt.javits.at(stepOf(NIGHT.towers, DAWN?.towers)) : c.javits,
+          STACK.javits.p,
+          centreAt(STACK.javits.p) - c.javits.width / 2,
+          F + STACK.cityFar.bottom,
+        );
         const towersBegin = edgeAt(STACK.towers.p, SEQ.towersBegin);
         const tw = alignOpening(STACK.towers.period, towersBegin, centreAt(STACK.towers.p), TOWER_GAPS, insideClear);
         const towersY = F + STACK.towers.bottom - c.towers.height;
@@ -693,7 +776,10 @@ export class Level1 {
     // ── Mid layer: bushes and trees at 0.45, ending as the mid buildings arrive ──
     const midHedgeEnd = edgeAt(STACK.midHedge.p, SEQ.midHedgeEnd);
     const midScroll = STACK.midHedge.p * camLeft;
-    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, r, { to: end(midHedgeEnd, STACK.midHedge.p), phase: wrap(midHedgeEnd, a.hedge.width) });
+    drawTiled(ctx, a.hedge, midScroll, F + STACK.midHedge.bottom - a.hedge.height, r, {
+      to: end(midHedgeEnd, STACK.midHedge.p),
+      phase: wrap(midHedgeEnd, a.hedge.width),
+    });
     for (const u of MID_TREES) if (u + a.treeField.width <= midHedgeEnd) place(a.treeField, STACK.midHedge.p, u, F + STACK.midHedge.treeBottom);
 
     if (c) {
@@ -715,7 +801,11 @@ export class Level1 {
       for (const img of nearLit ? [nearImg, nearLit] : [nearImg]) {
         const nb = begin(nearBegin, STACK.cityNear.p);
         drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb, to: nearBegin + STACK.cityNear.gapFrom, phase: nearPhase });
-        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, { from: nb === Infinity ? Infinity : nearBegin + STACK.cityNear.gapTo, to: endShown, phase: nearPhase });
+        drawTiled(ctx, img, STACK.cityNear.p * camLeft, nearY, r, {
+          from: nb === Infinity ? Infinity : nearBegin + STACK.cityNear.gapTo,
+          to: endShown,
+          phase: nearPhase,
+        });
       }
     }
     ctx.restore();

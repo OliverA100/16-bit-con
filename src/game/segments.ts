@@ -50,7 +50,6 @@ export function crackStage(q: number): number {
   return Math.min(CRACK_STAGES, Math.ceil((q - BREAKOUT.cracks[0]) / CRACK_STEP - 1e-6));
 }
 
-
 /** The enter segment's schedule, in p. */
 export const ENTER = {
   /** The eyebrow, the wordmark, the tagline and PRESS START go. */
@@ -86,7 +85,6 @@ export const ENTER = {
   /** From here the 3D renders at the device's full resolution (the native pose needs every device pixel). */
   fullRes: 0.3,
 } as const;
-
 
 /** A CSS cubic-bezier(x1, y1, x2, y2) easing (x1, x2 in 0–1): y for x, by Newton's method, bisection when it stalls. */
 export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (x: number) => number {

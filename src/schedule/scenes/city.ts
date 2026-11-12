@@ -59,7 +59,15 @@ const scene: SceneModule = {
     const at = (v: View) => {
       if (v.narrow) return { beach: -1, phone: -1, chess: -8, laptop: 140, plant: -1, flowers: -1, lift: v.w - 100 };
       const c = Math.round(v.w * 0.22);
-      return { beach: Math.round(v.w * 0.02), phone: Math.round(v.w * 0.02) + 96, chess: c, laptop: c + 176, plant: v.w - 137 - 20 - 50, flowers: c + 300, lift: v.w - 137 - 20 };
+      return {
+        beach: Math.round(v.w * 0.02),
+        phone: Math.round(v.w * 0.02) + 96,
+        chess: c,
+        laptop: c + 176,
+        plant: v.w - 137 - 20 - 50,
+        flowers: c + 300,
+        lift: v.w - 137 - 20,
+      };
     };
     const back = backdrop((ctx, v) => {
       const gy = ground(v.h);

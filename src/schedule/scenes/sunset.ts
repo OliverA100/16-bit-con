@@ -3,7 +3,24 @@
  * Vega's daisies swaying out of it and clouds drifting home.
  */
 import { sprites } from '../../data/sprites.manifest';
-import { backdrop, cloudsKey, daisyFrames, drawClouds, frameAt, img, paintGoldenHills, paintMeadow, put, skyTop, stateKey, sunsetArt, sunsetDaisies, SWAY_FPS, type Cloud, type SceneModule } from '../kit';
+import {
+  backdrop,
+  cloudsKey,
+  daisyFrames,
+  drawClouds,
+  frameAt,
+  img,
+  paintGoldenHills,
+  paintMeadow,
+  put,
+  skyTop,
+  stateKey,
+  sunsetArt,
+  sunsetDaisies,
+  SWAY_FPS,
+  type Cloud,
+  type SceneModule,
+} from '../kit';
 
 const files = [sprites.hillsGolden.file, sprites.meadow.file, sprites.daisySway.file, sprites.cloudLg.file, sprites.cloudMd.file];
 

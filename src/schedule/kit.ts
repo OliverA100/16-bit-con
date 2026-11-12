@@ -148,11 +148,12 @@ export const SWAY_FPS = 4;
 export function stemTable(data: Uint8ClampedArray, width: number, fw: number, fh: number): Float32Array {
   const opaque = (x: number, y: number) => data[(y * width + x) * 4 + 3]! > 0;
   let prev = -1;
-  for (let x = 0; x < fw && prev < 0; x++) if (opaque(x, fh - 1)) {
-    let e = x;
-    while (e + 1 < fw && opaque(e + 1, fh - 1)) e++;
-    prev = (x + e) / 2; // the foot: the bottom row holds the stem alone
-  }
+  for (let x = 0; x < fw && prev < 0; x++)
+    if (opaque(x, fh - 1)) {
+      let e = x;
+      while (e + 1 < fw && opaque(e + 1, fh - 1)) e++;
+      prev = (x + e) / 2; // the foot: the bottom row holds the stem alone
+    }
   const raw = new Float32Array(fh);
   for (let y = fh - 1; y >= 0; y--) {
     let best: [number, number] | null = null;
@@ -236,11 +237,16 @@ export function put(ctx: CanvasRenderingContext2D, src: Drawable, x: number, y: 
 export type Standing = (ctx: CanvasRenderingContext2D, t: number, x: number, feet: number) => void;
 
 /** A single pose standing on a feet line. */
-export const standStill = (src: Drawable, flip = false): Standing => (ctx, _t, x, feet) => put(ctx, src, x, feet - src.height + 1, flip);
+export const standStill =
+  (src: Drawable, flip = false): Standing =>
+  (ctx, _t, x, feet) =>
+    put(ctx, src, x, feet - src.height + 1, flip);
 
 /** An animated strip standing on a feet line, looping at `fps`. */
-export const standAnim = (s: Strip, fps: number, flip = false): Standing => (ctx, t, x, feet) =>
-  s.draw(ctx, frameAt(t, fps, s.frames), x, feet - s.fh + 1, flip);
+export const standAnim =
+  (s: Strip, fps: number, flip = false): Standing =>
+  (ctx, t, x, feet) =>
+    s.draw(ctx, frameAt(t, fps, s.frames), x, feet - s.fh + 1, flip);
 
 export interface Cloud {
   src: Drawable;
@@ -255,7 +261,6 @@ export interface Cloud {
  * the folder's top on wide folders (where the sky beside the text is the scene's too).
  */
 export const skyTop = (v: View) => (v.narrow ? v.clear.y : 0);
-
 
 /**
  * Clouds drifting slowly to and fro in the sky beside the text (right of it on wide folders, under it on

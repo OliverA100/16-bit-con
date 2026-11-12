@@ -18,12 +18,23 @@ export function screenshot(html, width, height, { transparent = false } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'render-'));
   try {
     writeFileSync(join(tmp, 'page.html'), html);
-    execFileSync(chrome, [
-      '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--force-device-scale-factor=1',
-      `--window-size=${width},${height}`, '--virtual-time-budget=5000', `--user-data-dir=${join(tmp, 'profile')}`,
-      ...(transparent ? ['--default-background-color=00000000'] : []),
-      `--screenshot=${join(tmp, 'shot.png')}`, pathToFileURL(join(tmp, 'page.html')).href,
-    ], { stdio: 'ignore' });
+    execFileSync(
+      chrome,
+      [
+        '--headless=new',
+        '--disable-gpu',
+        '--hide-scrollbars',
+        '--force-color-profile=srgb',
+        '--force-device-scale-factor=1',
+        `--window-size=${width},${height}`,
+        '--virtual-time-budget=5000',
+        `--user-data-dir=${join(tmp, 'profile')}`,
+        ...(transparent ? ['--default-background-color=00000000'] : []),
+        `--screenshot=${join(tmp, 'shot.png')}`,
+        pathToFileURL(join(tmp, 'page.html')).href,
+      ],
+      { stdio: 'ignore' },
+    );
     const shot = decodePng(readFileSync(join(tmp, 'shot.png')));
     if (shot.width !== width || shot.height !== height) throw new Error(`screenshot is ${shot.width}×${shot.height}, expected ${width}×${height}`);
     return shot;

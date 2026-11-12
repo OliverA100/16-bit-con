@@ -16,7 +16,8 @@ export function subdivide(geo: BufferGeometry, maxLen: number): BufferGeometry {
   const p = src.getAttribute('position');
   const out: number[] = [];
   const stack: number[][] = [];
-  for (let i = 0; i < p.count; i += 3) stack.push([p.getX(i), p.getY(i), p.getZ(i), p.getX(i + 1), p.getY(i + 1), p.getZ(i + 1), p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2)]);
+  for (let i = 0; i < p.count; i += 3)
+    stack.push([p.getX(i), p.getY(i), p.getZ(i), p.getX(i + 1), p.getY(i + 1), p.getZ(i + 1), p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2)]);
   const len = (t: number[], a: number, b: number) => Math.hypot(t[a * 3]! - t[b * 3]!, t[a * 3 + 1]! - t[b * 3 + 1]!, t[a * 3 + 2]! - t[b * 3 + 2]!);
   const v = (t: number[], a: number) => t.slice(a * 3, a * 3 + 3);
   const mid = (t: number[], a: number, b: number) => [0, 1, 2].map((k) => (t[a * 3 + k]! + t[b * 3 + k]!) / 2);
@@ -75,7 +76,11 @@ export function portShape(w: number, h: number): Shape {
 export function svgShapes(svg: string, height: number): Shape[] {
   try {
     const data = new SVGLoader().parse(svg);
-    const box = (data.xml as unknown as Element).getAttribute('viewBox')?.trim().split(/[\s,]+/).map(Number);
+    const box = (data.xml as unknown as Element)
+      .getAttribute('viewBox')
+      ?.trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (!box || box.length !== 4) return [];
     const k = height / box[3]!;
     const cx = box[0]! + box[2]! / 2;

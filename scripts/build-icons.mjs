@@ -70,7 +70,10 @@ ${SIZES.map((s, i) => `<img src="${uri(rounded)}" style="left:${190 + SIZES.slic
 </body></html>`;
 const sheet = screenshot(html, SHEET_W, 180, { transparent: true });
 const apple = crop(sheet, 0, 0, 180, 180);
-const icoEntries = SIZES.map((s, i) => ({ size: s, png: encodePng(crop(sheet, 190 + SIZES.slice(0, i).reduce((a, t) => a + t + 10, 0), 0, s, s), { indexed: false }) }));
+const icoEntries = SIZES.map((s, i) => ({
+  size: s,
+  png: encodePng(crop(sheet, 190 + SIZES.slice(0, i).reduce((a, t) => a + t + 10, 0), 0, s, s), { indexed: false }),
+}));
 
 for (let i = 3; i < apple.data.length; i += 4) if (apple.data[i] !== 255) throw new Error('apple-touch-icon must be opaque to every edge');
 const corner = icoEntries[2]; // the 48: its corner pixel must be clear

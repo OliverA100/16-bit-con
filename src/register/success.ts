@@ -58,7 +58,14 @@ export function initSuccess(formApi: RegisterFormApi | null): { show(r: Registra
     body.getAnimations().forEach((a) => a.cancel());
     body.style.overflow = '';
     to.style.opacity = '';
-    await step(to, [{ opacity: 0, translate: '0 8px' }, { opacity: 1, translate: '0 0' }], 4);
+    await step(
+      to,
+      [
+        { opacity: 0, translate: '0 8px' },
+        { opacity: 1, translate: '0 0' },
+      ],
+      4,
+    );
     to.getAnimations().forEach((a) => a.cancel());
   };
 

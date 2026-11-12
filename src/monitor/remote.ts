@@ -81,8 +81,18 @@ function outline(): Shape {
 function plus(arm: number, w: number): Shape {
   const h = w / 2;
   const pts: [number, number][] = [
-    [h, -arm], [h, -h], [arm, -h], [arm, h], [h, h], [h, arm],
-    [-h, arm], [-h, h], [-arm, h], [-arm, -h], [-h, -h], [-h, -arm],
+    [h, -arm],
+    [h, -h],
+    [arm, -h],
+    [arm, h],
+    [h, h],
+    [h, arm],
+    [-h, arm],
+    [-h, h],
+    [-arm, h],
+    [-arm, -h],
+    [-h, -h],
+    [-h, -arm],
   ];
   return new Shape(pts.map(([x, y]) => new Vector2(x, y)));
 }
@@ -161,7 +171,14 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
   const onTop = (x: number, y: number, up = 0) => new Vector3(x, top + up, -y);
 
   // The body: the outline extruded, its edges rounded tight, smooth-shaded.
-  let bodyGeo: BufferGeometry = new ExtrudeGeometry(outline(), { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 4, curveSegments: 28 });
+  let bodyGeo: BufferGeometry = new ExtrudeGeometry(outline(), {
+    depth,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: 4,
+    curveSegments: 28,
+  });
   bodyGeo.applyMatrix4(flat).translate(0, bevel, 0);
   bodyGeo.deleteAttribute('uv');
   bodyGeo.deleteAttribute('normal');
@@ -186,7 +203,14 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
     }),
   )!;
   // a soft sheen only, so each reads as its own brand colour
-  const buttonMat = new MeshPhysicalMaterial({ color: 0xffffff, map: letterAtlas(buttons, colors.letter), roughness: 0.5, metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.3 });
+  const buttonMat = new MeshPhysicalMaterial({
+    color: 0xffffff,
+    map: letterAtlas(buttons, colors.letter),
+    roughness: 0.5,
+    metalness: 0,
+    clearcoat: 0.25,
+    clearcoatRoughness: 0.3,
+  });
 
   // Marked on it, as A and B are: an arrow on each arm of the d-pad.
   // (the arrows are recessed: cut through the d-pad below, their floor here, Leaf Green, half its height down)
@@ -226,7 +250,9 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
       const a = (k * Math.PI) / 2;
       const pts = arrow(1)
         .getPoints()
-        .map((q) => new Vector2(q.x * Math.cos(a) - q.y * Math.sin(a) + Math.cos(a) * ARROW_AT, q.x * Math.sin(a) + q.y * Math.cos(a) + Math.sin(a) * ARROW_AT));
+        .map(
+          (q) => new Vector2(q.x * Math.cos(a) - q.y * Math.sin(a) + Math.cos(a) * ARROW_AT, q.x * Math.sin(a) + q.y * Math.cos(a) + Math.sin(a) * ARROW_AT),
+        );
       pad.holes.push(new Path(pts));
     }
     const g = new ExtrudeGeometry(pad, { depth: 0.004, bevelEnabled: true, bevelThickness: 0.002, bevelSize: 0.0012, bevelSegments: 2 });
@@ -245,7 +271,14 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
   const plugOut = 0.03;
   let plugGeo: BufferGeometry;
   {
-    const housing = new ExtrudeGeometry(portShape(P.w * 0.94, P.h * 0.96), { depth: plugOut - 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.0035, bevelSegments: 4, curveSegments: 10 });
+    const housing = new ExtrudeGeometry(portShape(P.w * 0.94, P.h * 0.96), {
+      depth: plugOut - 0.008,
+      bevelEnabled: true,
+      bevelThickness: 0.004,
+      bevelSize: 0.0035,
+      bevelSegments: 4,
+      curveSegments: 10,
+    });
     // narrowing toward the back
     const hp = housing.getAttribute('position');
     for (let k = 0; k < hp.count; k++) {
@@ -255,11 +288,13 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
     housing.translate(portX, ROW2_Y, portZ + 0.004);
     const nose = new ExtrudeGeometry(portShape(P.w * 0.84, P.h * 0.84), { depth: 0.014, bevelEnabled: false, curveSegments: 10 });
     nose.translate(portX, ROW2_Y, portZ - 0.012);
-    plugGeo = mergeGeometries([housing, nose].map((g) => {
-      g.deleteAttribute('uv');
-      g.deleteAttribute('normal');
-      return g.toNonIndexed();
-    }))!;
+    plugGeo = mergeGeometries(
+      [housing, nose].map((g) => {
+        g.deleteAttribute('uv');
+        g.deleteAttribute('normal');
+        return g.toNonIndexed();
+      }),
+    )!;
     plugGeo = mergeVertices(plugGeo, 1e-6);
     plugGeo.computeVertexNormals();
     put(new CylinderGeometry(0.0068, 0.0092, 0.018, 18).rotateX(Math.PI / 2), new Vector3(portX, ROW2_Y - 0.0015, portZ + plugOut + 0.007), false);
@@ -283,7 +318,10 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
     new Vector3(-0.1, fy, 0.065),
     new Vector3(0.12, fy, 0.04),
     end.clone().addScaledVector(out, 0.1).setY(fy),
-    end.clone().addScaledVector(out, 0.035).setY((fy + end.y) / 2),
+    end
+      .clone()
+      .addScaledVector(out, 0.035)
+      .setY((fy + end.y) / 2),
     end,
   ];
   const curve = new CatmullRomCurve3(pts, false, 'centripetal');
@@ -296,7 +334,13 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
   // hard, glossy plastic: the pad is shinier than the monitor's matt casing
   const bodyMat = new MeshPhysicalMaterial({ color: colors.body, roughness: 0.42, metalness: 0, clearcoat: 0.7, clearcoatRoughness: 0.18 });
   const inkMat = new MeshPhysicalMaterial({ color: colors.ink, roughness: 0.45, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3 });
-  const meshes = [new Mesh(bodyGeo, bodyMat), new Mesh(plugGeo, bodyMat), new Mesh(buttonGeo, buttonMat), new Mesh(inkGeo, inkMat), new Mesh(logoGeo ?? arrowGeo, arrowMat)];
+  const meshes = [
+    new Mesh(bodyGeo, bodyMat),
+    new Mesh(plugGeo, bodyMat),
+    new Mesh(buttonGeo, buttonMat),
+    new Mesh(inkGeo, inkMat),
+    new Mesh(logoGeo ?? arrowGeo, arrowMat),
+  ];
   const group = new Group();
   group.add(...meshes);
   const cable = curve.getSpacedPoints(160);
@@ -317,6 +361,8 @@ function inMonitor(p: Vector3, pad: number): boolean {
 function checkCable(pts: Vector3[], r: number): void {
   const n = pts.length;
   const centre = new Vector3(REMOTE.at[0], 0, REMOTE.at[1]);
-  const bad = pts.filter((p, i) => (i > n * 0.12 && inMonitor(p, r)) || (i < n * 0.85 && Math.hypot(p.x - centre.x, p.z - centre.z) < REMOTE.reach * REMOTE.scale - 0.06));
+  const bad = pts.filter(
+    (p, i) => (i > n * 0.12 && inMonitor(p, r)) || (i < n * 0.85 && Math.hypot(p.x - centre.x, p.z - centre.z) < REMOTE.reach * REMOTE.scale - 0.06),
+  );
   if (bad.length) console.warn(`[monitor] the controller's cable passes through the monitor or the controller at ${bad.length} of ${n} points`);
 }

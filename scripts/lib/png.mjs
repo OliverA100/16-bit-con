@@ -156,12 +156,7 @@ export function encodePng({ width, height, data }, { indexed = true } = {}) {
       chunk('IEND', Buffer.alloc(0)),
     ]);
   }
-  return Buffer.concat([
-    SIG,
-    chunk('IHDR', ihdr(width, height, 6)),
-    chunk('IDAT', idat(data, width, height, 4)),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
+  return Buffer.concat([SIG, chunk('IHDR', ihdr(width, height, 6)), chunk('IDAT', idat(data, width, height, 4)), chunk('IEND', Buffer.alloc(0))]);
 }
 
 export function encodeIco(entries) {

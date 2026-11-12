@@ -5,7 +5,23 @@
 import { sprites } from '../../data/sprites.manifest';
 import { patchTileSeam } from '../../game/palette';
 import { FOOT_SINK } from '../../game/sam';
-import { backdrop, cloudsKey, daisyFrames, DAISY, drawClouds, frameAt, img, put, samStrip, skyTop, stateKey, SWAY_FPS, tileX, type Cloud, type SceneModule } from '../kit';
+import {
+  backdrop,
+  cloudsKey,
+  daisyFrames,
+  DAISY,
+  drawClouds,
+  frameAt,
+  img,
+  put,
+  samStrip,
+  skyTop,
+  stateKey,
+  SWAY_FPS,
+  tileX,
+  type Cloud,
+  type SceneModule,
+} from '../kit';
 
 const files = [
   sprites.hills.file,

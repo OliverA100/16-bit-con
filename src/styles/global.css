@@ -158,7 +158,9 @@ p {
   background: var(--surface-card);
   border: 0;
   border-radius: 0;
-  box-shadow: var(--ui-button-ring), 0 0 0 0 var(--outline);
+  box-shadow:
+    var(--ui-button-ring),
+    0 0 0 0 var(--outline);
   color: var(--text);
   font: var(--type-ui);
   cursor: pointer;
@@ -173,13 +175,17 @@ p {
 @media (hover: hover) {
   .ui-button:hover {
     translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
-    box-shadow: var(--ui-button-ring), var(--lift) var(--lift) 0 0 var(--outline);
+    box-shadow:
+      var(--ui-button-ring),
+      var(--lift) var(--lift) 0 0 var(--outline);
   }
 }
 
 .ui-button:active {
   translate: 0 0;
-  box-shadow: var(--ui-button-ring), 0 0 0 0 var(--outline);
+  box-shadow:
+    var(--ui-button-ring),
+    0 0 0 0 var(--outline);
 }
 
 /* While lifted, the hit area reaches back over the gap it left, so the pointer at the bottom-right
@@ -201,7 +207,9 @@ p {
 
 .ui-button:is([aria-current], :has(input:checked), [aria-disabled='true']):hover {
   translate: 0 0;
-  box-shadow: var(--ui-button-ring), 0 0 0 0 var(--outline);
+  box-shadow:
+    var(--ui-button-ring),
+    0 0 0 0 var(--outline);
 }
 
 :where(.ui-button:is([aria-current], :has(input:checked), [aria-disabled='true']):hover)::after {

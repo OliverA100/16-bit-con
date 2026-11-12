@@ -1,7 +1,19 @@
+# dependencies and build output
 node_modules/
 dist/
 .astro/
 .vercel/
-.DS_Store
-reference/
+
+# local environment
 .env*
+
+# logs and caches
+*.log
+.cache/
+*.tsbuildinfo
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -13,7 +13,16 @@
 import { sprites } from '../../data/sprites.manifest';
 import { cloudsKey, drawClouds, frameAt, img, layer, put, stateKey, strip, wrap, type Cloud, type SceneModule, type View } from '../kit';
 
-const files = [sprites.threatScene.file, sprites.hillsSilhouetteLight.file, sprites.cloudLg.file, sprites.cloudMd.file, sprites.cloudSm.file, sprites.cloudXs.file, sprites.cloudA.file, sprites.molePhone.file];
+const files = [
+  sprites.threatScene.file,
+  sprites.hillsSilhouetteLight.file,
+  sprites.cloudLg.file,
+  sprites.cloudMd.file,
+  sprites.cloudSm.file,
+  sprites.cloudXs.file,
+  sprites.cloudA.file,
+  sprites.molePhone.file,
+];
 
 /** The picture's pixel pitch and the centre of its first whole pixel (measured from its edges). */
 const PITCH = 3600 / 509;
@@ -37,7 +46,18 @@ const RANGE = { x: 85, y: 111, w: 316, h: 110 };
  * Where the far range stands: [x as a fraction of the folder, how far its foot sinks below the ground's
  * line], wide and on phones. Under the text a copy sinks further, its peaks below the text.
  */
-const RANGES = { wide: [[0.02, 0], [0.33, 0], [0.67, 0], [0.88, 24]], narrow: [[-0.25, 12], [0.42, 0]] } as const;
+const RANGES = {
+  wide: [
+    [0.02, 0],
+    [0.33, 0],
+    [0.67, 0],
+    [0.88, 24],
+  ],
+  narrow: [
+    [-0.25, 12],
+    [0.42, 0],
+  ],
+} as const;
 
 /** A mole out in the rain, reading their phone: x as a fraction of the folder, feet in band rows. */
 const MOLE = { wide: 0.74, narrow: 0.56, feet: 92 };
@@ -106,7 +126,16 @@ function build(src: HTMLImageElement) {
     const p = stack.pop()!;
     const x = p % W;
     const y = (p / W) | 0;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ] as const) {
       const nx = x + dx;
       const ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
@@ -199,7 +228,9 @@ const scene: SceneModule = {
      * enough for the text to read through, blue enough to show against the sage range.
      */
     const rain = (() => {
-      const d = layer(dayCloud.width, dayCloud.height, (c) => c.drawImage(dayCloud, 0, 0)).getContext('2d')!.getImageData(0, 0, dayCloud.width, dayCloud.height).data;
+      const d = layer(dayCloud.width, dayCloud.height, (c) => c.drawImage(dayCloud, 0, 0))
+        .getContext('2d')!
+        .getImageData(0, 0, dayCloud.width, dayCloud.height).data;
       let [k, lum] = [0, Infinity];
       for (let i = 0; i < d.length; i += 4) {
         const [r, g, b] = [d[i]!, d[i + 1]!, d[i + 2]!];

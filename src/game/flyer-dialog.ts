@@ -10,7 +10,11 @@ export interface FlyerDialog {
   show(from: DOMRect | null): void;
 }
 
-export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void; /** "Let's go" or Esc: the step out begins. */ onClosing?(): void }): FlyerDialog | null {
+export function createFlyerDialog(hooks: {
+  onOpen(): void;
+  onClose(): void;
+  /** "Let's go" or Esc: the step out begins. */ onClosing?(): void;
+}): FlyerDialog | null {
   const dialog = document.querySelector<HTMLDialogElement>('[data-flyer-dialog]');
   const stack = dialog?.querySelector<HTMLElement>('[data-flyer-stack]');
   const go = dialog?.querySelector<HTMLButtonElement>('[data-flyer-go]');

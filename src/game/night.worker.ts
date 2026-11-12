@@ -28,7 +28,9 @@ scope.onmessage = async (e) => {
     scope.postMessage({ id: job.id, bitmap }, [bitmap]);
   } else {
     const { boxes, pixels } = windowSprites(findWindows(im, job.glass, job.wrap), rgbOf(job.lit));
-    const sprites = await Promise.all(pixels.map((px, i) => createImageBitmap(new ImageData(px as Uint8ClampedArray<ArrayBuffer>, boxes[i * 4 + 2]!, boxes[i * 4 + 3]!))));
+    const sprites = await Promise.all(
+      pixels.map((px, i) => createImageBitmap(new ImageData(px as Uint8ClampedArray<ArrayBuffer>, boxes[i * 4 + 2]!, boxes[i * 4 + 3]!))),
+    );
     scope.postMessage({ id: job.id, boxes, sprites }, [boxes.buffer, ...sprites]);
   }
 };

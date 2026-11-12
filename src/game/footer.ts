@@ -9,7 +9,22 @@
  * reduced motion, not under the Register dialog); otherwise the band is one still.
  */
 import { sprites } from '../data/sprites.manifest';
-import { cloudsKey, daisyFrames, drawClouds, frameAt, img, paintGoldenHills, paintMeadow, put, stateKey, sunsetArt, sunsetDaisies, SWAY_FPS, type Cloud, type View } from '../schedule/kit';
+import {
+  cloudsKey,
+  daisyFrames,
+  drawClouds,
+  frameAt,
+  img,
+  paintGoldenHills,
+  paintMeadow,
+  put,
+  stateKey,
+  sunsetArt,
+  sunsetDaisies,
+  SWAY_FPS,
+  type Cloud,
+  type View,
+} from '../schedule/kit';
 import { reducedMotion } from '../lib/reduced-motion';
 
 /**
@@ -17,8 +32,6 @@ import { reducedMotion } from '../lib/reduced-motion';
  * meadow shows whole, down to its last row (51 rows, its surface at row 6). The field is never cropped.
  */
 export const FOOTER_GROUND_BELOW = 45;
-
-
 
 /** CSS px per art px: the page's Sam scale. */
 export function samPx(): number {
@@ -61,7 +74,8 @@ export async function startFooter(): Promise<void> {
   let visible = false;
   let raf = 0;
   let last = 0;
-  const moving = () => !reducedMotion.matches && document.documentElement.classList.contains('has-game') && !document.documentElement.classList.contains('is-paused');
+  const moving = () =>
+    !reducedMotion.matches && document.documentElement.classList.contains('has-game') && !document.documentElement.classList.contains('is-paused');
 
   /** Fit both canvases to the band in whole art px, anchored bottom-left (as the schedule's scenes are). */
   const size = (): boolean => {

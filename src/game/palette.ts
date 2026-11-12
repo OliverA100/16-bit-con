@@ -74,7 +74,11 @@ export function readToken(name: string): string {
 
 // ── Load-time image helpers for the depth stack ────────────────────────────────────────
 
-function toCanvas(image: HTMLImageElement | HTMLCanvasElement, w = image.width, h = image.height): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+function toCanvas(
+  image: HTMLImageElement | HTMLCanvasElement,
+  w = image.width,
+  h = image.height,
+): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;

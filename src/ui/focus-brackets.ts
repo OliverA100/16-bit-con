@@ -100,9 +100,13 @@ export function startFocusBrackets(): void {
     });
   });
   // a dialog closing takes the brackets' host away: they go back to the page
-  document.addEventListener('close', () => {
-    if (box.parentElement !== document.body) document.body.append(box);
-  }, true);
+  document.addEventListener(
+    'close',
+    () => {
+      if (box.parentElement !== document.body) document.body.append(box);
+    },
+    true,
+  );
   // a mouse click after keyboard use: no brackets until the keyboard is back
   document.addEventListener('pointerdown', hide, true);
 }

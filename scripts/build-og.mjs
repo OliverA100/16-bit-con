@@ -61,11 +61,13 @@ class Context2D {
   }
   getImageData(x, y, w, h) {
     const data = new Uint8ClampedArray(w * h * 4);
-    for (let r = 0; r < h; r++) data.set(this.canvas.data.subarray(((y + r) * this.canvas.width + x) * 4, ((y + r) * this.canvas.width + x + w) * 4), r * w * 4);
+    for (let r = 0; r < h; r++)
+      data.set(this.canvas.data.subarray(((y + r) * this.canvas.width + x) * 4, ((y + r) * this.canvas.width + x + w) * 4), r * w * 4);
     return { width: w, height: h, data };
   }
   putImageData(img, x, y) {
-    for (let r = 0; r < img.height; r++) this.canvas.data.set(img.data.subarray(r * img.width * 4, (r + 1) * img.width * 4), ((y + r) * this.canvas.width + x) * 4);
+    for (let r = 0; r < img.height; r++)
+      this.canvas.data.set(img.data.subarray(r * img.width * 4, (r + 1) * img.width * 4), ((y + r) * this.canvas.width + x) * 4);
   }
   fillRect(x, y, w, h) {
     const [r, g, b] = parseColor(this.fillStyle);
@@ -77,11 +79,23 @@ class Canvas {
   #w = 0;
   #h = 0;
   data = Buffer.alloc(0);
-  get width() { return this.#w; }
-  set width(v) { this.#w = v; this.data = Buffer.alloc(this.#w * this.#h * 4); }
-  get height() { return this.#h; }
-  set height(v) { this.#h = v; this.data = Buffer.alloc(this.#w * this.#h * 4); }
-  getContext() { return new Context2D(this); }
+  get width() {
+    return this.#w;
+  }
+  set width(v) {
+    this.#w = v;
+    this.data = Buffer.alloc(this.#w * this.#h * 4);
+  }
+  get height() {
+    return this.#h;
+  }
+  set height(v) {
+    this.#h = v;
+    this.data = Buffer.alloc(this.#w * this.#h * 4);
+  }
+  getContext() {
+    return new Context2D(this);
+  }
 }
 
 globalThis.document = { createElement: () => new Canvas() };
@@ -145,7 +159,8 @@ ctx.drawImage(idle, 0, 0, SAM_CELL, SAM_CELL, SAM_X, SURFACE - SAM_CELL + FOOT_S
 
 const big = blank(W * SCALE, H * SCALE);
 for (let y = 0; y < big.height; y++) {
-  for (let x = 0; x < big.width; x++) art.data.copy(big.data, (y * big.width + x) * 4, (((y / SCALE) | 0) * W + ((x / SCALE) | 0)) * 4, (((y / SCALE) | 0) * W + ((x / SCALE) | 0)) * 4 + 4);
+  for (let x = 0; x < big.width; x++)
+    art.data.copy(big.data, (y * big.width + x) * 4, (((y / SCALE) | 0) * W + ((x / SCALE) | 0)) * 4, (((y / SCALE) | 0) * W + ((x / SCALE) | 0)) * 4 + 4);
 }
 
 // ── The type, set by Chrome over the art ──────────────────────────────────────────────
@@ -201,4 +216,6 @@ if (textPx < 10000) throw new Error(`only ${textPx} text pixels: did the font or
 
 const out = encodePng(shot);
 writeFileSync(new URL('public/og.png', root), out);
-console.log(`public/og.png  ${shot.width}×${shot.height}  ${out.length} B  (text ${textPx} px, lowest at y ${textBottom}; hills from y ${hillsY * SCALE + mesaTop * SCALE})`);
+console.log(
+  `public/og.png  ${shot.width}×${shot.height}  ${out.length} B  (text ${textPx} px, lowest at y ${textBottom}; hills from y ${hillsY * SCALE + mesaTop * SCALE})`,
+);

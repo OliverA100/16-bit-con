@@ -20,7 +20,11 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
     const img = new Image();
     img.decoding = 'async';
     // Decode off the main thread before first use, so cropping and the first draw never decode on a frame.
-    img.onload = () => img.decode().then(() => resolve(img), () => resolve(img));
+    img.onload = () =>
+      img.decode().then(
+        () => resolve(img),
+        () => resolve(img),
+      );
     img.onerror = () => reject(new Error(`Could not load sprite ${url}`));
     img.src = url;
   });

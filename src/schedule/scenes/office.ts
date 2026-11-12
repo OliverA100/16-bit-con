@@ -44,7 +44,6 @@ const CHAIR = 34;
 const SEAT = 14;
 const RAISE = 5;
 
-
 const scene: SceneModule = {
   files,
   async load() {
@@ -111,7 +110,9 @@ const scene: SceneModule = {
     /** Every brick patch of both tiles (the slivers left out): [tile's motifs, its box]. */
     const patchPool = [wall, wall2].flatMap((t) => {
       const m = motifs(t);
-      return patches(m).filter(([, , w, h]) => w >= 12 && h >= 6).map((box) => [m, box] as const);
+      return patches(m)
+        .filter(([, , w, h]) => w >= 12 && h >= 6)
+        .map((box) => [m, box] as const);
     });
     const ground = (v: View) => v.h - (v.narrow ? GROUND.narrow : GROUND.wide);
     /** The top of the window, as high as the wall's two tiles reach above the skirting (under the text on phones). */
@@ -126,10 +127,15 @@ const scene: SceneModule = {
       // own, scattered (a seeded random, the same every time), apart from each other, more of them low
       // toward the skirting; none behind the text, and none on or round what hangs on the wall
       const foot = gy - FLOOR.skirt;
-      const hung: [Drawable, number, number][] = [[win, v.w - win.width - (v.narrow ? 6 : 18), top + 8], v.narrow ? [shelf, 10, top + 28] : [cork, side(v) + 22, top + 26]];
+      const hung: [Drawable, number, number][] = [
+        [win, v.w - win.width - (v.narrow ? 6 : 18), top + 8],
+        v.narrow ? [shelf, 10, top + 28] : [cork, side(v) + 22, top + 26],
+      ];
       const bare = (x: number, y: number, w: number, h: number) =>
         !(x < v.clear.x && y < v.clear.y) &&
-        hung.every(([d, hx, hy]) => x + w + BRICKS.clear <= hx || hx + d.width + BRICKS.clear <= x || y + h + BRICKS.clear <= hy || hy + d.height + BRICKS.clear <= y);
+        hung.every(
+          ([d, hx, hy]) => x + w + BRICKS.clear <= hx || hx + d.width + BRICKS.clear <= x || y + h + BRICKS.clear <= hy || hy + d.height + BRICKS.clear <= y,
+        );
       const rand = mulberry32(BRICKS.seed);
       const wallTopY = skyTop(v) + 6;
       const count = Math.round((v.w * (foot - wallTopY)) / BRICKS.per);
@@ -192,7 +198,13 @@ const scene: SceneModule = {
       start: 0,
       still: 0,
       key(t, v) {
-        return stateKey(frameAt(t, 6, screens.frames), ...[0, 0.35, 0.6, 0.8].map((dt) => frameAt(t + dt, 10, typing.frames)), frameAt(t, 8, laptop.frames), v.w, v.h);
+        return stateKey(
+          frameAt(t, 6, screens.frames),
+          ...[0, 0.35, 0.6, 0.8].map((dt) => frameAt(t + dt, 10, typing.frames)),
+          frameAt(t, 8, laptop.frames),
+          v.w,
+          v.h,
+        );
       },
       draw(ctx, t, v) {
         const gy = ground(v);
