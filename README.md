@@ -41,7 +41,8 @@ npm run og             # regenerate the social image (needs Google Chrome)
 | `src/monitor/` | The three.js monitor: model, CRT shader, breakout |
 | `src/schedule/` | The drawer's behaviour, the scene runner and the nine folder scenes |
 | `src/register/` | Validation, the success state, the pass, the calendar file, the dialog over the game |
-| `src/lib/` | Shared helpers: small maths, cloud drift, the reduced-motion preference |
+| `src/lib/` | Shared helpers: small maths, cloud drift, the motion numbers script needs, the reduced-motion preference |
+| `src/ui/` | The focus brackets |
 | `src/data/` | Sessions, Sam's lines, the sprite manifest, the wordmark's paths, the pixel icons |
 | `scripts/` | The favicon and social image builders |
 | `public/` | Sprites, fonts, sounds, the monitor's posters |
@@ -49,7 +50,7 @@ npm run og             # regenerate the social image (needs Google Chrome)
 ## Decisions, and why
 
 - **Astro with static output, TypeScript and plain CSS.** The page is content first; the game is an island that loads after it. No UI framework: there is no state a few modules cannot hold.
-- **One system in `tokens.css`.** Colour by role, one type scale as named roles, one spacing scale, one frame line, one shadow. Components carry no values of their own.
+- **One system in `tokens.css`.** Colour by role, one type scale as named roles, one spacing scale, one frame line, one window shadow. Components take their colours, type and spacing from it.
 - **Two motions.** Things that appear step in on a 50 ms beat, like a 16-bit game; things you push (buttons, tabs) glide.
 - **The game is optional and scroll-driven.** One timeline maps scroll to the story, so it plays backwards too, works with wheel, keys and touch, and can be skipped or left at any point.
 - **Canvas 2D at a whole-number pixel scale.** One art pixel is always a whole number of device pixels, so the 3D monitor can hand over to the 2D world without a visible change.
@@ -68,9 +69,9 @@ npm run og             # regenerate the social image (needs Google Chrome)
 
 ## Accessibility and performance
 
-- Semantic landmarks and heading order, a skip link past the game, visible focus brackets, 44 px touch targets, labelled and described form fields, live regions for Sam's lines and the game's state. The two dialogs are native modal dialogs.
+- Semantic landmarks and heading order, a skip link past the game, visible focus brackets, 44 px touch areas on every button, link and tab, labelled and described form fields, live regions for Sam's lines and the game's state. The two dialogs are native modal dialogs.
 - Checked with axe (no violations on either page or in the dialogs), a keyboard run-through, and a computed-style comparison of every component state.
-- The largest paint is text, there is no layout shift, the game's loop rests when it is off screen, and each scene animates only while it is visible. Lighthouse on the live home page: 100 on desktop; 96 performance and 100 accessibility and best practices on mobile.
+- The largest paint is text, there is no layout shift on load, the game's loop rests when it is off screen, and each scene animates only while it is visible. three.js loads after the page, and only where WebGL 2 is available.
 
 ## What I'd add next
 
