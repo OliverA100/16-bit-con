@@ -81,7 +81,6 @@ export interface CityAssets {
   facade: Drawable;
   facadeBay: Drawable;
   cypress: Drawable;
-  signPost: Drawable;
   /** The NEW letter set, and the signage composed from it at load. */
   letters: Drawable;
 }
@@ -212,11 +211,10 @@ export async function loadCity(): Promise<CityAssets> {
     sprites.vegaSignHorizontal,
     sprites.javitsFacade,
     sprites.cypress,
-    sprites.signPost,
     sprites.letters,
     sprites.entranceDoors,
   ];
-  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, molePhone, dog, javits, chess, pingPong, watering, subwayClosed, pizza, dogBark, vegaSignH, facade, cypress, signPost, letters, doors] =
+  const [far, towers, mid, near, fence, sidewalk, road, subway, arcade, plant, molePhone, dog, javits, chess, pingPong, watering, subwayClosed, pizza, dogBark, vegaSignH, facade, cypress, letters, doors] =
     await loadAll(files);
   const strip = (img: HTMLImageElement | undefined, fw = 60, fh = 60) => makeStrip(img!, fw, fh);
   // the facade without its little "16" plaque and its flag on a pole (the new signage takes their place)
@@ -249,7 +247,6 @@ export async function loadCity(): Promise<CityAssets> {
     facade: facadeClean,
     facadeBay: cropImage(facadeClean, 0, 0, FACADE_BAY, facadeClean.height),
     cypress: cypress!,
-    signPost: signPost!,
     letters: letters!,
   };
 }

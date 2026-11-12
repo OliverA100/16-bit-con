@@ -122,7 +122,6 @@ export const sprites = {
   javitsFacade: { file: '/sprites/new/javits-facade_1408x680.png', w: 1408, h: 680, parallax: 0.25, scale: 'world', note: 'NEW: the real Javits — stepped glass cubes with peaked tops (the tallest centre-back, taller than any viewport), Blue 300/500/700 glass with cloud reflections, a 1 px Outline Black space frame every 8 px with Grey 700 diagonals every 16 px, Grey 500 mullions, Cloud White ridges; the entrance with its canopy, doors, the 16-BIT CON marquee, a glass pyramid kiosk and two flags; its first 128 px (a flat annex) repeats outward' },
   cypress: { file: '/sprites/new/cypress_12x40.png', w: 12, h: 40, parallax: 0.25, scale: 'world', note: 'NEW: a clipped columnar tree for the row along the Javits base' },
   letters: { file: '/sprites/new/pixel-letters_5x7.png', w: 532, h: 58, scale: 'world', note: 'NEW: the 5×7 letter set in the vega-sign yellow-tile style — rows: small day (9×11 tiles), large day (14×18, 2 px cells), small neon, large neon; A–Z, 0–9, hyphen, middle dot' },
-  signPost: { file: '/sprites/new/sign-post_10x72.png', w: 10, h: 72, scale: 'world', note: 'NEW: Grey 700 post with Outline Black edges and a Grey 500 highlight for the 2× Booth 630 sign' },
 } as const satisfies Record<string, SpriteEntry>;
 
 export type SpriteKey = keyof typeof sprites;

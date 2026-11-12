@@ -1,11 +1,11 @@
 /**
  * The Javits plaza, the game's last level. Where the city's near fronts end —
  * the side wall of a block — the plaza opens up: the Javits facade (NEW, p 0.25) with its entrance
- * where Sam stops at x 6000, the 16-BIT CON LED board high on its front, its end annex repeating
- * outward and a row of clipped cypress along its base, the far skyline behind its low wings. On the
- * ground the street's three bands run on as paving until the daisy bed takes over through the same
- * three staggered seams; the plaza's trees, plants and daisies stand on it, and the Booth 630 sign
- * stands beside where Sam stops. Level1 draws each part at its depth and gives each image its
+ * (Vega's lobby doors under a canopy) where Sam stops at x 6000, the 16-Bit Con letters on its tall tower,
+ * its end annex repeating outward and a row of clipped cypress along its base, the far skyline behind its
+ * low wings. On the ground the sidewalk's paving carries on and takes the whole band where the kerb turns
+ * away (world.ts); the plaza's trees, a plant and the con's promo cabinet stand on it, and the Booth 630
+ * sign stands beside where Sam stops. Level1 draws each part at its depth and gives each image its
  * palette step: the night images serve the night, and the dawn steps them back to day.
  */
 import type { CityAssets, Level1Assets } from './assets';
@@ -17,8 +17,8 @@ import { Stepper, rank, type NightTokens } from './night';
 export const PLAZA = {
   /**
    * The facade's depth, its base behind the ground band, its entrance column, and where that entrance
-   * sits on screen when Sam stops (x 6000): right of centre on wide screens so the big marquee and the
-   * small Booth sign never share a column; centred on phones.
+   * sits on screen when Sam stops (x 6000): right of centre on wide screens so the letters on the tower and
+   * the Booth sign never share a column; centred on phones.
    */
   facade: { p: 0.25, bottom: 6, hallAt: 6000, entrance: 730, wide: 0.62, narrow: 0.5 },
   /**
@@ -29,14 +29,14 @@ export const PLAZA = {
   marquee: { faceTop: 206, lift: 24 },
   /** The horizon band: this many px above F, hidden behind the facade except over its lowest rooflines. */
   horizon: 260,
-  /** X1: paving → daisy bed at the surface; the edge at X1 + 28, the fill at X1 + 56 — farthest-down last. */
+  /** Where the kerb turns away and the plaza's paving takes the whole ground band (world.ts plazaEdge). */
   seam: 5800,
   /**
    * The Booth 630 sign's near edge: its right edge just left of Sam on wide screens; on phones (the compact
    * sign) its left edge just right of him, in the gap Sam's bubble and the touch controls leave before the A button.
    */
   sign: { wide: 6012, narrow: 5988 },
-  /** The sign board's bottom, px above F: clear of the daisies and of Sam's head; on phones, beside him and under his bubble. */
+  /** The sign board's bottom, px above F: clear of the plants and of Sam's head; on phones, beside him and under his bubble. */
   signClear: 64,
   signClearNarrow: 40,
   trees: [5680, 5760],
@@ -44,11 +44,11 @@ export const PLAZA = {
   /** The con's promo cabinet on the plaza, between the plant and the first tree. */
   arcade: 5608,
 } as const;
-/** Cypress row along the facade base, facade x; the entrance with its flags and kiosk stays open. */
+/** Cypress row along the facade base, facade x; the entrance stays open. */
 const CYPRESS = { from: 140, to: 1270, step: 22, gap: [560, 910] } as const;
 /**
  * The facade's glass (Blue 300/500/700 and its cloud reflections): dark at night, under its space frame
- * — the LED board and the Booth sign are the plaza's lights. (Lit cell by cell like the city's windows,
+ * — the Booth sign is the plaza's light. (Lit cell by cell like the city's windows,
  * the glass joins into a few large panes and the whole hall glows.)
  */
 const FACADE_GLASS = ['#5DB3FF', '#8DCAFF', '#CAE6FF', '#2189E5'];
@@ -63,7 +63,6 @@ interface PlazaNight {
   facade: Stepper;
   bay: Stepper;
   cypress: Stepper;
-  post: Stepper;
   tree: Stepper;
   plant: Stepper;
 }
@@ -104,17 +103,15 @@ export class Plaza {
     if (!c || this.night) return;
     const glass = Object.fromEntries(FACADE_GLASS.map((h) => [h, T.k]));
     const facadeSpec = rank([T.n9, T.g7], [2, 1], glass);
-    const pave = rank([T.k, T.g7, T.g5], [1, 1, 1]);
     this.night = {
       facade: new Stepper(c.facade, facadeSpec),
       bay: new Stepper(c.facadeBay, facadeSpec),
       cypress: new Stepper(c.cypress, rank([T.n9, T.n7], [2, 1])),
-      post: new Stepper(c.signPost, pave),
       tree,
       plant,
     };
     const n = this.night;
-    for (const s of [n.facade, n.bay, n.cypress, n.post]) s.prepare();
+    for (const s of [n.facade, n.bay, n.cypress]) s.prepare();
   }
 
   /** The big sign: the 16-Bit Con wordmark in channel letters, centred over the entrance on the tall tower. */
@@ -173,7 +170,7 @@ export class Plaza {
     ctx.restore();
   }
 
-  /** The plaza's trees, plants and daisies, and the Booth 630 sign on its two posts beside where Sam stops. */
+  /** The plaza's trees, its plant and the promo cabinet, and the Booth 630 sign on its post beside where Sam stops. */
   drawProps(ctx: CanvasRenderingContext2D, f: Frame, look: PlazaLook): void {
     const c = this.city;
     if (!c) return;
