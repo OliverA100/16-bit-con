@@ -7,7 +7,7 @@
 import { WORDMARK_DAISY, WORDMARK_DAISY_AT, WORDMARK_LETTERS, WORDMARK_VIEW, WORDMARK_VIEW_LETTERS } from '../data/wordmark';
 import { readToken } from './palette';
 
-export interface WordmarkInk {
+interface WordmarkInk {
   fill: string;
   /** null: no outline (the page's own look, solid Green 900). */
   outline: string | null;

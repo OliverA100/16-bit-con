@@ -78,7 +78,7 @@ const scene: SceneModule = {
     const canyon = withoutStalk(canyonImg);
     // the stem's centre on each row, so his hands stay round it as it curves (as on the page)
     const stemFrame = layer(stalk.fw, stalk.fh, (ctx) => ctx.drawImage(stalk.image, 0, 0, stalk.fw, stalk.fh, 0, 0, stalk.fw, stalk.fh));
-    const stem = stemTable(stemFrame.getContext('2d')!.getImageData(0, 0, stalk.fw, stalk.fh).data, stalk.fw, stalk.fw, stalk.fh);
+    const stem = stemTable(stemFrame.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, stalk.fw, stalk.fh).data, stalk.fw, stalk.fw, stalk.fh);
     /** His hands' row in his climb cell (its rows 22–29): where he holds the stem. */
     const HANDS_ROW = 25;
     const ground = (h: number) => h - GROUND;

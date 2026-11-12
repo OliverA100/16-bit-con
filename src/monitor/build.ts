@@ -272,7 +272,7 @@ function contactTexture(
   return t;
 }
 
-export interface MonitorColors {
+interface MonitorColors {
   plastic: Color;
   bevel: Color;
   slot: Color;

@@ -109,7 +109,7 @@ interface Geo {
   edge: { x: number; top: number; bottom: number } | null;
 }
 
-export interface JourneyOptions {
+interface JourneyOptions {
   perch: Perch;
   sheets: SamSheets;
   /** His idle on the Register window (smiling). */
@@ -156,7 +156,8 @@ export async function startJourney(o: JourneyOptions): Promise<void> {
     height: `${(44 / 60) * 100}%`,
     pointerEvents: 'none',
   });
-  Object.assign(canvas.style, { display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated' });
+  canvas.className = 'pixel';
+  Object.assign(canvas.style, { display: 'block', width: '100%', height: '100%' });
   document.body.append(el);
   const style = document.createElement('style');
   style.textContent = '.page-stalk canvas{position:absolute;left:0;top:0;image-rendering:pixelated}';

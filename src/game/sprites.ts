@@ -15,7 +15,20 @@ export interface Strip {
   draw(ctx: CanvasRenderingContext2D, frame: number, x: number, y: number, flip?: boolean): void;
 }
 
+const images = new Map<string, Promise<HTMLImageElement>>();
+
+/** One image per file, however many parts of the page ask for it: loaded and decoded once (a failed load may be tried again). */
 export function loadImage(url: string): Promise<HTMLImageElement> {
+  let p = images.get(url);
+  if (!p) {
+    p = fetchImage(url);
+    images.set(url, p);
+    p.catch(() => images.delete(url));
+  }
+  return p;
+}
+
+function fetchImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.decoding = 'async';

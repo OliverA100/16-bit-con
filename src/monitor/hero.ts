@@ -62,10 +62,10 @@ const BEVEL_GLOW = 0.35;
 /** The glass at rest (src/monitor/index.ts): its opacity and its reflection. */
 const GLASS = { opacity: 0.15, env: 2.2 } as const;
 
-export type PowerPhase = 'off' | 'line' | 'open' | 'on';
+type PowerPhase = 'off' | 'line' | 'open' | 'on';
 
 /** What the page knows about its layout: the canvas's CSS box, the slot, and the canvas world it hands over to. */
-export interface HeroLayout {
+interface HeroLayout {
   cssW: number;
   cssH: number;
   slot: Slot;

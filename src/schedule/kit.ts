@@ -44,17 +44,7 @@ export interface SceneModule {
   load(): Promise<Scene>;
 }
 
-const images = new Map<string, Promise<HTMLImageElement>>();
-
-export function img(url: string): Promise<HTMLImageElement> {
-  let p = images.get(url);
-  if (!p) {
-    p = loadImage(url);
-    images.set(url, p);
-    p.catch(() => images.delete(url));
-  }
-  return p;
-}
+export const img = loadImage;
 
 export function preloadFiles(files: string[]): Promise<unknown> {
   return Promise.all(files.map(img));
@@ -103,9 +93,9 @@ export function daisyFrames(): Promise<HTMLCanvasElement[]> {
  * hills (seam patched, tiled plainly) standing on the ground line with their last 12 rows under it, the
  * sand-and-daisy meadow with its surface (row 6) on the ground line, and two of Vega's daisies swaying out of it.
  */
-export const MEADOW_TOP = 6;
+const MEADOW_TOP = 6;
 
-export interface SunsetArt {
+interface SunsetArt {
   hills: HTMLCanvasElement;
   meadow: HTMLImageElement;
 }
@@ -234,7 +224,7 @@ export function put(ctx: CanvasRenderingContext2D, src: Drawable, x: number, y: 
  * Someone (or something) on the ground: drawn with its bottom row, where every sheet's feet are, on a
  * feet line, at a scene time, optionally mirrored to face the other way.
  */
-export type Standing = (ctx: CanvasRenderingContext2D, t: number, x: number, feet: number) => void;
+type Standing = (ctx: CanvasRenderingContext2D, t: number, x: number, feet: number) => void;
 
 /** A single pose standing on a feet line. */
 export const standStill =
@@ -283,12 +273,15 @@ export function cloudsKey(clouds: Cloud[], t: number, v: View): number {
   return stateKey(skyTop(v), ...clouds.map((c) => cloudX(c, t, v) * v.k));
 }
 
-/** A canvas the size of `w` × `h`, drawn once by `paint`, for layers that never move. */
-export function layer(w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void): HTMLCanvasElement {
+/**
+ * A canvas the size of `w` × `h`, drawn once by `paint`, for layers that never move. `readBack`: its pixels
+ * will be read again after it is made, so the browser keeps them where reading is fast.
+ */
+export function layer(w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void, readBack = false): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', { willReadFrequently: readBack })!;
   ctx.imageSmoothingEnabled = false;
   paint(ctx);
   return c;

@@ -15,7 +15,7 @@ import { DIVE, ENTER, PLAY, playMs, playP } from './segments';
 import { clamp01 } from '../lib/math';
 
 /** The numbers to tune by ear (/dev/sound edits them live). Levels are linear gain, times seconds. */
-export const params = {
+const params = {
   master: 0.5,
   // enter / exit
   clickLevel: 0.22,
@@ -68,12 +68,10 @@ export const params = {
   openLevel: 0.11,
   closeLevel: 0.09,
 };
-export type SoundParams = typeof params;
-export const defaults: Readonly<SoundParams> = { ...params };
 
-export const CRACK_FILES = ['crack-4', 'crack-3', 'glass-1', 'glass-3'] as const;
+const CRACK_FILES = ['crack-4', 'crack-3', 'glass-1', 'glass-3'] as const;
 const FILES = [...CRACK_FILES, 'shatter'] as const;
-export type FileName = (typeof FILES)[number];
+type FileName = (typeof FILES)[number];
 /**
  * What glass-1 and glass-3 need that the other files already have, done here so the files stay as they are:
  * a gain to bring each one's loudest moment to the others' (−3.4 dBFS; theirs are −14.7 and −14.0),
@@ -84,7 +82,7 @@ const FILE_TRIM: Partial<Record<FileName, { db: number; fade: number }>> = {
   'glass-3': { db: 10.6, fade: 0.03 },
 };
 /** A crack "cut to fit": it plays this long (s, real time) and then fades over CUT_FIT_FADE, so it ends as the next hit can land. */
-export const CUT_FIT = 0.32;
+const CUT_FIT = 0.32;
 const CUT_FIT_FADE = 0.06;
 /**
  * The crack for each stage, 1–6, and whether it is cut to fit. The new crack length per stage,
@@ -272,18 +270,9 @@ export function setEnabled(v: boolean): void {
   setMaster();
 }
 
-/** The master's level now (the tuning page moves it). */
-export function applyMaster(): void {
-  setMaster(0.05);
-}
-
 /** Every voice still holding nodes (dev checks, and "stop all"). */
 export function live(): { name: string }[] {
   return [...voices].map((v) => ({ name: v.name }));
-}
-
-export function stopAll(): void {
-  for (const v of voices) v.stop();
 }
 
 /** Whether a sound may start now. */
@@ -636,7 +625,7 @@ function staticEnvelope(name: string, level: number) {
 }
 
 /** The broken tube's static, under the shatter, once per visit: it holds, fades to exactly 0 and stops. */
-export function playStatic(force = false): Voice | null {
+function playStatic(force = false): Voice | null {
   if (staticPlayed && !force) {
     return null;
   }

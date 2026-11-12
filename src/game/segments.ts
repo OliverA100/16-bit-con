@@ -101,7 +101,7 @@ export const ENTER = {
 } as const;
 
 /** A CSS cubic-bezier(x1, y1, x2, y2) easing (x1, x2 in 0–1): y for x, by Newton's method, bisection when it stalls. */
-export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (x: number) => number {
+function cubicBezier(x1: number, y1: number, x2: number, y2: number): (x: number) => number {
   const cx = 3 * x1;
   const bx = 3 * (x2 - x1) - cx;
   const ax = 1 - cx - bx;

@@ -45,7 +45,7 @@ export const CRT_REST = {
   bright: 1.15,
 } as const;
 
-export interface CrtUniforms {
+interface CrtUniforms {
   uMap: { value: Texture | null };
   /** The frame's rectangle inside the texture (u0, v0, u1, v1), mapped onto the opening. */
   uFrame: { value: Vector4 };
@@ -293,7 +293,7 @@ export function createCrtMaterial(tube: Color): CrtMaterial {
 export const STATIC_RATE = 18;
 
 /** One scanline every this many device px of the screen at rest (about 4 reads as a tube of this size). */
-export const SCAN_PX = 4;
+const SCAN_PX = 4;
 
 /**
  * The sizes set in device px of the screen at rest (w × h device px): a dark gap every 4 px, an

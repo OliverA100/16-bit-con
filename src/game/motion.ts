@@ -3,7 +3,7 @@
  * deceleration, a short skid when reversing at speed, and a true full stop. Units are world px
  * and seconds. The loop integrates the returned displacement into X and scrolls the page.
  */
-export const RUN_SPEED = 200; // world px/s (~4.4 of Sam's heights a second; the run is ~30 s held)
+const RUN_SPEED = 200; // world px/s (~4.4 of Sam's heights a second; the run is ~30 s held)
 const ACCEL = RUN_SPEED / 0.12; // 0 → full in 0.12 s: a platformer's quick start
 const DECEL = RUN_SPEED / 0.1; // full → 0 in 0.1 s
 const AIR_CONTROL = 0.75; // in the air he still steers, a little less sharply

@@ -3,7 +3,7 @@
  * Each icon is a grid of cells ('#' filled); pixelPath() turns it into one SVG path of rectangles, a row's
  * runs merged.
  */
-export type PixelGrid = readonly string[];
+type PixelGrid = readonly string[];
 
 export const PIXEL_ICONS = {
   /** The checkbox's tick: 2 px blocks on 8 × 8 cells, drawn 1 px in from the left (16 × 16). */
@@ -107,13 +107,11 @@ export const PIXEL_ICONS = {
   ],
 } as const satisfies Record<string, PixelGrid>;
 
-export type PixelIconName = keyof typeof PIXEL_ICONS;
-
 /**
  * A grid drawn with lines twice as thick: every filled cell also fills the cells right of it and below it, so a
  * 1-cell line becomes 2 (the grid grows by one row and column). The HUD's icons use it on their 16 × 16 grids.
  */
-export function thicken(grid: PixelGrid): PixelGrid {
+function thicken(grid: PixelGrid): PixelGrid {
   const n = grid.length;
   const on = (x: number, y: number) => y >= 0 && y < n && x >= 0 && x < grid[y]!.length && grid[y]![x] === '#';
   return Array.from({ length: n + 1 }, (_, y) =>

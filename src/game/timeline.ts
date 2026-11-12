@@ -13,7 +13,7 @@ import { clamp } from '../lib/math';
 export type Source = 'idle' | 'scroll' | 'keys' | 'dpad' | 'mash' | 'auto';
 
 /** Time constant of the visual ease toward the scroll position, seconds. */
-export const SCROLL_TAU = 0.3;
+const SCROLL_TAU = 0.3;
 /** The ease never crawls slower than this (world px/s), so it reaches the target and Sam fully stops. */
 const MIN_CLOSE_SPEED = 60;
 /** Within an art pixel the ease snaps; the camera rounds to whole pixels anyway. */
@@ -32,7 +32,7 @@ export class Timeline {
   constructor(
     /** World length in art px. */
     public readonly W: number,
-    /** Highest t the current build exposes (Level 1 gate: 0.34). */
+    /** The highest t the run reaches. */
     public tMax: number,
     /** Lowest t: the top of the enter segment, −D_E / D_W (0 when there is none). */
     public tMin = 0,

@@ -8,7 +8,7 @@ import type { Strip } from './sprites';
 import type { Rect } from './world';
 import { SAM_HITBOX, SAM_CELL } from './sam';
 
-export interface CoinDef {
+interface CoinDef {
   id: string;
   x: number;
   /** Height of the coin's centre above F. */
@@ -16,7 +16,7 @@ export interface CoinDef {
   high: boolean;
 }
 
-export const LEVEL1_COINS: CoinDef[] = [
+export const WORLD_COINS: CoinDef[] = [
   { id: 'l1-a', x: 760, y: 24, high: false },
   { id: 'l1-b', x: 1000, y: 76, high: true },
   { id: 'l1-c', x: 1240, y: 76, high: true },

@@ -3,7 +3,7 @@
  * monitor's screen). The projection of a plane is a homography, and a CSS matrix3d can hold one
  * exactly — the same maths the CSS3DRenderer relies on, without the addon.
  */
-export type Point = [number, number];
+type Point = [number, number];
 /** Corners in order: top left, top right, bottom right, bottom left. */
 export type Quad = [Point, Point, Point, Point];
 
@@ -38,7 +38,7 @@ function squareTo(q: Quad): Homography {
 }
 
 /** The point at (u, v) of the unit square, mapped into `q`. */
-export function quadPoint(q: Quad, u: number, v: number): Point {
+function quadPoint(q: Quad, u: number, v: number): Point {
   const { a, b, c, d, e, f, g, h } = squareTo(q);
   const w = g * u + h * v + 1;
   return [(a * u + b * v + c) / w, (d * u + e * v + f) / w];

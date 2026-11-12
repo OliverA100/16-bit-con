@@ -110,12 +110,12 @@ const passes = [
 </Window>
 
 <script>
-  import { initRegisterForm } from '../register/form';
-  import { initSuccess } from '../register/success';
+  import { startRegisterForm } from '../register/form';
+  import { startSuccess } from '../register/success';
 
-  let success: ReturnType<typeof initSuccess> = null;
-  const formApi = initRegisterForm({ onRegistered: (r) => success?.show(r) });
-  success = initSuccess(formApi);
+  let success: ReturnType<typeof startSuccess> = null;
+  const formApi = startRegisterForm({ onRegistered: (r) => success?.show(r) });
+  success = startSuccess(formApi);
 </script>
 
 <style>

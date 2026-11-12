@@ -102,9 +102,9 @@ export async function startSky(paused: () => boolean): Promise<void> {
       top: '0',
       width: `${img.width * a}px`,
       height: `${img.height * a}px`,
-      imageRendering: 'pixelated',
       opacity: '0',
     });
+    el.className = 'pixel';
     layer.append(el);
     return { el, w: img.width * a, h: img.height * a };
   };

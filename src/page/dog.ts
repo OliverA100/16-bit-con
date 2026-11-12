@@ -29,7 +29,7 @@ const NEAR = 58;
 
 type Phase = 'away' | 'in' | 'greet' | 'stay' | 'bark' | 'out';
 
-export interface DogOptions {
+interface DogOptions {
   paused: () => boolean;
   /** Where Sam stops in the field (his cell's left, page px). */
   samStop: () => number;
@@ -61,7 +61,8 @@ export async function startDog(o: DogOptions): Promise<{ wake(): void } | null> 
     pointerEvents: 'none',
     display: 'none',
   });
-  Object.assign(canvas.style, { display: 'block', imageRendering: 'pixelated' });
+  canvas.className = 'pixel';
+  canvas.style.display = 'block';
   document.body.append(el);
 
   let phase: Phase = 'away';

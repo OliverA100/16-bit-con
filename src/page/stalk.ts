@@ -28,7 +28,7 @@ const GROW_MS = 1200;
 const UNFURL = 0.6;
 const V_ROWS = 110;
 
-export interface StalkArt {
+interface StalkArt {
   /** The ten frames, each mirrored in place, side by side. */
   sheet: HTMLCanvasElement;
   /** The stem's centre column (smoothed) on each of the period's 258 rows, in the mirrored frame. */

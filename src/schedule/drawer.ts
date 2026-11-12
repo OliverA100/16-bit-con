@@ -70,7 +70,7 @@ function settleMs(drawer: HTMLElement): number {
   return Math.max(msOf(drawer, '--dur-folder', 450), msOf(drawer, '--dur-base', 200)) + 60;
 }
 
-export function bootDrawer(drawer: HTMLElement): void {
+export function startDrawer(drawer: HTMLElement): void {
   const runner = new SceneRunner();
   const days: Day[] = [...drawer.querySelectorAll<HTMLElement>('[data-panel]')].map((panel) => {
     const id = panel.dataset.panel!;

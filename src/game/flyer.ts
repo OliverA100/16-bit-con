@@ -21,7 +21,7 @@ import { hexToRgb, readToken } from './palette';
 import { clamp01, lerp } from '../lib/math';
 
 /** Top of the screen to the ground. */
-export const FALL_MS = 3900;
+const FALL_MS = 3900;
 /** The flat flyer settles after it touches down. */
 const SETTLE_MS = 160;
 /** The swing's period, set so the sixth end of a swing comes exactly at the ground: T = P/4 + 5·P/2. */
@@ -99,7 +99,7 @@ const descended = (ms: number) => {
   return i >= descent.length - 1 ? 1 : lerp(descent[i]!, descent[i + 1]!, f - i);
 };
 
-export interface FlyerPose {
+interface FlyerPose {
   /** World x of the paper's centre. */
   x: number;
   /** Height of the paper's bottom above the ground line, art px. */
@@ -113,7 +113,7 @@ export interface FlyerPose {
 }
 
 /** Where the flyer is `ms` after it was dropped, falling from `top` px above the ground towards `landX`. */
-export function flyerPose(ms: number, top: number, fromX: number, landX: number): FlyerPose {
+function flyerPose(ms: number, top: number, fromX: number, landX: number): FlyerPose {
   const T = FALL_MS / 1000;
   const t = Math.min(ms, FALL_MS) / 1000;
   const k = t / T;
@@ -173,7 +173,7 @@ function toCanvas(px: Uint8ClampedArray, w: number, h: number): HTMLCanvasElemen
 }
 
 /** Sounds the fall asks for, as they happen. */
-export interface FallCues {
+interface FallCues {
   /** Each end of a swing, where the paper catches air; `size` 1 at the top down to ~0.2 at the ground. */
   swing?: (size: number) => void;
   land?: () => void;

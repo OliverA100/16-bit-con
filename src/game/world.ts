@@ -6,7 +6,7 @@
  * out of the ground and the horizon never moves. Everything is a pure function of the timeline
  * plus wall-clock cloud drift, coin spin, dust and the idle NPC loops, so reverse is free.
  */
-import { FIELD, JOINT_SLOPE, STREET, type CityAssets, type Level1Assets } from './assets';
+import { FIELD, JOINT_SLOPE, STREET, type CityAssets, type WorldAssets } from './assets';
 import { cityAd, conPoster } from './signage';
 import type { Drawable } from './sprites';
 import { FOOT_SINK, type Sam } from './sam';
@@ -66,7 +66,7 @@ export interface Frame {
  * Sam is at that x, and "ends" where its trailing edge leaves the right edge; from there it
  * simply scrolls at its own parallax speed. Reverse walks out of town the same way backwards.
  */
-export const SEQ = {
+const SEQ = {
   farBegin: 300, // city-far: a small skyline at the right end of the horizon, long before anything else
   towersBegin: 1500,
   hillsEnd: 1600, // the hills stop tiling and scroll off to the left
@@ -240,7 +240,7 @@ function stripOver(img: Drawable, like: Strip): Strip {
   return st;
 }
 
-function buildNight(a: Level1Assets, c: CityAssets, T: NightTokens): NightSet {
+function buildNight(a: WorldAssets, c: CityAssets, T: NightTokens): NightSet {
   // Glass by layer: the blue panes, and the panes Vega drew in warm "already lit" colours. Both go
   // dark at night and both belong to the window finder, so a window lights only as a whole and
   // only through the overlay — a warm slat gap under a dark pane never glows on its own.
@@ -473,7 +473,7 @@ function rowClip(
 }
 
 /** A tiled far layer on the screen canvas: positions snap to device pixels, tiles abut exactly (k · width is whole). */
-export function farTiled(
+function farTiled(
   ctx: CanvasRenderingContext2D,
   img: Drawable,
   scroll: number,
@@ -497,7 +497,7 @@ export function farTiled(
   }
 }
 
-export function drawTiled(
+function drawTiled(
   ctx: CanvasRenderingContext2D,
   img: Drawable,
   scroll: number,
@@ -536,7 +536,7 @@ export function drawTiled(
   if (bounded) ctx.restore();
 }
 
-export class Level1 {
+export class World {
   /** Set once the city assets arrive; until then the city simply has not come into view. */
   city: CityAssets | null = null;
   /** The Javits plaza at the end of the run, the game's last level (src/game/plaza.ts). */
@@ -547,7 +547,7 @@ export class Level1 {
   /** The clouds and the far range, recoloured gradually with the sky. */
   private readonly tints: Map<Drawable, Tinted>;
 
-  constructor(private readonly a: Level1Assets) {
+  constructor(private readonly a: WorldAssets) {
     this.plaza = new Plaza(a);
     this.tints = new Map([...a.small, ...a.medium, ...a.cumulus, a.cloudBank].map((img) => [img, new Tinted(img, CLOUD_ROLES)]));
     this.tints.set(a.silhouette, new Tinted(a.silhouette, RANGE_ROLES));

@@ -606,7 +606,7 @@ interface Shard {
   splits: boolean;
 }
 
-export interface BreakoutParts {
+interface BreakoutParts {
   /** Lay the pattern out from Sam's spot on the screen (screen UV, v up). */
   layout(impact: [number, number]): void;
   /** The crack stage shown (0–6), the break (0–1 of the glass's own clock; the tube shows static behind it), and the camera the flying pieces pass. */

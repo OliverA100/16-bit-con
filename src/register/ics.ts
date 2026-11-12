@@ -32,7 +32,7 @@ const stamp = (d: Date) =>
     .replace(/[-:]/g, '')
     .replace(/\.\d{3}/, '');
 
-export function icsFor(pass: PassId, player: string, code: string, now = new Date()): string {
+function icsFor(pass: PassId, player: string, code: string, now = new Date()): string {
   const p = PASSES[pass];
   const lines = [
     'BEGIN:VCALENDAR',

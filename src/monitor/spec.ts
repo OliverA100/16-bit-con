@@ -80,7 +80,7 @@ export const SLOT_Y = DIMS.frame.lip + (CHIN - DIMS.lip - DIMS.frame.lip) * DIMS
 export const ROW2_Y = DIMS.frame.lip + (CHIN - DIMS.lip - DIMS.frame.lip) * DIMS.chin.bottom;
 
 /** Signed distance from (x, y) to a rounded rectangle centred on (cx, cy), half-size hw × hh, corner r (negative inside). */
-export function sdRoundRect(x: number, y: number, cx: number, cy: number, hw: number, hh: number, r: number): number {
+function sdRoundRect(x: number, y: number, cx: number, cy: number, hw: number, hh: number, r: number): number {
   const qx = Math.abs(x - cx) - hw + r;
   const qy = Math.abs(y - cy) - hh + r;
   return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;

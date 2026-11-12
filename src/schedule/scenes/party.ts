@@ -325,7 +325,7 @@ const scene: SceneModule = {
         for (let t = 0; t < 3; t += 0.125) for (const [who, x, d] of castOf(v)) actors[who](ctx, t, x, ground(v) + d);
         ctx.fillRect(0, ground(v) - PAVE, v.w, v.h);
       });
-      const alpha = mask.getContext('2d')!.getImageData(0, 0, v.w, v.h).data;
+      const alpha = mask.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, v.w, v.h).data;
       return (x: number, y: number) => x < 0 || y < 0 || x >= v.w || y >= v.h || alpha[(y * v.w + x) * 4 + 3]! > 0;
     };
     /** Every window that shows in this view and nobody stands in front of, in one lighting order. */

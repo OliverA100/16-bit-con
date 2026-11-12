@@ -7,7 +7,7 @@ export type Day = 'Oct 3' | 'Oct 4' | 'Oct 5';
 /** Which animated scene a session's folder shows (src/schedule/scenes). */
 export type SceneId = 'field' | 'city' | 'party' | 'office' | 'desert' | 'rain' | 'beanstalk' | 'park' | 'sunset';
 
-export interface Session {
+interface Session {
   /** Slug for element ids. */
   id: string;
   day: Day;

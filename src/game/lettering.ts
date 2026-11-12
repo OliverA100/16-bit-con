@@ -7,7 +7,7 @@
  */
 import type { Drawable } from './sprites';
 
-export const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-·';
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-·';
 export type Size = 'small' | 'large';
 const ROWS = {
   small: { day: 0, neon: 29, w: 9, h: 11, space: 4 },

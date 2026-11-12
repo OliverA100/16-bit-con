@@ -35,9 +35,9 @@ import { Motion } from './motion';
 import { Dust } from './dust';
 import { FallingFlyer, FlyerSprites } from './flyer';
 import { FOOT_SINK, Sam, SAM_CELL } from './sam';
-import { Coins, LEVEL1_COINS, TOTAL_COINS } from './coins';
-import { loadCity, loadLevel1 } from './assets';
-import { Level1 } from './world';
+import { Coins, WORLD_COINS, TOTAL_COINS } from './coins';
+import { loadCity, loadWorld } from './assets';
+import { World } from './world';
 import { clockFor, skyAt } from './stages';
 import { GROUND_BAND } from '../data/layers';
 import { GG_LINE, samLines, type SamLine } from '../data/guide';
@@ -59,6 +59,7 @@ import { GL_ATTRIBUTES } from '../monitor/spec';
 import * as sound from './sound';
 import { clamp01 } from '../lib/math';
 import { reducedMotion } from '../lib/reduced-motion';
+import { BEAT_MS } from '../lib/motion';
 
 const W = 6000;
 /** The whole run: the field, the city, the night and the dawn at the Javits plaza, the game's last level (world x 0–6000). */
@@ -113,7 +114,7 @@ export function shouldRunWorld(): boolean {
 
 const clamp1 = (v: number) => Math.min(1, Math.max(-1, v));
 
-export async function bootWorld(section: HTMLElement): Promise<void> {
+export async function startWorld(section: HTMLElement): Promise<void> {
   if (!shouldRunWorld()) return;
   const o = queryOverlay(section);
   gsap.registerPlugin(ScrollTrigger);
@@ -126,7 +127,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // loading window covers it — and the world's ~1 MB of art waits until the opening's LCP element
   // has painted, so the opening's text never queues behind it.
   await afterOpeningPaint(section.querySelector('[data-stage]'));
-  const assets = await loadLevel1();
+  const assets = await loadWorld();
 
   // ── Viewport, buffers, geometry ─────────────────────────────────────────
   // The game frame, drawn offscreen at art pixels and scaled onto the canvas over the far sky.
@@ -296,8 +297,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const input = new Input(o.canvas);
   if (o.dpadLeft && o.dpadRight && o.buttonA) input.bindDpad(o.dpadLeft, o.dpadRight, o.buttonA);
   const sam = new Sam(assets.sam);
-  const coins = new Coins(LEVEL1_COINS);
-  const level = new Level1(assets);
+  const coins = new Coins(WORLD_COINS);
+  const level = new World(assets);
   // The city set (and the plaza's art) loads right behind the field; city-far first enters at world x 300.
   loadCity()
     .then((c) => {
@@ -587,9 +588,22 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let lastFloor = '';
   let floorReadAt = -Infinity;
   const FLOOR_READ_MS = 400;
+  /**
+   * One row of a canvas' pixels, read through a one-row canvas made for reading: the world's own canvases are
+   * drawn to every frame, and a canvas marked for read-back draws slower.
+   */
+  const rowProbe = document.createElement('canvas');
+  rowProbe.height = 1;
+  const rowCtx = rowProbe.getContext('2d', { willReadFrequently: true })!;
+  const readRow = (from: HTMLCanvasElement, y: number) => {
+    if (rowProbe.width !== from.width) rowProbe.width = from.width;
+    rowCtx.clearRect(0, 0, from.width, 1);
+    rowCtx.drawImage(from, 0, y, from.width, 1, 0, 0, from.width, 1);
+    return rowCtx.getImageData(0, 0, from.width, 1).data;
+  };
   /** The ground's colour for the strip: the mean of the buffer's bottom row, which drifts as the world passes and never flips between two of a textured ground's tones. */
   const floorColour = () => {
-    const row = bctx.getImageData(0, buffer.height - 1, buffer.width, 1).data;
+    const row = readRow(buffer, buffer.height - 1);
     let r = 0;
     let g = 0;
     let b = 0;
@@ -614,7 +628,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const c = document.createElement('canvas');
     c.setAttribute('aria-hidden', 'true');
     c.hidden = true;
-    c.style.cssText = `position:sticky;z-index:-1;display:block;width:100%;pointer-events:none;image-rendering:pixelated;${css}`;
+    c.style.cssText = `position:sticky;z-index:-1;display:block;width:100%;pointer-events:none;${css}`;
+    c.className = 'pixel';
     return c;
   };
   const below = strip(`bottom:-${SKIRT_BELOW}px;height:${SKIRT_BELOW}px;margin-top:-${SKIRT_BELOW}px`);
@@ -636,7 +651,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   const SKYLINE_BANDS = 48;
   const skyline = () => {
     const w = o.canvas.width;
-    const row = sctx.getImageData(0, 0, w, 1).data;
+    const row = readRow(o.canvas, 0);
     const stops: string[] = [];
     let run = '';
     let from = 0;
@@ -1387,7 +1402,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   //    twist's two lines (from SKIP_SAYS_FROM) to be typed out before it even at full speed. ──
   const SKIP_TO = 0.88;
   const SKIP_SAYS_FROM = 0.85;
-  const SKIP_FADE_MS = 400;
+  const SKIP_FADE_MS = 8 * BEAT_MS; // four steps to the sky, four back
   let skipFade: { t0: number; jumped: boolean } | null = null;
   o.skip?.addEventListener('click', () => {
     if (mode !== 'play' || paused || zoom || finale || exiting || skipFade || timeline.t >= SKIP_TO) return;

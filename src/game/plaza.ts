@@ -5,10 +5,10 @@
  * its end annex repeating outward and a row of clipped cypress along its base, the far skyline behind its
  * low wings. On the ground the sidewalk's paving carries on and takes the whole band where the kerb turns
  * away (world.ts); the plaza's trees, a plant and the con's promo cabinet stand on it, and the Booth 630
- * sign stands beside where Sam stops. Level1 draws each part at its depth and gives each image its
+ * sign stands beside where Sam stops. World draws each part at its depth and gives each image its
  * palette step: the night images serve the night, and the dawn steps them back to day.
  */
-import type { CityAssets, Level1Assets } from './assets';
+import type { CityAssets, WorldAssets } from './assets';
 import type { Drawable } from './sprites';
 import { STACK, type Frame } from './world';
 import { BOOTH_DEPTH, boothSign, boothSignStand, javitsLetters } from './signage';
@@ -77,7 +77,7 @@ export class Plaza {
   private marquee: { img: Drawable; x: number; bottom: number } | null = null;
   private night: PlazaNight | null = null;
 
-  constructor(private readonly a: Level1Assets) {}
+  constructor(private readonly a: WorldAssets) {}
 
   /** Once the city set is here: build the two signs and touch the big images in idle time, so the plaza's first frame does no one-off work. */
   warm(c: CityAssets): void {
@@ -89,7 +89,7 @@ export class Plaza {
       this.marqueeFor();
       const probe = document.createElement('canvas');
       probe.width = probe.height = 1;
-      const pctx = probe.getContext('2d')!;
+      const pctx = probe.getContext('2d', { willReadFrequently: true })!;
       for (const img of [c.facade, c.facadeBay, c.cypress]) pctx.drawImage(img, 0, 0, 1, 1);
     });
   }

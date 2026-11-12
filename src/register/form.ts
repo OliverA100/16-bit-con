@@ -11,9 +11,9 @@
  */
 import { PIXEL_ICONS, pixelPath } from '../data/pixel-icons';
 
-export type FieldName = 'name' | 'email' | 'pass';
+type FieldName = 'name' | 'email' | 'pass';
 
-export const MESSAGES = {
+const MESSAGES = {
   name: 'Enter your name.',
   emailEmpty: 'Enter your email address.',
   emailInvalid: 'Enter a valid email address, like sam@vega.io.',
@@ -24,11 +24,11 @@ export const MESSAGES = {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The name: trimmed, at least 2 characters (code points, so any script counts), any letters or marks. */
-export function checkName(value: string): string {
+function checkName(value: string): string {
   return [...value.trim()].length >= 2 ? '' : MESSAGES.name;
 }
 
-export function checkEmail(value: string): string {
+function checkEmail(value: string): string {
   const v = value.trim();
   if (!v) return MESSAGES.emailEmpty;
   return EMAIL.test(v) ? '' : MESSAGES.emailInvalid;
@@ -44,7 +44,7 @@ export interface Registration {
   news: boolean;
 }
 
-export interface FormHooks {
+interface FormHooks {
   /** Show the success state for this registration (the form has stepped out by then). */
   onRegistered(r: Registration): void | Promise<void>;
 }
@@ -58,7 +58,7 @@ export interface RegisterFormApi {
   focusFirst(): void;
 }
 
-export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
+export function startRegisterForm(hooks: FormHooks): RegisterFormApi | null {
   const form = document.getElementById('register-form') as HTMLFormElement | null;
   const win = document.getElementById('register');
   if (!form || !win) return null;

@@ -11,7 +11,7 @@ import { cropImage, patchTileSeam } from './palette';
 import { loadSamSheets, type SamSheets } from './sam';
 import { facadeWithDepth, facadeWithoutSigns } from './signage';
 
-export interface Level1Assets {
+export interface WorldAssets {
   sam: SamSheets;
   coin: Strip;
   /** High and small: cloud-f, g, h, faint. */
@@ -130,7 +130,7 @@ async function loadAll(files: { file: string }[], onProgress?: (done: number, to
   );
 }
 
-export async function loadLevel1(onProgress?: (done: number, total: number) => void): Promise<Level1Assets> {
+export async function loadWorld(onProgress?: (done: number, total: number) => void): Promise<WorldAssets> {
   const files = [
     sprites.coin,
     sprites.cloudF,

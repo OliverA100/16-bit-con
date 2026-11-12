@@ -82,8 +82,8 @@ export function conPoster(c: CityAssets): HTMLCanvasElement {
  * bottom and right), the poster behind glass with a faint glint across its corner; on the booth sign's rounded
  * post and plinth. Lit at night.
  */
-export const AD_POST = 16;
-export const AD_DEPTH = 4;
+const AD_POST = 16;
+const AD_DEPTH = 4;
 export function cityAd(poster: Drawable): HTMLCanvasElement {
   const [k, g7, g5, cw] = ['--color-outline-black', '--color-grey-700', '--color-grey-500', '--color-cloud-white'].map(readToken) as [
     string,
@@ -148,7 +148,7 @@ export function cityAd(poster: Drawable): HTMLCanvasElement {
  * The Javits Center's letters: the wordmark, large, in solid Green 900 like the page's own (the nav's), as channel
  * letters with depth — their returns in Green 500, receding up and right like the booth sign's top and side.
  */
-export const LETTER_DEPTH = 3;
+const LETTER_DEPTH = 3;
 export function javitsLetters(): HTMLCanvasElement {
   const face = wordmarkPixels(200, { ink: { fill: readToken('--color-green-900'), outline: null } });
   const side = wordmarkPixels(200, { ink: { fill: readToken('--color-green-500'), outline: null } });

@@ -32,7 +32,7 @@ function hash(s: string): number {
 }
 
 /** Bars of 1–3 px with 1–3 px gaps between guard bars (1 px, gap, 1 px at each end), filling `width`. */
-export function barcodeBars(code: string, width = 96): [number, number][] {
+function barcodeBars(code: string, width = 96): [number, number][] {
   const rand = mulberry32(hash(code));
   const bars: [number, number][] = [
     [0, 1],

@@ -27,7 +27,7 @@ export async function loadSamSheets(): Promise<SamSheets> {
  * The two sheets Sam needs only once he is out on the page (src/page/journey.ts): climbing the beanstalk
  * and smoking on the footer's ground, through the same brand map so all five sheets are one Sam.
  */
-export interface PageSheets {
+interface PageSheets {
   climb: Strip;
   smoke: Strip;
 }
@@ -73,7 +73,7 @@ const JUMP_MIN_MS = 50;
 /** A press this soon before landing jumps on landing. */
 const JUMP_BUFFER_MS = 100;
 
-export type SamMode = 'idle' | 'run' | 'skid' | 'jump';
+type SamMode = 'idle' | 'run' | 'skid' | 'jump';
 
 export class Sam {
   facing: 1 | -1 = 1;

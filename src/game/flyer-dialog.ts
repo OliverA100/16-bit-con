@@ -4,6 +4,7 @@
  * It opens out of the little flyer in the world: from its rect on screen, it grows to its place.
  */
 import { reducedMotion } from '../lib/reduced-motion';
+import { STEP_OUT_FALLBACK_MS } from '../lib/motion';
 export interface FlyerDialog {
   readonly open: boolean;
   /** Open, growing from `from` (the little flyer's box on screen, CSS px), if given. */
@@ -58,7 +59,7 @@ export function createFlyerDialog(hooks: {
     }
     closing = true;
     dialog.classList.add('is-closing');
-    timer = window.setTimeout(finish, 400);
+    timer = window.setTimeout(finish, STEP_OUT_FALLBACK_MS);
   };
   go.addEventListener('click', close);
   dialog.addEventListener('cancel', (e) => {

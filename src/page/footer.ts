@@ -31,10 +31,10 @@ import { reducedMotion } from '../lib/reduced-motion';
  * The band in art rows: the ground line (the meadow's surface) this many rows above its bottom, so the
  * meadow shows whole, down to its last row (51 rows, its surface at row 6). The field is never cropped.
  */
-export const FOOTER_GROUND_BELOW = 45;
+const FOOTER_GROUND_BELOW = 45;
 
 /** CSS px per art px: the page's Sam scale. */
-export function samPx(): number {
+function samPx(): number {
   const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sam-px'));
   return v > 0 ? v : 2;
 }

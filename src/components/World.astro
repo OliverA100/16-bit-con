@@ -169,7 +169,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 </section>
 
 <script>
-  import { bootWorld, shouldRunWorld } from '../game/index';
+  import { startWorld, shouldRunWorld } from '../game/index';
   import { queryHero, staticHero } from '../game/hero-dom';
   import { perchStill, queryPerch } from '../page/landing';
 
@@ -185,7 +185,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   };
 
   if (section && shouldRunWorld()) {
-    bootWorld(section).catch((err) => {
+    startWorld(section).catch((err) => {
       console.error('[world] boot failed, the static opening stays', err);
       document.documentElement.classList.remove('has-game', 'is-playing');
       const d = queryHero(section);
@@ -429,7 +429,10 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   /* The live world's height is held by the page (--world-h, src/game/index.ts viewH): a phone's toolbar
-     showing or hiding mid-scroll never resizes it, so the 3D under PRESS START never stretches. */
+     showing or hiding mid-scroll never resizes it, so the 3D under PRESS START never stretches. The opening
+     takes this size from the first paint wherever the game will run (:root.has-game, set before anything is
+     drawn), not when the game boots: on a short window the two layouts differ, and the page would jump. */
+  :global(:root.has-game) .world,
   .world--live {
     height: 100vh;
     height: var(--world-h, 100dvh);
@@ -464,6 +467,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
   }
 
+  :global(:root.has-game) .world .hero__stage,
   .world--live .hero__stage {
     position: absolute;
     inset: 0;

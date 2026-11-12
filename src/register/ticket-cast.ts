@@ -8,7 +8,7 @@ import { sprites } from '../data/sprites.manifest';
 import { frameAt, img, stateKey, wrap } from '../schedule/kit';
 import { makeStrip, type Strip } from '../game/sprites';
 
-export interface CastView {
+interface CastView {
   /** Box size in art px. */
   w: number;
   h: number;

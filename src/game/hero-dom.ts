@@ -68,13 +68,13 @@ export function slotBox(d: HeroDom): { x: number; y: number; w: number; h: numbe
 }
 
 /** The poster's screen, px of the stage. */
-export function posterScreen(d: HeroDom): Quad {
+function posterScreen(d: HeroDom): Quad {
   const b = slotBox(d);
   return POSTER.screen.map(([fx, fy]) => [b.x + fx * b.w, b.y + fy * b.h]) as unknown as Quad;
 }
 
 /** Paint a poster into the canvas: `off` (dark glass) while the 3D loads, `on` where there is no 3D. */
-export function paintPoster(d: HeroDom, which: 'on' | 'off'): Promise<void> {
+function paintPoster(d: HeroDom, which: 'on' | 'off'): Promise<void> {
   if (d.poster.dataset.state === which && d.poster.dataset.painted === '1') return Promise.resolve();
   d.poster.dataset.state = which;
   d.poster.dataset.painted = '';

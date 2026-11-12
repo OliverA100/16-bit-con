@@ -6,7 +6,8 @@
  * slot it leaves keeps its height so nothing below it moves. Esc closes the dialog only.
  */
 import { reducedMotion } from '../lib/reduced-motion';
-export interface RegisterDialog {
+import { STEP_OUT_FALLBACK_MS } from '../lib/motion';
+interface RegisterDialog {
   readonly open: boolean;
   /** Open over the game; focus goes back to `opener` when it closes. */
   show(opener: HTMLElement | null): void;
@@ -44,7 +45,7 @@ export function createRegisterDialog(hooks: { onOpen(): void; onClose(): void })
     }
     closing = true;
     dialog.classList.add('is-closing');
-    timer = window.setTimeout(finish, 400);
+    timer = window.setTimeout(finish, STEP_OUT_FALLBACK_MS);
   };
   win.querySelector<HTMLButtonElement>('[data-window-close]')?.addEventListener('click', close);
   // Esc: the same step out (a second Esc while it runs closes it at once, as the browser decides)

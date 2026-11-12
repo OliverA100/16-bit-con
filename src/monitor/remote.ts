@@ -36,6 +36,9 @@ import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometr
 import { portShape, svgShapes } from './mesh';
 import { DIMS, faceRise, ROW2_Y, scaleAt } from './spec';
 
+/** Flat triangles, ready to merge: a geometry that has no index already is left as it is. */
+const unindexed = (g: BufferGeometry): BufferGeometry => (g.index ? g.toNonIndexed() : g);
+
 /**
  * The controller's measurements (monitor units; the screen opening is 0.7 wide), where it lies in the
  * monitor's body space, and its cable. `reach` is its footprint for the breakout's glass, which never
@@ -148,7 +151,7 @@ function letterAtlas(cells: { fill: Color; letter: string }[], ink: Color): Canv
   return t;
 }
 
-export interface RemoteParts {
+interface RemoteParts {
   group: Group;
   /** Every mesh, for the shadow and the visibility. */
   meshes: Mesh[];
@@ -199,7 +202,7 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
       const uv = g.getAttribute('uv');
       for (let k = 0; k < p.count; k++) uv.setXY(k, (i + p.getX(k) / (2 * b.r) + 0.5) / 2, -p.getZ(k) / (2 * b.r) + 0.5);
       const at = onTop(b.x, b.y);
-      return g.translate(at.x, at.y, at.z).applyMatrix4(place).toNonIndexed();
+      return unindexed(g.translate(at.x, at.y, at.z).applyMatrix4(place));
     }),
   )!;
   // a soft sheen only, so each reads as its own brand colour
@@ -233,7 +236,7 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
     const at = onTop(0, 0.004, 0);
     logoGeo.applyMatrix4(flat).translate(at.x, at.y, at.z).applyMatrix4(place);
     logoGeo.deleteAttribute('uv');
-    logoGeo = mergeGeometries([logoGeo.toNonIndexed(), arrowGeo.toNonIndexed()])!;
+    logoGeo = mergeGeometries([unindexed(logoGeo), unindexed(arrowGeo)])!;
   }
 
   // The ink parts (Green 900): the d-pad, the plug's sleeve on the top
@@ -242,7 +245,7 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
   const put = (g: BufferGeometry, at: Vector3, local = true) => {
     g.translate(at.x, at.y, at.z);
     if (local) g.applyMatrix4(place);
-    ink.push(g.index ? g.toNonIndexed() : g);
+    ink.push(unindexed(g));
   };
   {
     const pad = plus(0.038, 0.024);
@@ -292,7 +295,7 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
       [housing, nose].map((g) => {
         g.deleteAttribute('uv');
         g.deleteAttribute('normal');
-        return g.toNonIndexed();
+        return unindexed(g);
       }),
     )!;
     plugGeo = mergeVertices(plugGeo, 1e-6);
@@ -325,7 +328,7 @@ export function buildRemote(colors: { body: Color; a: Color; b: Color; letter: C
     end,
   ];
   const curve = new CatmullRomCurve3(pts, false, 'centripetal');
-  ink.push(new TubeGeometry(curve, 200, R, 6, false).toNonIndexed());
+  ink.push(unindexed(new TubeGeometry(curve, 200, R, 6, false)));
   // one set of attributes for the merge: positions and normals only
   for (const g of ink) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
   const inkGeo = mergeGeometries(ink)!;

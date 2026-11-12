@@ -14,7 +14,7 @@ export type NightSpec =
   { map: ColorMap } | { rank: { targets: string[]; weights?: number[]; roles?: ColorMap } } | { shade: { toward: string; amount: number; roles?: ColorMap } };
 
 export const pack = (r: number, g: number, b: number) => (r << 16) | (g << 8) | b;
-export const hexOf = (p: number) => `#${p.toString(16).padStart(6, '0').toUpperCase()}`;
+const hexOf = (p: number) => `#${p.toString(16).padStart(6, '0').toUpperCase()}`;
 const lum = (p: number) => 0.2126 * ((p >> 16) & 255) + 0.7152 * ((p >> 8) & 255) + 0.0722 * (p & 255);
 export const rgbOf = (hex: string): [number, number, number] => {
   const n = parseInt(hex.replace('#', ''), 16);
@@ -57,7 +57,7 @@ export function indexImage(d: Uint8ClampedArray, w: number, h: number): Indexed 
  * Map every colour to one of `targets` by luminance rank, splitting the colours by cumulative pixel
  * share (`weights`, default equal), then apply explicit `roles` on top.
  */
-export function rankMap(im: Indexed, targets: string[], weights?: number[], roles: ColorMap = {}): ColorMap {
+function rankMap(im: Indexed, targets: string[], weights?: number[], roles: ColorMap = {}): ColorMap {
   const order = im.colors.map((p, i) => ({ p, n: im.counts[i]! })).sort((a, b) => lum(a.p) - lum(b.p));
   const total = order.reduce((s, c) => s + c.n, 0);
   const w = weights ?? targets.map(() => 1);
@@ -121,7 +121,7 @@ export interface Run {
   x0: number;
   x1: number;
 }
-export interface LitWindow {
+interface LitWindow {
   runs: Run[];
 }
 

@@ -5,9 +5,9 @@
  * scale:  'world' = careers-game scale, lives on the canvas at 1 art px = 1 buffer px
  *         'ui'    = touch controls / icons, DOM at CSS 1:1 or 2:1
  */
-export type ScaleClass = 'world' | 'ui';
+type ScaleClass = 'world' | 'ui';
 
-export interface SpriteEntry {
+interface SpriteEntry {
   file: string;
   w: number;
   h: number;
@@ -255,8 +255,6 @@ export const sprites = {
     note: 'NEW: the 5×7 letter set in the vega-sign yellow-tile style — rows: small day (9×11 tiles), large day (14×18, 2 px cells), small neon, large neon; A–Z, 0–9, hyphen, middle dot',
   },
 } as const satisfies Record<string, SpriteEntry>;
-
-export type SpriteKey = keyof typeof sprites;
 
 /** Whole lobes of big-cloud.png (x, y, w, h), chosen where each lobe's own edges end. */
 export const CUMULUS_LOBES: [number, number, number, number][] = [

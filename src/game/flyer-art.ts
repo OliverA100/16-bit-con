@@ -23,8 +23,8 @@ export interface FlyerInk {
   edge: Rgb; // the paper seen edge-on: a shade darker than the paper
 }
 
-export const FLYER_W = 14;
-export const FLYER_H = 18;
+const FLYER_W = 14;
+const FLYER_H = 18;
 /** Every frame's cell: room for the flyer at any tilt up to ±40°. */
 export const FLYER_CELL = 24;
 

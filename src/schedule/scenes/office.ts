@@ -64,23 +64,28 @@ const scene: SceneModule = {
     ]);
     /** A wall tile with its base colour (its most common pixel) left out: the brick motifs alone. */
     const motifs = (src: Drawable) =>
-      layer(src.width, src.height, (c) => {
-        c.drawImage(src, 0, 0);
-        const im = c.getImageData(0, 0, src.width, src.height);
-        const d = im.data;
-        const n = new Map<number, number>();
-        for (let i = 0; i < d.length; i += 4) {
-          const k = (d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!;
-          n.set(k, (n.get(k) ?? 0) + 1);
-        }
-        const base = [...n].sort((a, b) => b[1] - a[1])[0]![0];
-        for (let i = 0; i < d.length; i += 4) if (((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!) === base) d[i + 3] = 0;
-        c.putImageData(im, 0, 0);
-      });
+      layer(
+        src.width,
+        src.height,
+        (c) => {
+          c.drawImage(src, 0, 0);
+          const im = c.getImageData(0, 0, src.width, src.height);
+          const d = im.data;
+          const n = new Map<number, number>();
+          for (let i = 0; i < d.length; i += 4) {
+            const k = (d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!;
+            n.set(k, (n.get(k) ?? 0) + 1);
+          }
+          const base = [...n].sort((a, b) => b[1] - a[1])[0]![0];
+          for (let i = 0; i < d.length; i += 4) if (((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!) === base) d[i + 3] = 0;
+          c.putImageData(im, 0, 0);
+        },
+        true,
+      );
     /** Each tile's brick patches: the motifs grouped (pixels within a few px of each other), as boxes. */
     const patches = (m: HTMLCanvasElement) => {
       const { width: w, height: h } = m;
-      const a = m.getContext('2d')!.getImageData(0, 0, w, h).data;
+      const a = m.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, w, h).data;
       const seen = new Uint8Array(w * h);
       const out: [number, number, number, number][] = [];
       for (let start = 0; start < w * h; start++) {

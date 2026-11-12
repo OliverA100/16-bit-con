@@ -12,14 +12,14 @@
 import { DIMS, SCREEN_ASPECT } from '../monitor/spec';
 import { Coins } from './coins';
 import type { Dust } from './dust';
-import type { Frame, Level1, Rect } from './world';
+import type { Frame, World, Rect } from './world';
 
 /** The viewport frame never comes closer than this to the opening's edges, texels. */
 const MIN_MARGIN = 8;
 /** … nor its corners closer than this to the opening's rounded corners. */
 const CORNER_CLEAR = 2;
 
-export interface ScreenGeom {
+interface ScreenGeom {
   /** The frame, texels (art px). */
   W: number;
   H: number;
@@ -34,7 +34,7 @@ export interface ScreenGeom {
  * above and below, the bottom keeps only what clears the opening's rounded corners (a little dirt
  * under the ground band) and the rest goes to the sky, so the screen at rest reads as a title screen.
  */
-export function screenGeom(bw: number, bh: number): ScreenGeom {
+function screenGeom(bw: number, bh: number): ScreenGeom {
   const rFrac = DIMS.opening.r / DIMS.opening.w;
   for (let m = MIN_MARGIN; ; m += 2) {
     let W = Math.max(bw + 2 * m, Math.ceil((bh + 2 * m) * SCREEN_ASPECT));
@@ -91,7 +91,7 @@ export class ScreenFrame {
    * Redraw the game into the frame if anything it shows has moved since the last draw.
    * @returns true when it redrew
    */
-  update(f: Frame, level: Level1, dust: Dust, now: number): boolean {
+  update(f: Frame, level: World, dust: Dust, now: number): boolean {
     const g: Frame = { ...f, range: this.rect };
     const s = f.sam;
     const key = [

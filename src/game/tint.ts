@@ -26,7 +26,7 @@ function rgbOf(token: string): Rgb {
 }
 
 /** A role's colour at timeline position t, 'source' resolving to the sprite's own colour. */
-export function roleAt(t: number, role: CloudRole, source: Rgb): Rgb {
+function roleAt(t: number, role: CloudRole, source: Rgb): Rgb {
   const keys = cloudKeyframes[role];
   let a = keys[0]!;
   let b = keys[0]!;
@@ -71,7 +71,7 @@ export class Tinted {
     const read = document.createElement('canvas');
     read.width = w;
     read.height = h;
-    const rctx = read.getContext('2d')!;
+    const rctx = read.getContext('2d', { willReadFrequently: true })!;
     rctx.drawImage(src, 0, 0);
     const data = rctx.getImageData(0, 0, w, h).data;
     const listed = Object.entries(roles).map(([hex, role]) => ({ rgb: hexToRgb(hex), role }));

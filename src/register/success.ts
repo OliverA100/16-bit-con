@@ -13,18 +13,16 @@ import { mountTicket, type MountedTicket, type TicketData } from './ticket';
 import { makeCode, type PassId } from './ticket-data';
 import { GG_LINE } from '../data/guide';
 import { reducedMotion } from '../lib/reduced-motion';
-
-/** The site's beat: a step every 50 ms. */
-const BEAT = 50;
+import { BEAT_MS } from '../lib/motion';
 
 /** First word of the name, as the heading greets them. */
-export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name.trim();
+const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name.trim();
 
 function step(el: Element, keyframes: Keyframe[], steps: number): Promise<unknown> {
-  return el.animate(keyframes, { duration: steps * BEAT, easing: `steps(${steps}, end)`, fill: 'both' }).finished;
+  return el.animate(keyframes, { duration: steps * BEAT_MS, easing: `steps(${steps}, end)`, fill: 'both' }).finished;
 }
 
-export function initSuccess(formApi: RegisterFormApi | null): { show(r: Registration): Promise<void> } | null {
+export function startSuccess(formApi: RegisterFormApi | null): { show(r: Registration): Promise<void> } | null {
   const win = document.getElementById('register');
   const form = document.getElementById('register-form') as HTMLFormElement | null;
   const done = document.getElementById('register-done');
