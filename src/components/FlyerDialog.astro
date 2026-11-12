@@ -65,7 +65,7 @@ import Wordmark from './Wordmark.astro';
   /* ── The paper: an 8 px margin of paper, a 6 px orange band, a 6 px green rule, all inset shadows over its
         cream, and a hard drop shadow of the ink at a third, so the world shows through it. ── */
   .flyer {
-    --flyer-edge: 20px;
+    --flyer-edge: var(--space-5);
     position: relative;
     container-type: inline-size;
     display: grid;
@@ -74,7 +74,7 @@ import Wordmark from './Wordmark.astro';
     width: 100%;
     padding: calc(var(--flyer-edge) + var(--space-5)) calc(var(--flyer-edge) + var(--space-5)) calc(var(--flyer-edge) + var(--space-5));
     background: var(--color-paper);
-    color: var(--color-green-900);
+    color: var(--text);
     text-align: center;
     rotate: -2deg;
     box-shadow:
@@ -91,9 +91,7 @@ import Wordmark from './Wordmark.astro';
 
   .flyer__kicker,
   .flyer__place {
-    font-family: var(--font-pixel);
-    font-size: 1.25rem;
-    line-height: 1.2;
+    font: var(--type-flyer);
   }
 
   .flyer__title {
@@ -104,9 +102,8 @@ import Wordmark from './Wordmark.astro';
 
   /* One line at any width: as large as the inner column allows (it measures 5.6 em in Mondwest; 100cqi is the column inside the padding), 2.5rem at most. */
   .flyer__date {
-    font-family: var(--font-pixel);
+    font: var(--type-flyer-date);
     font-size: min(2.5rem, calc(100cqi / 5.8));
-    line-height: 1;
     white-space: nowrap;
   }
 
@@ -144,19 +141,17 @@ import Wordmark from './Wordmark.astro';
     rotate: 12deg;
     background: var(--color-yellow-400);
     clip-path: polygon(50% 0%, 59% 13%, 75% 7%, 76% 24%, 93% 25%, 87% 41%, 100% 50%, 87% 59%, 93% 75%, 76% 76%, 75% 93%, 59% 87%, 50% 100%, 41% 87%, 25% 93%, 24% 76%, 7% 75%, 13% 59%, 0% 50%, 13% 41%, 7% 25%, 24% 24%, 25% 7%, 41% 13%);
-    font-family: var(--font-pixel);
-    line-height: 1;
+    font: var(--type-flyer-burst);
     text-align: center;
   }
 
   .flyer__burst-big {
     display: block;
-    font-size: 1.375rem;
   }
 
   .flyer__burst-small {
     display: block;
-    font-size: 0.875rem;
+    font: var(--type-flyer-burst-small);
   }
 
   /* ── In and out: it opens out of the little flyer Sam picked up (--from-x/y/s, set as it opens), and

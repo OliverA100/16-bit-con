@@ -18,15 +18,12 @@
   --color-yellow-600: #FF7B07;
 
   /* Greens */
-  --color-green-100: #D5FB19;
-  --color-green-300: #75A70D;
   --color-green-500: #457D07;
   --color-green-700: #0D5500;
   --color-green-900: #0F3301;
 
   /* Neutrals */
   --color-cloud-white: #FAFAF9;
-  --color-daisy-white: #FFFAEB;
   --color-grey-500: #8A8880;
   --color-grey-700: #3C3B38;
   --color-outline-black: #151514;
@@ -35,7 +32,6 @@
   --color-blue-100: #CAE6FF;
   --color-blue-300: #8DCAFF;
   --color-blue-500: #5DB3FF;
-  --color-blue-700: #2189E5;
   --color-blue-900: #0072D6;
 
   /* Tokens outside the brand palette. The close red from Vega's own game UI (vega.io's notepad.exe):
@@ -48,10 +44,10 @@
   /* Semantic aliases: colour by role, nothing else.
      Green 900: all text and lines, and selected things (filled). Grey 700: secondary text. Grey 500:
      placeholders and resting field borders only. Yellow 400: the primary button. Yellow 600: form errors only.
-     Sky: art only. */
+     Sky: art only. These roles are for the UI. Art (the flyer and its wordmark, the world, Sam's portrait on
+     its sky) draws from the whole palette above. */
   --surface: var(--color-daisy-white);
   --surface-raised: var(--color-cloud-white);
-  --surface-dark: var(--color-green-900);
   --surface-card: var(--color-cloud-white); /* window bodies and UI buttons (the guidelines' white) */
   /* Green 900 is the ink: all body text, all frame lines, all icons default to it. */
   --text: var(--color-green-900);
@@ -60,7 +56,6 @@
   --field-border: var(--color-grey-500);
   --error: var(--color-yellow-600);
   --text-on-dark: var(--color-daisy-white);
-  --text-on-dark-accent: var(--color-green-100);
   --wordmark: var(--color-green-900); /* the 16-Bit Con wordmark, in the page's ink */
   --accent: var(--color-yellow-400);
   --outline: var(--color-green-900);
@@ -96,9 +91,9 @@
   --rhythm-actions: var(--space-6);
 
   /* Frame lines at vega.io's scale: 1 px Green 900, no radius, hard offset shadow. */
-  --border: 1px solid var(--outline);
+  --line-w: 1px;
+  --border: var(--line-w) solid var(--outline);
   --shadow-hard: 4px 4px 0 var(--outline);
-  --shadow-hard-sm: 2px 2px 0 var(--outline);
   --window-bar-h: 33px;               /* title bar incl. its 1 px rule (vega.io) */
   --window-bar-pad: 6px 8px;
   --window-pad: 20px;                 /* body padding, as vega.io's cards */
@@ -127,19 +122,35 @@
   --type-ui: 400 13px / 20px var(--font-mono);
   --type-body: 400 16px / 24px var(--font-body);
   --type-small: 400 14px / 20px var(--font-body);
+  /* In the game's windows: a spoken or prompting line (Sam's, the prompt's second), what a prompt asks for,
+     and the HUD's row of numbers. */
+  --type-line: 400 0.875rem / 1.3 var(--font-mono);
+  --type-prompt: 400 1.5rem / 1 var(--font-pixel);
+  --type-hud: 400 0.875rem / 1.5 var(--font-body);
+  /* The Schedule: a session's title on its folder (and on a narrow drawer), a tab's label on the narrowest. */
+  --type-session: 700 2rem / 1.15 var(--font-body);
+  --type-session-compact: 700 1.5rem / 1.15 var(--font-body);
+  --type-ui-compact: 400 0.75rem / 20px var(--font-mono);
+  /* The pass: its name, and its two sizes of small label. */
+  --type-pass: 400 40px / 44px var(--font-pixel);
+  --type-label: 400 12px / 16px var(--font-mono);
+  --type-label-small: 400 11px / 16px var(--font-mono);
+  /* The flyer, a printed sheet: its lines, its date (as large as its column allows), the burst's two words. */
+  --type-flyer: 400 1.25rem / 1.2 var(--font-pixel);
+  --type-flyer-date: 400 2.5rem / 1 var(--font-pixel);
+  --type-flyer-burst: 400 1.375rem / 1 var(--font-pixel);
+  --type-flyer-burst-small: 400 0.875rem / 1 var(--font-pixel);
+  /* The letter on the A button. */
+  --type-key: 700 28px / 1 var(--font-body);
   --sub-max: 34rem;
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 2rem;
-  --leading-snug: 1.3;
-  --leading-normal: 1.5;
-  /* UI type at vega.io's scale (measured on vega.io/careers at 1440 px) */
-  --text-ui: 13px;          /* Geist Mono: window titles, buttons, labels */
-  --leading-ui: 20px;       /* its line, and the line of 14 px small copy */
+  --leading-normal: 1.5;    /* running text with no role of its own */
+  --leading-ui: 20px;       /* the UI's line, as a measure: a message line's room under a field */
 
-  /* Layout */
+  /* Layout. Breakpoints cannot be tokens (a media query reads no custom property), so the one set is written
+     here: 24rem (the narrowest phones), 40rem (phones), 48rem (tablets), 64rem (small laptops). A component
+     may add a break of its own where its content needs one, and says so there. */
   --container: 72rem; /* 1152 px: one city tile period */
+  --window-max: 36rem; /* the page's own windows: Register, the sessions without JavaScript */
   --gutter: var(--space-4);
   --nav-h: 64px; /* fixed nav frame (50 px, no title bar) + its top margin */
 
@@ -155,9 +166,6 @@
 
   /* The Schedule's drawer of folders: Vega's folder frame in the site's frame line (1 px Green 900), and
      the stepped motion it uses as a folder rises or settles. */
-  --folder-ink: var(--outline);
-  --line-w: 1px;
-  --line-folder: var(--line-w) solid var(--folder-ink);
   --dur-folder: 450ms;
   --folder-peek: 4px; /* a closed folder's lift on hover: a first bit of opening it */
   /* The drawer moves on the site's 16-bit beat, a step every 50 ms, as a day change does (--dur-base on

@@ -48,7 +48,7 @@ export function conPoster(c: CityAssets): HTMLCanvasElement {
   centre(mark, 7);
   const top = 7 + mark.height + 3;
   ctx.drawImage(c.arcade, 0, 0, c.arcade.width, ARCADE_TOP, Math.round((W - c.arcade.width) / 2), top, c.arcade.width, ARCADE_TOP);
-  const date = pixelText(c.letters, 'OCT 3-5', ink, 1);
+  const date = pixelText(c.letters, 'OCT 3–5', ink, 1);
   centre(date, top + ARCADE_TOP + 5);
   const place = pixelText(c.letters, 'JAVITS NYC', ink, 1);
   centre(place, top + ARCADE_TOP + 5 + date.height + 4);

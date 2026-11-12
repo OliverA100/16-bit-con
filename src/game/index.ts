@@ -1081,7 +1081,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   if (perch) idleOnPerch(perch, perchIdle, () => perch.root.classList.contains('is-landed') && !perch.root.classList.contains('is-away'));
   // Back on the Register window from the page, he says something new: an invitation, typed out as before (the
   // full line for screen readers too).
-  const RETURN_LINE = "Come say hi at Booth\u00A0630. I'll save you a seat."; // the booth's number kept with it
+  const RETURN_LINE = 'Come say hi at Booth\u00A0630. I’ll save you a spot.'; // the booth's number kept with it
   /** Sam types a new line on the Register window (the full line for screen readers too). */
   const sayOnPerch = (line: string) => {
     if (!landingTyped) return;
@@ -1562,7 +1562,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   //    twist's two lines (from SKIP_SAYS_FROM) to be typed out before it even at full speed. ──
   const SKIP_TO = 0.88;
   const SKIP_SAYS_FROM = 0.85;
-  const SKIP_FADE_MS = 240;
+  const SKIP_FADE_MS = 400;
   let skipFade: { t0: number; jumped: boolean } | null = null;
   o.skip?.addEventListener('click', () => {
     if (mode !== 'play' || paused || zoom || finale || exiting || skipFade || timeline.t >= SKIP_TO) return;

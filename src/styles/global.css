@@ -94,14 +94,13 @@ p {
 }
 
 /* Selected text: inverted to Green 900 with Daisy White type, as the site marks anything selected
-   (yellow is for actions). On the site's own Green 900 surfaces — a selected day tab or button, a dark
-   window — it inverts back, so a selection never vanishes into its background. */
+   (yellow is for actions). On the site's own Green 900 surfaces, a selected day tab or button, it inverts back, so a selection never vanishes into its background. */
 ::selection {
   background: var(--outline);
   color: var(--text-on-dark);
 }
 
-:is(.window--dark, .daytab[aria-selected='true'], .ui-button[aria-current], .ui-button:has(input:checked)) ::selection {
+:is(.daytab[aria-selected='true'], .ui-button[aria-current], .ui-button:has(input:checked)) ::selection {
   background: var(--text-on-dark);
   color: var(--outline);
 }
@@ -161,10 +160,7 @@ p {
   border-radius: 0;
   box-shadow: var(--ui-button-ring), 0 0 0 0 var(--outline);
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: var(--text-ui);
-  font-weight: 400;
-  line-height: var(--leading-ui);
+  font: var(--type-ui);
   cursor: pointer;
   user-select: none;
   transition:
@@ -173,9 +169,12 @@ p {
     background-color var(--dur-lift) var(--ease-lift);
 }
 
-.ui-button:hover {
-  translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
-  box-shadow: var(--ui-button-ring), var(--lift) var(--lift) 0 0 var(--outline);
+/* Only where a pointer can hover: after a tap on a touch screen a button would stay lifted (the tabs do the same). */
+@media (hover: hover) {
+  .ui-button:hover {
+    translate: calc(-1 * var(--lift)) calc(-1 * var(--lift));
+    box-shadow: var(--ui-button-ring), var(--lift) var(--lift) 0 0 var(--outline);
+  }
 }
 
 .ui-button:active {
@@ -192,28 +191,27 @@ p {
   inset: 0 calc(-1 * var(--lift)) calc(-1 * var(--lift)) 0;
 }
 
-/* Selected (a checked pass, the current rail stop): inverted to Green 900, as vega.io marks a
-   selection (yellow is for actions). It stays put — a dark lift onto a dark shadow reads as a smear. */
+/* Selected (a checked pass): inverted to Green 900 (yellow is for actions). It stays put: a dark lift onto a
+   dark shadow reads as a smear. Busy (aria-disabled, so it keeps its focus: the submit while it registers)
+   stays put too, in its own colours. */
 .ui-button:is([aria-current], :has(input:checked)) {
   background: var(--outline);
   color: var(--surface-card);
 }
 
-.ui-button:is([aria-current], :has(input:checked)):hover {
+.ui-button:is([aria-current], :has(input:checked), [aria-disabled='true']):hover {
   translate: 0 0;
   box-shadow: var(--ui-button-ring), 0 0 0 0 var(--outline);
 }
 
-:where(.ui-button:is([aria-current], :has(input:checked)):hover)::after {
+:where(.ui-button:is([aria-current], :has(input:checked), [aria-disabled='true']):hover)::after {
   content: none;
 }
 
 /* Type roles (tokens.css) as classes, for the roles markup applies directly (titles, headings and subheadings
-   take theirs in their components). Sentence case everywhere; no tracking. */
-.t-eyebrow,
-.eyebrow {
+   take theirs in their components; the lead is 20/30, 18/28 on phones). Sentence case everywhere. */
+.t-eyebrow {
   font: var(--type-eyebrow);
-  font-variant-numeric: tabular-nums;
 }
 
 .t-lead {
@@ -222,7 +220,6 @@ p {
 
 .t-ui {
   font: var(--type-ui);
-  font-variant-numeric: tabular-nums;
 }
 
 .t-body {
@@ -236,7 +233,6 @@ p {
 /* Utilities */
 .mono {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
 }
 
 .pixel {
@@ -299,7 +295,7 @@ p {
   height: var(--control-h-page);
   padding: 0 var(--space-3);
   background: var(--surface-raised);
-  border: 1px solid var(--field-border);
+  border: var(--line-w) solid var(--field-border);
   border-radius: 0;
   font: var(--type-body);
   color: var(--text);

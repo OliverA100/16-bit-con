@@ -10,11 +10,12 @@ import Button from '../components/Button.astro';
 ---
 
 <Base
-  title="Level not found — 16-Bit Con"
-  description="This level doesn't exist. The page you're looking for isn't on the map."
+  title="Level not found · 16-Bit Con"
+  description="This level doesn’t exist. The page you’re looking for isn’t on the map."
   footer={false}
   noindex
   fonts={['PPMondwest-Regular', 'GeistMono-Variable', 'Geist-Variable']}
+  themeColor="#8DCAFF"
 >
   <section class="lost" aria-labelledby="lost-title">
     <div class="lost__scene" aria-hidden="true" data-lost-scene>
@@ -46,8 +47,8 @@ import Button from '../components/Button.astro';
     display: grid;
     grid-template-rows: auto minmax(calc(210 * var(--sam-px, 2px)), 1fr);
     min-height: 100dvh;
-    background: var(--color-sky-blue);
-    color: var(--wordmark);
+    background: var(--sky);
+    color: var(--text);
   }
 
   /* The cloud bank without JS (and until the canvas paints): Vega's strip tiled along the bottom, its first

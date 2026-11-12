@@ -10,6 +10,7 @@
 import Window from './Window.astro';
 import Button from './Button.astro';
 import Ticket from './Ticket.astro';
+import { PIXEL_ICONS, pixelPath } from '../data/pixel-icons';
 
 const passes = [
   { value: 'sat', label: 'Saturday', meta: 'Oct 3' },
@@ -23,7 +24,7 @@ const passes = [
   <!-- Only in the dialog: the section's header isn't on screen there. -->
   <div class="register__dialog-head">
     <h2 class="register__dialog-title">Grab your pass</h2>
-    <p class="t-small register__dialog-line">Free · limited spots · Oct 3–5 · Javits Center, New York</p>
+    <p class="t-small register__dialog-line">Free · limited spots · Oct 3–5, 2026 · Javits Center, New York</p>
   </div>
 
   <form id="register-form" class="register__form" novalidate>
@@ -79,7 +80,7 @@ const passes = [
       <input class="check__input" type="checkbox" name="news" />
       <span class="check__box" aria-hidden="true">
         <svg viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges">
-          <path d="M3 8h2v2H3zM5 10h2v2H5zM7 8h2v2H7zM9 6h2v2H9zM11 4h2v2h-2z" />
+          <path d={pixelPath(PIXEL_ICONS.tick, 2, 1)} />
         </svg>
       </span>
       <span class="t-small check__label">Email me news and offers from 16-Bit Con and Vega.</span>

@@ -1,11 +1,30 @@
 /**
- * The site's icons, drawn as the Register checkbox's tick is: 2 px pixel blocks on a 16 px grid (8 × 8 cells),
- * filled in the text's colour, rendered with crisp edges. Each icon is a grid of cells ('#' filled); pixelPath()
- * turns it into one SVG path of rectangles, a row's runs merged.
+ * The site's icons, all drawn one way: pixel blocks, filled in the text's colour, rendered with crisp edges.
+ * Each icon is a grid of cells ('#' filled); pixelPath() turns it into one SVG path of rectangles, a row's
+ * runs merged.
  */
 export type PixelGrid = readonly string[];
 
 export const PIXEL_ICONS = {
+  /** The checkbox's tick: 2 px blocks on 8 × 8 cells, drawn 1 px in from the left (16 × 16). */
+  tick: ['........', '........', '.....#..', '....#...', '.#.#....', '..#.....', '........', '........'],
+  /** A form error's "!": a 2 px bar and its dot, on the 14 px square's own pixels (1 px cells). */
+  bang: [
+    '..............',
+    '..............',
+    '..............',
+    '......##......',
+    '......##......',
+    '......##......',
+    '......##......',
+    '......##......',
+    '..............',
+    '..............',
+    '......##......',
+    '......##......',
+    '..............',
+    '..............',
+  ],
   /*
    * The game's HUD, in the pixel line of vega.io's game buttons: drawn on 16 × 16 cells, then drawn with
    * 1.5 px lines (halfThick: on half-pixel cells, every line a half pixel thicker): 16.5 × 16.5.

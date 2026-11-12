@@ -168,7 +168,7 @@ const plate = 'Files · Oct 3–5';
   .plain {
     display: grid;
     gap: var(--space-6);
-    width: min(100%, 36rem);
+    width: min(100%, var(--window-max));
     text-align: left;
   }
 
@@ -189,7 +189,7 @@ const plate = 'Files · Oct 3–5';
         whose tab and edge cut it like the ground. Nothing here changes size. ── */
   .drawer {
     --tab-h: 36px; /* a tab as drawn; its button reaches one line further down (it covers its body's top line) */
-    --step: calc(var(--tab-h) + 12px); /* a tab and the sliver of body under it */
+    --step: calc(var(--tab-h) + var(--space-3)); /* a tab and the sliver of body under it */
     --view: 300px; /* an open folder's visible body: from its top line to the next folder's */
     --rise: calc(var(--view) - var(--step));
     /* A folder's move in nine steps of 50 ms, eased out along cubic-bezier(0.22, 1, 0.36, 1): big steps
@@ -197,7 +197,7 @@ const plate = 'Files · Oct 3–5';
        phones), so the 1 px lines stay crisp while a step is held. Recompute if --view or --step change. */
     --ease-folder: linear(0 0%, 0 11.111%, 0.436508 11.111%, 0.436508 22.222%, 0.718254 22.222%, 0.718254 33.333%, 0.865079 33.333%, 0.865079 44.444%, 0.940476 44.444%, 0.940476 55.556%, 0.97619 55.556%, 0.97619 66.667%, 0.992063 66.667%, 0.992063 77.778%, 0.996032 77.778%, 0.996032 88.889%, 1 88.889%, 1 100%, 1 100%);
     --body-h: calc(var(--view) + var(--step));
-    --gap: 12px; /* the back card's sliver above an open folder */
+    --gap: var(--space-3); /* the back card's sliver above an open folder */
     --files-h: calc(3 * var(--step) + var(--tab-h));
     --inset: var(--space-8);
     --front-h: 180px;
@@ -229,7 +229,7 @@ const plate = 'Files · Oct 3–5';
     z-index: 1;
     margin-inline: var(--inset);
     background: var(--surface-card);
-    border: var(--line-folder);
+    border: var(--border);
     border-bottom: 0;
     /* Cut at the front's top edge: the day's folders reach on under the front. Everything there is behind
        the opaque front, and clip (unlike a clip-path) also keeps it out of the page's scrollable area, so
@@ -246,7 +246,7 @@ const plate = 'Files · Oct 3–5';
     position: absolute;
     inset: 0 calc(-1 * var(--line-w)) 0;
     z-index: 5;
-    border-inline: var(--line-folder);
+    border-inline: var(--border);
     pointer-events: none;
   }
 
@@ -310,7 +310,8 @@ const plate = 'Files · Oct 3–5';
      opening it makes, on the same 50 ms beat (4 px in four 1 px steps). Its tab's hit area reaches back
      down over the gap it leaves. Pointers that hover only; still with reduced motion. */
   @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-    .card:not(.is-open):has(> .tab--folder:hover) {
+    /* pressed, it drops back, as a button does */
+    .card:not(.is-open):has(> .tab--folder:hover:not(:active)) {
       --peek: var(--folder-peek);
     }
 
@@ -329,7 +330,7 @@ const plate = 'Files · Oct 3–5';
     /* Top and bottom lines only: the back card's side lines are every folder's sides. Two boxes drawing a
        line in the same place would part by a device pixel whenever a moving folder sits at a sub-pixel
        position; one line, drawn once by the box that never moves, cannot. */
-    border-block: var(--line-folder);
+    border-block: var(--border);
   }
 
 
@@ -387,7 +388,7 @@ const plate = 'Files · Oct 3–5';
   .tab__shape {
     position: absolute;
     inset: 0 0 -1px;
-    background: var(--folder-ink);
+    background: var(--outline);
     clip-path: polygon(0 calc(100% - 1px), var(--slant) 0, calc(100% - var(--slant)) 0, 100% calc(100% - 1px));
   }
 
@@ -418,8 +419,7 @@ const plate = 'Files · Oct 3–5';
 
   .tab__label {
     position: relative;
-    font-size: var(--text-ui);
-    line-height: var(--leading-ui);
+    font: var(--type-ui);
     white-space: nowrap;
   }
 
@@ -441,7 +441,7 @@ const plate = 'Files · Oct 3–5';
   }
 
   .daytab[aria-selected='true'] .tab__shape::after {
-    background: var(--folder-ink);
+    background: var(--outline);
   }
 
   /* An unselected day tab lifts onto a hard Green 900 shadow with the weight of a button's (3 px of ink: a
@@ -461,7 +461,7 @@ const plate = 'Files · Oct 3–5';
   @media (hover: hover) {
     .daytab[aria-selected='false']:hover {
       translate: calc(-1 * var(--tab-lift-x)) calc(-1 * var(--tab-lift-y));
-      filter: drop-shadow(var(--tab-lift-x) var(--tab-lift-y) 0 var(--folder-ink));
+      filter: drop-shadow(var(--tab-lift-x) var(--tab-lift-y) 0 var(--outline));
     }
 
     .daytab[aria-selected='false']:hover::after {
@@ -475,7 +475,7 @@ const plate = 'Files · Oct 3–5';
   }
 
   .daytab[aria-selected='true'] .tab__label {
-    color: var(--color-daisy-white);
+    color: var(--surface-card);
   }
 
   /* ── An open folder: its text top-left, its scene under it. The folder box is exactly the visible
@@ -515,15 +515,11 @@ const plate = 'Files · Oct 3–5';
   }
 
   .folder__meta {
-    font-size: var(--text-ui);
-    line-height: var(--leading-ui);
+    font: var(--type-ui);
   }
 
   .folder__title {
-    font-family: var(--font-body);
-    font-weight: 700;
-    font-size: var(--text-2xl);
-    line-height: 1.15;
+    font: var(--type-session);
     letter-spacing: -0.01em;
     text-wrap: balance;
   }
@@ -579,7 +575,7 @@ const plate = 'Files · Oct 3–5';
     padding-bottom: var(--space-6);
     height: var(--front-h);
     background: var(--surface-card);
-    border: var(--line-folder);
+    border: var(--border);
     box-shadow: var(--shadow-hard);
   }
 
@@ -588,11 +584,10 @@ const plate = 'Files · Oct 3–5';
   .drawer__plate {
     position: relative;
     padding: var(--space-3) calc(var(--space-12) + var(--space-2));
-    background: var(--color-daisy-white);
-    border: var(--line-folder);
+    background: var(--surface);
+    border: var(--border);
     color: var(--text);
-    font-size: var(--text-ui);
-    line-height: var(--leading-ui);
+    font: var(--type-ui);
     white-space: nowrap;
   }
 
@@ -602,7 +597,7 @@ const plate = 'Files · Oct 3–5';
   .drawer__plate::before,
   .drawer__plate::after,
   .drawer__pull {
-    --edge: linear-gradient(var(--folder-ink), var(--folder-ink));
+    --edge: linear-gradient(var(--outline), var(--outline));
     background:
       var(--edge) left var(--line-w) top 0 / calc(100% - 2 * var(--line-w)) var(--line-w) no-repeat,
       var(--edge) left var(--line-w) bottom 0 / calc(100% - 2 * var(--line-w)) var(--line-w) no-repeat,
@@ -636,7 +631,8 @@ const plate = 'Files · Oct 3–5';
   }
 
   /* ── Narrow: the same drawer, the open folder's text on top and its scene in a band below ── */
-  @media (max-width: 859px) {
+  /* The drawer's own break: under 860 px (53.75rem) the scene no longer fits beside the text. */
+  @media (max-width: 53.6875rem) {
     .tab {
       --day-room: var(--space-3);
     }
@@ -654,7 +650,7 @@ const plate = 'Files · Oct 3–5';
     }
 
     .folder__title {
-      font-size: var(--text-xl);
+      font: var(--type-session-compact);
     }
 
     /* the label thinner on the phone's shorter front, as wide as on wide screens (the pull keeps its
@@ -670,7 +666,7 @@ const plate = 'Files · Oct 3–5';
     }
   }
 
-  @media (max-width: 380px) {
+  @media (max-width: 24rem) {
     .tab {
       --tab-room: var(--space-3);
       --day-room: var(--space-2);
@@ -680,7 +676,7 @@ const plate = 'Files · Oct 3–5';
     }
 
     .tab__label {
-      font-size: var(--text-xs);
+      font: var(--type-ui-compact);
     }
   }
 

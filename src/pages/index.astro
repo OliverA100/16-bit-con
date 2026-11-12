@@ -97,7 +97,7 @@ import SectionHeader from '../components/SectionHeader.astro';
 
   .landing__window {
     position: relative;
-    width: min(100%, 36rem);
+    width: min(100%, var(--window-max));
   }
 
   .landing__perch {
@@ -124,11 +124,10 @@ import SectionHeader from '../components/SectionHeader.astro';
     bottom: calc(24 * var(--sam-px, 1.5px));
     left: calc(60 * var(--sam-px, 1.5px) + var(--space-2));
     width: min(15rem, calc(100vw - 2 * var(--gutter) - 60 * var(--sam-px, 1.5px) - var(--space-8)));
-    box-shadow: var(--shadow-hard-sm);
   }
 
   .landing__line {
-    font-size: var(--text-sm);
+    font: var(--type-line);
   }
 
   /* With the game on the page, Sam is in it until he escapes and lands: the perch (his bubble too) waits
@@ -197,7 +196,7 @@ import SectionHeader from '../components/SectionHeader.astro';
   /* centred while it fits; once it does not, its top under the nav and the rest below (auto margins go to 0) */
   .register-dialog :global(#register) {
     flex: none;
-    width: min(36rem, 100%);
+    width: min(var(--window-max), 100%);
     margin: auto;
   }
 

@@ -36,7 +36,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     <!-- Over the monitor's own power button (placed there by src/game/index.ts): switches the screen off and on. -->
     <button type="button" class="hero__power" aria-label="Monitor power" aria-pressed="true" data-power hidden></button>
     <div class="hero__copy">
-      <p class="eyebrow hero__eyebrow">October 3–5, 2026 · Javits Center, New York</p>
+      <p class="t-eyebrow hero__eyebrow"><span>October 3–5, 2026</span><span class="hero__eyebrow-dot" aria-hidden="true"> · </span><span>Javits Center, New York</span></p>
       <Wordmark as="h1" size="hero" id="hero-title" />
     </div>
     <div class="hero__monitor" style={`--slot-aspect: ${1 / POSTER.slotAspect};`} data-monitor>
@@ -52,7 +52,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
         data-on="/monitor/monitor-on.webp"></canvas>
       <noscript><img class="hero__poster" src="/monitor/monitor-on.webp" width={POSTER.w} height={POSTER.h} style={posterStyle} alt={monitorLabel} /></noscript>
     </div>
-    <p class="hero__tagline">The retro gaming convention for people who never stopped playing.</p>
+    <p class="t-lead hero__tagline">The retro gaming convention for people who never stopped playing.</p>
     <Window size="compact" title="Player 1" class="hero__start" data-start>
       <Button class="hero__start-btn" data-start-button>Start</Button>
     </Window>
@@ -262,17 +262,30 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     color: var(--text);
   }
 
-  /* On a phone the facts line runs to two lines: balanced, so the break falls after the dates */
-  .hero__eyebrow {
-    text-wrap: balance;
+  /* The facts line: the dates, a dot, the place. On a phone it is two lines, the dates then the place, and
+     the dot between them goes (it would hang at the first line's end). */
+  .hero__eyebrow span {
+    white-space: nowrap;
   }
 
-  /* the lead role: 20/30, 18/28 on phones (tokens.css) */
+  .hero__eyebrow-dot {
+    white-space: pre;
+  }
+
+  @media (max-width: 40rem) {
+    .hero__eyebrow {
+      display: grid;
+    }
+
+    .hero__eyebrow .hero__eyebrow-dot {
+      display: none;
+    }
+  }
+
   .hero__tagline {
     position: relative;
     z-index: 2;
-    max-width: 34rem;
-    font: var(--type-lead);
+    max-width: var(--sub-max);
   }
 
   @media (max-width: 40rem) {
@@ -601,8 +614,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
   .sam-bubble__text {
     min-height: 3lh;
-    font-size: var(--text-sm);
-    line-height: var(--leading-snug);
+    font: var(--type-line);
   }
 
   @media (max-width: 48rem) {
@@ -644,15 +656,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   }
 
   .world__prompt-key {
-    font-family: var(--font-pixel);
-    font-size: var(--text-xl);
-    line-height: 1;
+    font: var(--type-prompt);
   }
 
   .world__prompt-sub {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    line-height: var(--leading-snug);
+    font: var(--type-line);
   }
 
   /* ── The HUD: the controls straight on the scene, as on vega.io's own game — Exit game and sound top
@@ -721,7 +729,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: var(--text-sm);
+    font: var(--type-hud);
     white-space: nowrap;
   }
 
@@ -841,17 +849,17 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
 
     .dpad__body {
-      fill: var(--color-green-900);
+      fill: var(--outline);
     }
 
     .dpad__arrow {
-      fill: var(--color-cloud-white);
+      fill: var(--surface-card);
     }
 
     /* Held: the arm's arrow lights up in Florets Yellow. */
     .world__dpad-arm--left.is-held ~ svg .dpad__arrow--left,
     .world__dpad-arm--right.is-held ~ svg .dpad__arrow--right {
-      fill: var(--color-florets-yellow);
+      fill: var(--accent);
     }
 
     .world__dpad-arm {
@@ -890,16 +898,16 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
 
     .abtn__rim {
-      fill: var(--color-green-900);
+      fill: var(--outline);
     }
 
     .abtn__face {
-      fill: var(--color-florets-yellow);
+      fill: var(--accent);
     }
 
     .abtn__letter {
-      fill: var(--color-cloud-white);
-      font: 700 28px/1 var(--font-body);
+      fill: var(--surface-card);
+      font: var(--type-key);
     }
 
     /* Held: pressed in, a touch down and darker. */
@@ -908,7 +916,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
 
     .world__a.is-held .abtn__face {
-      fill: color-mix(in srgb, var(--color-florets-yellow) 80%, var(--color-green-900));
+      fill: color-mix(in srgb, var(--accent) 80%, var(--outline));
     }
   }
 </style>

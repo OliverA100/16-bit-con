@@ -8,7 +8,7 @@
  * beside it, so an h1 made of it still has real text.
  */
 interface Props {
-  size?: 'hero' | 'nav' | 'og' | 'ticket' | 'flyer';
+  size?: 'hero' | 'nav' | 'ticket' | 'flyer';
   /** `flyer`: Yellow 600 letters in a Green 900 outline, as printed on the flyer (FlyerDialog.astro). */
   tone?: 'ink' | 'flyer';
   as?: 'h1' | 'span' | 'div';
@@ -67,10 +67,6 @@ const { size = 'hero', tone = 'ink', as: Tag = 'span', id, class: className, dai
   /* About 20 px tall, like vega.io's nav logo: 19 px, so it never pushes the nav's button at 320 px. */
   .wm--nav {
     --wm-w: 7.75rem;
-  }
-
-  .wm--og {
-    --wm-w: 60rem;
   }
 
   /* On the ticket: about 20 px tall with the daisy */

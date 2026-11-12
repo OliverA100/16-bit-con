@@ -72,11 +72,11 @@ const p = PASSES[pass];
     --ink: var(--ticket-ink);
     --ink-2: var(--ticket-ink-2);
     --frame: var(--ticket-frame);
-    --tear-dot: var(--color-cloud-white);
+    --tear-dot: var(--surface-card);
     /* geometry: the stub's width, the notch's radius, the frame's inset */
     --stub-w: 132px;
     --notch: 11px;
-    --inset: 8px;
+    --inset: var(--space-2);
     --tear-x: calc(100% - var(--stub-w));
     --tear-y: 0px;
 
@@ -132,7 +132,7 @@ const p = PASSES[pass];
   }
 
   .ticket__admit {
-    font: 400 12px / 16px var(--font-mono);
+    font: var(--type-label);
     color: var(--ink-2);
     white-space: nowrap;
   }
@@ -140,25 +140,25 @@ const p = PASSES[pass];
   /* The pass name: the game is saying it, so Mondwest */
   .ticket__pass {
     margin-top: var(--space-3);
-    font: 400 40px / 44px var(--font-pixel);
+    font: var(--type-pass);
     text-wrap: nowrap;
   }
 
   .ticket__when {
     margin-top: var(--space-1);
-    font: 400 13px / 20px var(--font-mono);
+    font: var(--type-ui);
     color: var(--ink-2);
   }
 
   .ticket__player-k {
     margin-top: var(--space-3);
-    font: 400 11px / 16px var(--font-mono);
+    font: var(--type-label-small);
     color: var(--ink-2);
   }
 
   .ticket__player {
     overflow: hidden;
-    font: 400 13px / 20px var(--font-mono);
+    font: var(--type-ui);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -210,7 +210,7 @@ const p = PASSES[pass];
   }
 
   .ticket__hosted {
-    font: 400 12px / 16px var(--font-mono);
+    font: var(--type-label);
     color: var(--ink-2);
   }
 
@@ -231,7 +231,7 @@ const p = PASSES[pass];
   }
 
   .ticket__code {
-    font: 400 11px / 16px var(--font-mono);
+    font: var(--type-label-small);
     color: var(--ink-2);
     font-variant-numeric: tabular-nums;
   }

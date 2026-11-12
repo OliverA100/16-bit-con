@@ -19,14 +19,11 @@ type Tag = 'div' | 'section' | 'article' | 'nav' | 'aside' | 'header' | 'footer'
 interface Props {
   title: string;
   as?: Tag;
-  tone?: 'light' | 'dark';
   size?: 'full' | 'compact';
   /** No title bar (the title stays as the frame's name for assistive tech). */
   bare?: boolean;
   id?: string;
   class?: string;
-  /** Remove body padding when the content is an image or a canvas crop. */
-  flush?: boolean;
   /** In a <dialog>, the third square is the close button. */
   closable?: boolean;
   /** The title's place in the bar: left on a full window, centred on a compact one, unless set. */
@@ -37,12 +34,10 @@ interface Props {
 const {
   title,
   as: Element = 'div',
-  tone = 'light',
   size = 'full',
   bare = false,
   id,
   class: className,
-  flush = false,
   closable = false,
   titleAlign,
   ...rest
@@ -54,7 +49,7 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
 ---
 
 <Element
-  class:list={['window', `window--${tone}`, `window--${size}`, { 'window--flush': flush, 'window--bare': bare, 'window--title-start': titleStart }, className]}
+  class:list={['window', `window--${size}`, { 'window--bare': bare, 'window--title-start': titleStart }, className]}
   id={id}
   aria-labelledby={bare ? undefined : titleId}
   aria-label={bare ? title : undefined}
@@ -112,9 +107,7 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
     height: var(--window-bar-h);
     padding: var(--window-bar-pad);
     border-bottom: var(--border);
-    font-family: var(--font-mono);
-    font-size: var(--text-ui);
-    line-height: var(--leading-ui);
+    font: var(--type-ui);
     user-select: none;
   }
 
@@ -174,7 +167,14 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
     transition: fill var(--dur-lift) var(--ease-lift);
   }
 
-  .window__close:hover svg {
+  /* darker under a hovering pointer, and while pressed (the only sign on a touch screen) */
+  @media (hover: hover) {
+    .window__close:hover svg {
+      fill: var(--color-close-hover);
+    }
+  }
+
+  .window__close:active svg {
     fill: var(--color-close-hover);
   }
 
@@ -194,19 +194,5 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
 
   .window--compact {
     --window-body-pad: var(--window-pad-compact);
-  }
-
-  .window--flush {
-    --window-body-pad: 0;
-  }
-
-  .window--dark {
-    background: var(--surface-dark);
-    color: var(--text-on-dark);
-  }
-
-  .window--dark .window__bar {
-    color: var(--text-on-dark-accent);
-    border-bottom-color: var(--color-green-700);
   }
 </style>

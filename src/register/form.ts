@@ -9,6 +9,7 @@
  * - once it shows an error, on every input, so the error clears the moment the value is valid.
  * Each field keeps its 20 px message line whether or not it shows one, so nothing ever moves.
  */
+import { PIXEL_ICONS, pixelPath } from '../data/pixel-icons';
 
 export type FieldName = 'name' | 'email' | 'pass';
 
@@ -90,7 +91,7 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
       const sr = document.createElement('span');
       sr.className = 'sr-only';
       sr.textContent = 'Error: ';
-      // the "!" in pixel blocks, like every icon (a 2 px bar and its dot in the 14 px square)
+      // the "!" in pixel blocks, from the one icon set (a 2 px bar and its dot in the 14 px square)
       const bang = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       bang.setAttribute('class', 'field__bang');
       bang.setAttribute('viewBox', '0 0 14 14');
@@ -98,7 +99,7 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
       bang.setAttribute('height', '14');
       bang.setAttribute('shape-rendering', 'crispEdges');
       bang.setAttribute('aria-hidden', 'true');
-      bang.innerHTML = '<rect width="14" height="14" class="field__bang-box"/><path d="M6 3h2v5H6zM6 10h2v2H6z"/>';
+      bang.innerHTML = `<rect width="14" height="14" class="field__bang-box"/><path d="${pixelPath(PIXEL_ICONS.bang, 1)}"/>`;
       const text = document.createElement('span');
       text.textContent = message;
       el.replaceChildren(sr, bang, text);

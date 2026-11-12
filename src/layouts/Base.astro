@@ -11,6 +11,8 @@ interface Props {
   footer?: boolean;
   /** Keep the page out of search results. */
   noindex?: boolean;
+  /** The browser bar's colour: the page's surface, or the sky on the page that is all sky (the hex of --surface, --sky). */
+  themeColor?: string;
   /** The font files the first screen sets type in, preloaded (file names in public/fonts, without .woff2). */
   fonts?: string[];
 }
@@ -22,6 +24,7 @@ const {
   footer = true,
   noindex = false,
   fonts = ['Signifier-Variable', 'GeistMono-Variable', 'Geist-Variable'],
+  themeColor = '#FFFAEB',
 } = Astro.props;
 ---
 
@@ -38,7 +41,7 @@ const {
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     {fonts.map((font) => <link rel="preload" href={`/fonts/${font}.woff2`} as="font" type="font/woff2" crossorigin />)}
     <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#FFFAEB" />
+    <meta name="theme-color" content={themeColor} />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
@@ -220,6 +223,7 @@ const {
   .site-footer__info a {
     color: var(--text);
     text-decoration: underline;
+    white-space: nowrap; /* the address never breaks in two */
   }
 
   /* About as tall as vega.io's own nav logo; width from the file's aspect. */

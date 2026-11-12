@@ -42,4 +42,4 @@ export const samLines: SamLine[] = [
 ];
 
 /** Sam's line on the Register window once someone has registered (the booth's number kept with it). */
-export const GG_LINE = 'GG! Saved you a spot at Booth 630.';
+export const GG_LINE = 'GG! Saved you a spot at Booth\u00A0630.';

@@ -14,7 +14,7 @@ import { preloadFiles, type Scene, type SceneModule, type View } from './kit';
 import { sceneModules } from './scenes';
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-const phone = matchMedia('(max-width: 859px)');
+const phone = matchMedia('(max-width: 53.6875rem)'); // the drawer's own break (ScheduleDrawer.astro)
 
 /** CSS px per art px: k = max(1, round(this × dpr)), whole device pixels per art pixel (the mock's scale). */
 const CSS_PER_ART = 1;
