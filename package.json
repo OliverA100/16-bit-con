@@ -10,8 +10,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "lint": "astro check",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "prettier --write src scripts \"*.{mjs,json}\"",
+    "format:check": "prettier --check src scripts \"*.{mjs,json}\"",
     "icons": "node scripts/build-icons.mjs",
     "og": "node scripts/build-og.mjs"
   },
