@@ -662,6 +662,32 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     }
     return `#${best.toString(16).padStart(6, '0')}`;
   };
+  /**
+   * The skyline: the page's background through the run on a touch screen, the canvas' top row as vertical bands
+   * across the page. Behind Safari's clock it shows the page, which scrolls, so no pixel of the pinned world can be
+   * there; bands the same down their whole length look the same at any scroll, so the scene's top edge carries on up
+   * (a building as a building, the sky as sky). Read a few times a second, as the world moves under it.
+   */
+  let lastSkyline = '';
+  let skylineReadAt = -Infinity;
+  const SKYLINE_READ_MS = 80;
+  const SKYLINE_BANDS = 48;
+  const skyline = () => {
+    const w = o.canvas.width;
+    const row = sctx.getImageData(0, 0, w, 1).data;
+    const stops: string[] = [];
+    let run = '';
+    let from = 0;
+    for (let i = 0; i <= SKYLINE_BANDS; i++) {
+      const p = Math.min(w - 1, Math.floor(((i + 0.5) * w) / SKYLINE_BANDS)) * 4;
+      const c = i < SKYLINE_BANDS ? `rgb(${row[p]},${row[p + 1]},${row[p + 2]})` : '';
+      if (c === run) continue;
+      if (run) stops.push(`${run} ${((from / SKYLINE_BANDS) * 100).toFixed(2)}% ${((i / SKYLINE_BANDS) * 100).toFixed(2)}%`);
+      run = c;
+      from = i;
+    }
+    return `linear-gradient(to right, ${stops.join(', ')})`;
+  };
   /** Sam where the run ends, on the monitor's screen: his cell's centre (screen UV) and size (screen heights) — where the cracks start. */
   let samOnScreen: { centre: [number, number]; size: number } | null = null;
   /**
@@ -1807,7 +1833,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         lastTint = tint;
         section.classList.toggle('world--bleed', bleed);
         root.style.backgroundColor = tint;
+        root.classList.toggle('is-bleeding', bleed);
         floorStrip.hidden = !tint;
+        if (!tint) {
+          root.style.backgroundImage = '';
+          lastSkyline = '';
+        }
       }
       if (tint && showWorld && now - floorReadAt > FLOOR_READ_MS) {
         floorReadAt = now;
@@ -1815,6 +1846,14 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         if (floor !== lastFloor) {
           lastFloor = floor;
           floorStrip.style.backgroundColor = floor;
+        }
+      }
+      if (tint && showWorld && now - skylineReadAt > SKYLINE_READ_MS) {
+        skylineReadAt = now;
+        const sky = skyline();
+        if (sky !== lastSkyline) {
+          lastSkyline = sky;
+          root.style.backgroundImage = sky;
         }
       }
       o.hud?.classList.toggle('is-visible', inGame);
