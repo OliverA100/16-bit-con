@@ -1,5 +1,5 @@
 /**
- * Agent Sam's typewriter: a line typed out in a layout that never moves. The whole line is always laid
+ * Sam's typewriter: a line typed out in a layout that never moves. The whole line is always laid
  * out — the part still to come is there but hidden (`.type-rest`, global.css) — so a half-typed word never
  * wraps differently from the finished one. The cursor is drawn over the next character (`.type-caret`), a
  * half block in the text's colour, rather than added as a glyph: it takes no room of its own, and no

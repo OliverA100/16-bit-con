@@ -4,31 +4,20 @@
  * The opening is real DOM on the Daisy White page: the eyebrow and the wordmark above the monitor,
  * the tagline below, PRESS START laid on the monitor's screen. The monitor is a poster painted into
  * a canvas (so it is never the LCP element) until the 3D takes over; with the world live, the
- * canvas world sits under the opening. The game is opt-in: the overlays (HUD with Exit game, rail,
- * hint, d-pad) exist only in play mode, :root.is-playing, after PRESS START (src/game/index.ts).
+ * canvas world sits under the opening. The game is opt-in: the overlays (HUD with Exit game, Skip,
+ * hint, d-pad, the flyer) exist only in play mode, :root.is-playing, after PRESS START (src/game/index.ts).
  */
 import Window from './Window.astro';
 import Button from './Button.astro';
 import Wordmark from './Wordmark.astro';
-import { sessions } from '../data/sessions';
-import { railStops, type RailIcon } from '../data/guide';
+import FlyerDialog from './FlyerDialog.astro';
 import { POSTER } from '../monitor/poster';
 import { PIXEL_ICONS, pixelPath } from '../data/pixel-icons';
 
-/** The rail's icons, 16 × 16 in 2 px pixel blocks like every icon on the site (src/data/pixel-icons.ts). */
-const icons: Record<RailIcon, string> = {
-  sun: pixelPath(PIXEL_ICONS.sun),
-  city: pixelPath(PIXEL_ICONS.city),
-  moon: pixelPath(PIXEL_ICONS.moon),
-  crt: pixelPath(PIXEL_ICONS.crt),
-  booth: pixelPath(PIXEL_ICONS.booth),
-};
+/** Icons, 16 × 16 in 2 px pixel blocks like every icon on the site (src/data/pixel-icons.ts). */
+const skipIcon = pixelPath(PIXEL_ICONS.skip);
 const soundOn = pixelPath(PIXEL_ICONS.soundOn);
 const soundOff = pixelPath(PIXEL_ICONS.soundOff);
-
-const level1 = sessions[0]!;
-const level2 = sessions[1]!;
-const level3 = sessions[2]!;
 
 const pct = (v: number) => `${+(v * 100).toFixed(3)}%`;
 const posterStyle = `left: ${pct(POSTER.left)}; top: ${pct(POSTER.top)}; width: ${pct(POSTER.width)}; height: ${pct(POSTER.height)};`;
@@ -95,25 +84,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   </script>
 
   <!-- Live-only overlays -->
-  <Window title="Level 1 · 10:00 AM" class="world__session" data-session="1" aria-live="polite">
-    <p class="world__session-title">{level1.title}</p>
-    <p class="t-ui">{level1.place}</p>
-  </Window>
-  <Window title="Level 2 · 2:00 PM" class="world__session" data-session="2" aria-live="polite">
-    <p class="world__session-title">{level2.title}</p>
-    <p class="t-ui">{level2.place}</p>
-  </Window>
-  <Window title="Level 3 · 6:00 PM" class="world__session" data-session="3" aria-live="polite">
-    <p class="world__session-title">{level3.title}</p>
-    <p class="t-ui">{level3.place}</p>
-  </Window>
-
-  <Window size="compact" title="Player 1" class="world__hud" aria-label="Coins, time and level">
+  <Window size="compact" title="Player 1" class="world__hud" aria-label="Coins and time">
     <p class="world__hud-row">
       <span class="world__coin pixel" aria-hidden="true"></span>
       <span class="mono" data-hud-coins>00/12</span>
       <span class="mono world__clock" data-hud-clock>07:00 AM</span>
-      <span class="mono world__level" data-hud-level>Level 1</span>
       <Button variant="ghost" class="world__sound" data-sound aria-label="Sound" aria-pressed="true">
         <svg class="world__sound-icon" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true">
           <path class="world__sound-waves" d={soundOn} />
@@ -124,22 +99,12 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     </p>
   </Window>
 
-  <Window as="nav" size="compact" title="Levels" class="world__rail" aria-label="Progress">
-    <ol class="rail">
-      {
-        railStops.map((s) => (
-          <li>
-            <button type="button" class="rail__stop ui-button" data-rail={s.id} data-jump={String(s.jump)} data-state="next">
-              <svg class="rail__icon" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true"><path d={icons[s.icon]} /></svg>
-              <span class="rail__label">{s.label}</span>
-            </button>
-          </li>
-        ))
-      }
-    </ol>
-  </Window>
+  <Button variant="ghost" class="world__skip" data-skip aria-label="Skip to the end of the run">
+    <svg class="world__skip-icon" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true"><path d={skipIcon} /></svg>
+    <span>Skip</span>
+  </Button>
 
-  <Window size="compact" title="Agent Sam" class="world__sam">
+  <Window size="compact" title="Sam" class="world__sam">
     <div class="sam-bubble">
       <canvas class="sam-bubble__portrait pixel" width="46" height="49" aria-hidden="true" data-sam-portrait></canvas>
       <p class="mono sam-bubble__text" aria-hidden="true" data-sam-typed></p>
@@ -147,7 +112,11 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     </div>
   </Window>
 
-  <p class="t-ui world__hint" aria-hidden="true">← → run · space jump · scroll to play</p>
+  <!-- How to play, one line per kind of device (CSS picks by pointer); hidden while the flyer is open. -->
+  <p class="t-ui world__hint" aria-hidden="true">
+    <span class="world__hint-fine">← → or scroll to run · Space to jump</span>
+    <span class="world__hint-touch">Hold ◀ ▶ or swipe to run · Tap A to jump</span>
+  </p>
 
   <Window size="compact" title="Help Sam · 0/7" class="world__prompt" aria-live="polite">
     <!-- Click or tap the monitor to hit its glass (Space hits it too: said to screen readers). -->
@@ -178,6 +147,9 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
       </svg>
     </button>
   </div>
+
+  <!-- The flyer Sam picks up as the game starts, opened over the world (play mode only) -->
+  <FlyerDialog />
 
   <!-- The game's mode changes, announced (the overlays' own live regions are hidden outside the game). -->
   <p class="sr-only" aria-live="polite" data-world-status></p>
@@ -498,24 +470,22 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     visibility: hidden;
   }
 
-  .world__session,
   .world__hud,
   .world__hint,
   .world__prompt,
-  .world__rail,
   .world__sam,
-  .world__loading {
+  .world__loading,
+  .world :global(.world__skip) {
     position: absolute;
     z-index: 3;
     display: none;
   }
 
-  .world--live .world__session,
   .world--live .world__hud,
   .world--live .world__hint,
   .world--live .world__prompt,
-  .world--live .world__rail,
-  .world--live .world__sam {
+  .world--live .world__sam,
+  .world--live :global(.world__skip) {
     display: block;
     opacity: 0;
     transform: translateY(-8px);
@@ -531,23 +501,17 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
   /* ── Touch surfaces: the canvas and the controls are game input — never text
         to select or a long-press menu. The controls never start a scroll or a zoom; the canvas
         scrolls vertically (that is how a phone plays). Overlay windows allow panning; the
-        session copy stays selectable; the Arrival section below the pin is a normal page. ── */
+        Arrival section below the pin is a normal page. ── */
   .world__canvas,
   .world__touch,
   .world__hud,
   .world__hint,
   .world__prompt,
-  .world__loading,
-  .world__session {
+  .world__loading {
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
-  }
-
-  .world__session :global(.window__body) {
-    user-select: text;
-    -webkit-user-select: text;
   }
 
   .world__dpad-arm,
@@ -560,94 +524,57 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     touch-action: pan-y;
   }
 
-  .world__session,
   .world__hud,
   .world__prompt,
   .world__loading,
-  .hero__start {
+  .hero__start,
+  .world :global(.world__skip) {
     touch-action: manipulation;
   }
 
-  .world--live :is(.world__session, .world__hud, .world__hint, .world__prompt, .world__rail, .world__sam).is-visible {
+  .world--live :is(.world__hud, .world__hint, .world__prompt, .world__sam, :global(.world__skip)).is-visible {
     opacity: 1;
     transform: none;
   }
 
   /* Hidden overlays take no clicks or focus (the HUD holds Exit game). */
-  .world--live :is(.world__rail, .world__sam, .world__hud):not(.is-visible) {
+  .world--live :is(.world__sam, .world__hud, :global(.world__skip)):not(.is-visible) {
     visibility: hidden;
   }
 
   /* By default the page is a landing page: nothing of the game is there, nothing in it focusable. */
-  :global(:root:not(.is-playing)) :is(.world__hud, .world__rail, .world__hint, .world__touch, .world__sam, .world__session, .world__prompt) {
+  :global(:root:not(.is-playing)) :is(.world__hud, .world__hint, .world__touch, .world__sam, .world__prompt, :global(.world__skip)) {
     display: none !important;
   }
 
-  /* ── Progress rail: a Levels window on the left edge, one stop per level, the current
-        the current one inverted to Green 900; a click jumps the world there with no smear. Phones show the level
-        in the HUD instead. ── */
-  .world__rail {
-    top: 50%;
-    left: var(--gutter);
-    translate: 0 -50%;
-    user-select: none;
-    -webkit-user-select: none;
+  /* While the flyer is open, nothing else sits on the world but the HUD: no hint, no Skip, no Sam, no controls. */
+  :global(:root.is-reading) :is(.world__hint, .world__sam, .world__touch, :global(.world__skip)) {
+    visibility: hidden;
+    opacity: 0;
   }
 
-  .world__rail :global(.window__body) {
-    padding: var(--space-3);
+  /* The HUD's foot: where the overlays under it start (the compact window is ~5rem tall). */
+  .world {
+    --hud-foot: calc(var(--nav-h) + var(--space-4) + 5rem);
   }
 
-  .rail {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  /* Skip: a ghost button right under the HUD, its right edge on the HUD's. */
+  .world :global(.world__skip) {
+    top: calc(var(--hud-foot) + var(--space-2));
+    right: var(--gutter);
   }
 
-  /* Each stop is a ghost `.ui-button` (global.css), like the tickets: the lift on hover and keyboard
-     focus, the current one (aria-current, set with data-state) inverted to Green 900. Upcoming stops
-     keep their dimmed text. */
-  .rail__stop {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    width: 100%;
-    text-align: left;
-    white-space: nowrap;
-  }
-
-  .rail__icon {
+  .world__skip-icon {
+    display: block;
     flex: none;
     fill: currentColor;
   }
 
-  .rail__stop[data-state='next'] {
-    color: var(--text-secondary);
-  }
-
-  .world__level {
-    display: none;
-    padding-left: var(--space-2);
-    border-left: var(--border);
-  }
-
-  @media (max-width: 48rem) {
-    .world--live .world__rail {
-      display: none;
-    }
-
-    .world__level {
-      display: inline;
-    }
-  }
-
-  /* ── Agent Sam: small and sticky in a corner — top right under the HUD on wide
-        screens, above the controls on narrow ones — with his portrait at 2:1 and typewriter mono text. ── */
+  /* ── Sam: small and sticky in a corner — top left on wide screens (the HUD has the right),
+        above the controls on narrow ones — with his portrait at 2:1 and typewriter mono text. ── */
   .world__sam {
-    top: calc(var(--nav-h) + var(--space-4) + 5rem + var(--space-3));
-    right: var(--gutter);
+    top: calc(var(--nav-h) + var(--space-4));
+    left: var(--gutter);
     width: min(22rem, calc(100% - 2 * var(--gutter)));
     text-align: left;
     pointer-events: none;
@@ -723,28 +650,9 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     line-height: var(--leading-snug);
   }
 
-  .world__session {
-    top: calc(var(--nav-h) + var(--space-4));
-    left: var(--gutter);
-    width: min(20rem, calc(100% - 2 * var(--gutter)));
-    text-align: left;
-  }
-
-  /* The session's name in its window: a heading the game says, so Mondwest (the window-heading role) */
-  .world__session-title {
-    font: var(--type-window-heading);
-  }
-
   .world__hud {
     top: calc(var(--nav-h) + var(--space-4));
     right: var(--gutter);
-  }
-
-  @media (max-width: 40rem) {
-    /* Phones: HUD first, session window stacked under it. */
-    .world__session {
-      top: calc(var(--nav-h) + var(--space-4) + 5rem + var(--space-3));
-    }
   }
 
   .world__hud :global(.window__body) {
@@ -759,7 +667,7 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     font-size: var(--text-sm);
   }
 
-  /* Sound on/off: a square ghost button at Exit game's height, the rail's outline icon in it — a speaker
+  /* Sound on/off: a square ghost button at Exit game's height, a pixel icon in it — a speaker
      with its waves, or with an × when off. */
   .world__hud :global(.world__sound) {
     flex: none;
@@ -798,15 +706,14 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     border-left: var(--border);
   }
 
-  /* Phones show LVL too (the rail is hidden there): the row, the body and Exit game are tighter, so with
-     the sound button the HUD keeps a 16 px margin on a 375 px screen. */
+  /* Phones: the row, the body and Exit game are tighter, so the HUD keeps a 16 px margin on a 360 px
+     screen; below 24rem the clock gives way. */
   @media (max-width: 48rem) {
     .world__hud-row {
       gap: var(--space-1);
     }
 
-    .world__clock,
-    .world__level {
+    .world__clock {
       padding-left: var(--space-1);
     }
 
@@ -823,6 +730,15 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     }
   }
 
+  @media (max-width: 24rem) {
+    .world__clock {
+      display: none;
+    }
+  }
+
+  /* How to play: small, bottom centre over the ground on wide screens; on phones top left under the
+     HUD, beside Skip, so it never meets Sam's window or the controls at the bottom. One line per
+     kind of device: the keys and the scroll with a mouse or trackpad, the controls and a swipe on touch. */
   .world__hint {
     left: 50%;
     bottom: calc(130px * var(--px));
@@ -830,6 +746,30 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     padding: var(--space-1) var(--space-2);
     background: var(--surface);
     border: var(--border);
+  }
+
+  .world__hint-touch {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .world__hint-fine {
+      display: none;
+    }
+
+    .world__hint-touch {
+      display: inline;
+    }
+  }
+
+  @media (max-width: 48rem) {
+    .world__hint {
+      top: calc(var(--hud-foot) + var(--space-2));
+      bottom: auto;
+      left: var(--gutter);
+      max-width: calc(100% - 2 * var(--gutter) - 6rem - var(--space-2));
+      translate: none;
+    }
   }
 
   .world__loading {
@@ -947,10 +887,6 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
 
     .world__a.is-held .abtn__face {
       fill: color-mix(in srgb, var(--color-florets-yellow) 80%, var(--color-green-900));
-    }
-
-    .world__hint {
-      display: none !important;
     }
   }
 </style>

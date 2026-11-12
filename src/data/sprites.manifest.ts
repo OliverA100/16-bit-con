@@ -31,7 +31,7 @@ export const sprites = {
   samJump: { file: '/sprites/sam/sam-jump.png', w: 60, h: 60, frames: 1, fw: 60, fh: 60, scale: 'world', note: 'green goggles → swapped at load' },
   samIdle: { file: '/sprites/sam/idle.png', w: 1980, h: 60, frames: 33, fw: 60, fh: 60, scale: 'world', note: 'green goggles → swapped at load' },
   samSide: { file: '/sprites/sam/anim-sam-side-strip_8f_60x60.png', w: 480, h: 60, frames: 8, fw: 60, fh: 60, scale: 'world' },
-  samPortrait: { file: '/sprites/sam/portrait-sam.png', w: 46, h: 49, scale: 'ui', note: 'green goggles → swapped at load; Agent Sam dialogs' },
+  samPortrait: { file: '/sprites/sam/portrait-sam.png', w: 46, h: 49, scale: 'ui', note: 'green goggles → swapped at load; Sam dialogs' },
 
   // ── UI ──────────────────────────────────────────────────────────────────────
   coin: { file: '/sprites/ui/anim-vega-coin-3f_80x24.png', w: 80, h: 24, frames: 3, fw: 24, fh: 24, pitch: 28, scale: 'ui' },

@@ -3,10 +3,11 @@
  * deceleration, a short skid when reversing at speed, and a true full stop. Units are world px
  * and seconds. The loop integrates the returned displacement into X and scrolls the page.
  */
-export const RUN_SPEED = 160; // world px/s
-const ACCEL = RUN_SPEED / 0.4; // 0 → full in 0.4 s
-const DECEL = RUN_SPEED / 0.25; // full → 0 in 0.25 s
-const SKID_MS = 130; // the brief's 100–150 ms
+export const RUN_SPEED = 200; // world px/s (~4.4 of Sam's heights a second; the run is ~30 s held)
+const ACCEL = RUN_SPEED / 0.12; // 0 → full in 0.12 s: a platformer's quick start
+const DECEL = RUN_SPEED / 0.1; // full → 0 in 0.1 s
+const AIR_CONTROL = 0.75; // in the air he still steers, a little less sharply
+const SKID_MS = 90;
 const SKID_MIN = 0.35 * RUN_SPEED; // reversing slower than this just turns
 
 const approach = (v: number, target: number, maxDelta: number) =>
@@ -63,11 +64,12 @@ export class Motion {
         this.puff = true;
         this.vx = approach(this.vx, 0, this.skidRate * dt);
       } else {
-        this.vx = approach(this.vx, 0, DECEL * dt);
+        this.vx = approach(this.vx, 0, DECEL * (grounded ? 1 : AIR_CONTROL) * dt);
       }
       return this.vx * dt;
     }
-    this.vx = approach(this.vx, dir * RUN_SPEED, (dir !== 0 ? ACCEL : DECEL) * dt);
+    const air = grounded ? 1 : AIR_CONTROL;
+    this.vx = approach(this.vx, dir * RUN_SPEED, (dir !== 0 ? ACCEL : DECEL) * air * dt);
     return this.vx * dt;
   }
 }

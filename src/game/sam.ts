@@ -56,16 +56,22 @@ export const IDLE_FPS = 8;
 /** World px of travel per run frame: one 4-frame cycle every 48 px, ~13 fps at full speed. */
 export const STRIDE = 12;
 /** A fast scrub never strobes the cycle faster than this. */
-export const RUN_FPS_MAX = 16;
+export const RUN_FPS_MAX = 18;
 
-/** Variable jump: hold for height. Tap ≈ 15 px hop, full hold (450 ms) = 40 px, snappy fall. */
-const JUMP_V0 = 178; // px/s
-const JUMP_G_RISE = 395; // px/s² while held and rising → apex 40 px at 0.45 s
-const JUMP_G_FALL = 800; // px/s² once released or past the apex
-const JUMP_CUT = 70; // releasing early caps the upward speed
-const JUMP_HOLD_MAX_MS = 450;
-/** A tap still rises this long before the cut applies, so the smallest hop clears ~16 px. */
-const JUMP_MIN_MS = 80;
+/**
+ * Variable jump, platformer style: a hard launch, held for height (full: 56 px, apex at 0.32 s), and a
+ * fall twice as heavy as the rise. Releasing early cuts the rise and switches to the fall's gravity.
+ */
+const JUMP_V0 = 360; // px/s (measured: 56 px at 60 fps)
+const JUMP_G_RISE = 1100; // px/s² while held and rising → apex 56 px at 0.32 s
+const JUMP_G_FALL = 2200; // px/s² once released or past the apex: air ~0.55 s for a full jump
+const JUMP_V_MAX_FALL = 420; // terminal fall speed
+const JUMP_CUT = 150; // releasing early caps the upward speed
+const JUMP_HOLD_MAX_MS = 340;
+/** A tap still rises this long before the cut applies, so the smallest hop clears ~21 px. */
+const JUMP_MIN_MS = 50;
+/** A press this soon before landing jumps on landing. */
+const JUMP_BUFFER_MS = 100;
 
 export type SamMode = 'idle' | 'run' | 'skid' | 'jump';
 
@@ -81,6 +87,9 @@ export class Sam {
   private holding = false;
   private released = false;
   private jumpAt = -1;
+  /** A press in the air, kept for the landing (jump buffer): when, and whether it is still held. */
+  private bufferedAt = -Infinity;
+  private bufferedHeld = false;
   private odometer = 0;
   private idleClock = 0;
 
@@ -91,7 +100,11 @@ export class Sam {
   }
 
   jumpPress(now: number): void {
-    if (this.inAir) return;
+    if (this.inAir) {
+      this.bufferedAt = now;
+      this.bufferedHeld = true;
+      return;
+    }
     this.inAir = true;
     this.holding = true;
     this.released = false;
@@ -101,6 +114,7 @@ export class Sam {
   }
 
   jumpRelease(): void {
+    this.bufferedHeld = false;
     if (!this.holding) return;
     this.holding = false;
     this.released = true;
@@ -121,13 +135,20 @@ export class Sam {
       if (this.released && flight >= JUMP_MIN_MS && this.vy > JUMP_CUT) this.vy = JUMP_CUT;
       const rising = this.vy > 0 && flight < JUMP_HOLD_MAX_MS && (this.holding || flight < JUMP_MIN_MS);
       const g = rising ? JUMP_G_RISE : JUMP_G_FALL;
-      this.vy -= g * dt;
+      this.vy = Math.max(-JUMP_V_MAX_FALL, this.vy - g * dt);
       this.y += this.vy * dt;
       if (this.y <= 0) {
         this.y = 0;
         this.vy = 0;
         this.inAir = false;
         this.holding = false;
+        // Pressed just before landing: jump again now, as held as the press still is.
+        if (now - this.bufferedAt <= JUMP_BUFFER_MS) {
+          const held = this.bufferedHeld;
+          this.bufferedAt = -Infinity;
+          this.jumpPress(now);
+          if (!held) this.jumpRelease();
+        }
       }
       this.lift = Math.round(this.y);
     }

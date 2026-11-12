@@ -38,9 +38,11 @@
   --color-blue-700: #2189E5;
   --color-blue-900: #0072D6;
 
-  /* One token outside the brand palette: the close red from Vega's own game UI (vega.io's notepad.exe).
-     Its only job is the Register dialog's close square. */
+  /* Two tokens outside the brand palette. The close red from Vega's own game UI (vega.io's notepad.exe):
+     the dialogs' close squares. The flyer's paper, the cream of Vega's poster art (as in the flyer mock):
+     the flyer, in the world and opened. */
   --color-close: #C74842;
+  --color-paper: #FFE9B8;
 
   /* Semantic aliases: colour by role, nothing else.
      Green 900: all text and lines, and selected things (filled). Grey 700: secondary text. Grey 500:

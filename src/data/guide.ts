@@ -1,36 +1,9 @@
 /**
- * The progress rail's stops and Agent Sam's lines. Positions are timeline t.
- * Agent Sam is casual and short (brand rule: "Speech bubbles from Sam are windows titled
- * 'Agent Sam' with typewriter mono text"); each line shows while t is inside its window.
+ * Sam's lines through the run, by timeline t. Sam is short, first person and casual; each line shows
+ * while t is inside its window (and never during the flyer's opening, which index.ts holds back).
+ * The story: a flyer lands at his feet, he heads for New York, runs day and night, and finds the
+ * Javits Center there is made of pixels.
  */
-export type RailIcon = 'sun' | 'city' | 'moon' | 'crt' | 'booth';
-
-export interface RailStop {
-  id: string;
-  label: string;
-  /** Where a click lands: a timeline position. */
-  jump: number;
-  /** The stop is current while t is in [from, to). */
-  from: number;
-  to: number;
-  icon: RailIcon;
-}
-
-export const railStops: RailStop[] = [
-  { id: 'keynote', label: '10:00 Keynote', jump: 0.08, from: 0, to: 0.34, icon: 'sun' },
-  { id: 'panel', label: '2:00 Panel', jump: 0.36, from: 0.34, to: 0.62, icon: 'city' },
-  { id: 'party', label: '6:00 Party', jump: 0.62, from: 0.62, to: 0.84, icon: 'moon' },
-  { id: 'booth', label: 'Booth 630', jump: 1, from: 0.84, to: 1.01, icon: 'booth' },
-];
-
-/** The level shown in the HUD on phones, where the rail is hidden. */
-export function levelLabel(t: number): string {
-  if (t < 0.34) return 'Level 1';
-  if (t < 0.62) return 'Level 2';
-  if (t < 0.84) return 'Level 3';
-  return 'Level 4';
-}
-
 export interface SamLine {
   from: number;
   to: number;
@@ -38,12 +11,16 @@ export interface SamLine {
 }
 
 export const samLines: SamLine[] = [
-  { from: 0.15, to: 0.21, text: 'Keynote’s at 10. Grab coins on the way, the high ones need a jump.' },
+  { from: 0, to: 0.09, text: 'New York by Oct 3? I need a way to get there.' },
+  { from: 0.15, to: 0.21, text: 'Long way to New York. Grab coins, the high ones need a jump.' },
   { from: 0.29, to: 0.34, text: 'Leaving the field. New York, act normal.' },
-  { from: 0.53, to: 0.58, text: 'Glass box down the avenue? That’s Javits. Booth 630 is inside.' },
-  { from: 0.66, to: 0.72, text: 'Sun’s down, lights on. After party’s at 6. Follow the neon.' },
-  { from: 0.97, to: 1.01, text: 'Wait. This is just the game. The real one’s out there.' },
+  { from: 0.53, to: 0.58, text: 'Glass box down the avenue? That’s Javits.' },
+  { from: 0.64, to: 0.7, text: 'Sun’s going down. Not stopping now.' },
+  { from: 0.77, to: 0.82, text: 'Running all night. Worth it.' },
+  { from: 0.86, to: 0.91, text: 'Morning already. Javits, finally.' },
+  { from: 0.95, to: 0.98, text: 'Wait. This Javits is made of pixels.' },
+  { from: 0.98, to: 1.01, text: 'I’m still in the game. Help me break out.' },
 ];
 
-/** Agent Sam's line on the Register window once someone has registered (the booth's number kept with it). */
-export const GG_LINE = 'GG! Saved you a spot at Booth\u00A0630.';
+/** Sam's line on the Register window once someone has registered (the booth's number kept with it). */
+export const GG_LINE = 'GG! Saved you a spot at Booth 630.';

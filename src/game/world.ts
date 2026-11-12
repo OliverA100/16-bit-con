@@ -55,6 +55,8 @@ export interface Frame {
   dust: Dust;
   /** Sam has left the picture (the breakout: from the shatter on he is the monitor's own billboard). */
   hideSam?: boolean;
+  /** The opening's flyer (flyer.ts): in front of Sam while it falls, under his feet once it lies on the ground. */
+  flyer?: { draw(ctx: CanvasRenderingContext2D, camLeft: number, F: number, sink: number, now: number): void; landed(now: number): boolean } | null;
 }
 
 const mod = (v: number, m: number) => ((v % m) + m) % m;
@@ -698,7 +700,10 @@ export class Level1 {
     }
 
     f.coins.draw(ctx, a.coin, camLeft, F, r, now);
+    const flyerDown = !!f.flyer && f.flyer.landed(now);
+    if (flyerDown) f.flyer!.draw(ctx, camLeft, F, FOOT_SINK - 1, now);
     if (!f.hideSam) f.sam.draw(ctx, f.samX - camLeft, F);
+    if (f.flyer && !flyerDown) f.flyer.draw(ctx, camLeft, F, FOOT_SINK - 1, now);
     f.dust.draw(ctx, camLeft, F + FOOT_SINK, now);
   }
 }

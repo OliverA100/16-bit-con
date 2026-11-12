@@ -4,7 +4,7 @@
  *
  * Things that appear step: the form steps out (2 steps), the window's height steps to its new size (4), the
  * success content and the ticket step in (4); then `register:done` goes out on the window, so Sam jumps and
- * Agent Sam types his new line (src/game/index.ts, src/game/journey.ts). With reduced motion it simply swaps.
+ * Sam types his new line (src/game/index.ts, src/game/journey.ts). With reduced motion it simply swaps.
  * Back to the form runs the same way round.
  */
 import type { Registration, RegisterFormApi } from './form';
@@ -86,7 +86,7 @@ export function initSuccess(formApi: RegisterFormApi | null): { show(r: Registra
       });
       heading.focus({ preventScroll: true });
       win.dispatchEvent(new CustomEvent('register:done', { detail: { name: first } }));
-      // Without the game (the static page), Agent Sam's bubble just says it.
+      // Without the game (the static page), Sam's bubble just says it.
       if (!document.documentElement.classList.contains('has-game')) {
         const typed = document.querySelector<HTMLElement>('[data-landing-typed]');
         if (typed) {

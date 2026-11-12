@@ -33,13 +33,14 @@ import { Timeline } from './timeline';
 import { Input } from './input';
 import { Motion } from './motion';
 import { Dust } from './dust';
+import { FallingFlyer, FlyerSprites } from './flyer';
 import { FOOT_SINK, Sam, SAM_CELL } from './sam';
 import { Coins, LEVEL1_COINS, TOTAL_COINS } from './coins';
 import { loadCity, loadLevel1 } from './assets';
 import { Level1 } from './world';
 import { skyAt } from './stages';
 import { GROUND_BAND, PLAZA_TIME } from '../data/layers';
-import { GG_LINE, levelLabel, railStops, samLines, type SamLine } from '../data/guide';
+import { GG_LINE, samLines, type SamLine } from '../data/guide';
 import { sprites } from '../data/sprites.manifest';
 import { loadImage } from './sprites';
 import { remap, SAM_BRAND_MAP } from './palette';
@@ -50,6 +51,7 @@ import type { BreakoutState, Hero } from '../monitor/hero';
 import { BREAKOUT, CRACK_STAGES, DIVE, ENTER, PLAY, clamp01, crackStage, playMs, playP, scrollLengths, smooth } from './segments';
 import { drawCell, idleOnPerch, queryPerch, withSmile } from './landing';
 import { createRegisterDialog, focusRegister } from './register-dialog';
+import { createFlyerDialog } from './flyer-dialog';
 import { typeOut } from './typing';
 import { GL_ATTRIBUTES } from '../monitor/spec';
 import * as sound from './sound';
@@ -127,17 +129,14 @@ interface Overlay {
   hud: HTMLElement | null;
   hudCoins: HTMLElement | null;
   hudClock: HTMLElement | null;
-  sessions: HTMLElement[];
   hint: HTMLElement | null;
+  skip: HTMLButtonElement | null;
   prompt: HTMLElement | null;
   promptTitle: HTMLElement | null;
-  rail: HTMLElement | null;
-  railStops: HTMLButtonElement[];
   sam: HTMLElement | null;
   samTyped: HTMLElement | null;
   samSaid: HTMLElement | null;
   samPortrait: HTMLCanvasElement | null;
-  hudLevel: HTMLElement | null;
   loading: HTMLElement | null;
   loadingText: HTMLElement | null;
   dpadLeft: HTMLElement | null;
@@ -156,17 +155,14 @@ function query(section: HTMLElement): Overlay {
     hud: q('.world__hud'),
     hudCoins: q('[data-hud-coins]'),
     hudClock: q('[data-hud-clock]'),
-    sessions: [...section.querySelectorAll<HTMLElement>('.world__session')],
     hint: q('.world__hint'),
+    skip: q<HTMLButtonElement>('[data-skip]'),
     prompt: q('.world__prompt'),
     promptTitle: q('.world__prompt .window__title'),
-    rail: q('.world__rail'),
-    railStops: [...section.querySelectorAll<HTMLButtonElement>('[data-rail]')],
     sam: q('.world__sam'),
     samTyped: q('[data-sam-typed]'),
     samSaid: q('[data-sam-said]'),
     samPortrait: q<HTMLCanvasElement>('[data-sam-portrait]'),
-    hudLevel: q('[data-hud-level]'),
     loading: q('.world__loading'),
     loadingText: q('[data-loading-text]'),
     dpadLeft: q('[data-dpad="left"]'),
@@ -230,27 +226,28 @@ function pauseTask(): Promise<void> {
 }
 
 function clockFor(t: number): string {
-  // 07:00 during the title; 10:00 at t 0.08 → 14:00 at 0.36 → 18:00 at 0.62 → 22:00 at 0.84.
-  // Then the night fast-forwards with the dawn sky: 05:00 under its Blue 900, 06:00
-  // as it turns Yellow 600 (sunrise), 07:30 in the Blue 100 morning, 09:00 at the plaza's end — or,
-  // at a night plaza, on to midnight. Stepped to 10 minutes.
+  // The journey's time, kept with the light: 07:00 as the run starts, the afternoon through the city,
+  // 19:00 as the sky turns Yellow 600 (sunset), on through the night to 06:30 as the dawn sky warms
+  // (sunrise), 07:30 in the Blue 100 morning, 08:00 at the plaza's end — or, at a night plaza, on to
+  // midnight. Stepped to 10 minutes.
   const stops: [number, number][] = [
-    [0.08, 10 * 60],
-    [0.36, 14 * 60],
-    [0.62, 18 * 60],
-    [0.84, 22 * 60],
+    [0, 7 * 60],
+    [0.34, 13 * 60],
+    [0.6, 17 * 60 + 30],
+    [0.68, 19 * 60],
+    [0.77, 22 * 60],
     ...(PLAZA_TIME === 'dawn'
       ? ([
-          [0.86, 29 * 60],
-          [0.88, 30 * 60],
+          [0.84, 27 * 60],
+          [0.88, 30 * 60 + 30],
           [0.92, 31 * 60 + 30],
-          [1, 33 * 60],
+          [1, 32 * 60],
         ] as [number, number][])
       : ([[1, 24 * 60]] as [number, number][])),
   ];
-  let minutes = 7 * 60;
-  if (t >= 0.08) {
-    minutes = stops[stops.length - 1]![1];
+  let minutes = stops[stops.length - 1]![1];
+  if (t <= 0) minutes = stops[0]![1];
+  else {
     for (let i = 1; i < stops.length; i++) {
       const [t0, m0] = stops[i - 1]!;
       const [t1, m1] = stops[i]!;
@@ -565,21 +562,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     { passive: true },
   );
 
-  // ── Progress rail: a click jumps the world to a level with no smear ──
-  for (const btn of o.railStops) {
-    btn.addEventListener('click', () => {
-      if (mode !== 'play' || paused || zoom || finale) return;
-      const t = Number(btn.dataset.jump);
-      motion.cancel();
-      playing = null;
-      window.scrollTo({ top: Math.round(pinTop() + DE + t * DW), behavior: 'instant' });
-      expectedY = window.scrollY;
-      timeline.jumpTo(t);
-    });
-  }
-  let railCurrent = '';
-
-  // ── Agent Sam: his portrait with the brand goggles, and the line for the current stretch, typed out ──
+  // ── Sam: his portrait with the brand goggles, and the line for the current stretch, typed out ──
   if (o.samPortrait) {
     const pctx = o.samPortrait.getContext('2d')!;
     loadImage(sprites.samPortrait.file)
@@ -591,6 +574,77 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   let samShown = -1;
   /** Typewriter pace: one character per this many ms. */
   const TYPE_MS = 32;
+
+  // ── The opening: a flyer floats down from the sky, Sam watches it, walks over and picks it up, and it
+  //    opens (the flyer dialog). Once per page load; the page and the keys hold still until it is read. ──
+  const flyerSprites = new FlyerSprites();
+  type OpeningPhase = 'fall' | 'walk' | 'pickup' | 'read' | 'done';
+  let opening: { phase: OpeningPhase; t0: number; flyer: FallingFlyer } | null = null;
+  /** The flyer has been dropped this visit (an Exit before it is read drops it again on the way back in). */
+  let flyerSeen = false;
+  /** Sam walks over to it, world px/s (the run cycle at about half its pace). */
+  const WALK_SPEED = 90;
+  /** He looks at it on the ground for this long before he walks. */
+  const LOOK_MS = 300;
+  /** Picking it up: it lifts off the ground, then it is in his hands. */
+  const PICKUP_MS = 260;
+  /** Where it drifts from and lands, from Sam's centre at the start of the run: it swings across him early on. */
+  const FLYER_FROM = 4;
+  const FLYER_LAND = 84;
+  /** The opening is on, or still to come (the dive's last frames, before the flyer drops): the story's UI waits. */
+  const openingHolds = () => (opening ? opening.phase !== 'done' : !flyerSeen && mode === 'play');
+  const startOpening = (now: number) => {
+    flyerSeen = true;
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const centre = timeline.X + SAM_CELL / 2;
+    // from above the top of the screen (the paper's bottom 30 px over it)
+    const flyer = new FallingFlyer(flyerSprites, now, F + 30, centre + FLYER_FROM, centre + FLYER_LAND, {}, still);
+    opening = { phase: 'fall', t0: now, flyer };
+    holdPage(true);
+    input.enabled = false;
+    input.reset();
+    motion.cancel();
+  };
+  /** The flyer has been read: the run is Sam's. */
+  const endOpening = () => {
+    if (!opening) return;
+    opening.phase = 'done';
+    opening.flyer.taken = true;
+    holdPage(false);
+    input.reset();
+    input.enabled = mode === 'play';
+  };
+  /** Exit before the flyer was read: it drops again when the game resumes. */
+  const cancelOpening = () => {
+    if (!opening || opening.phase === 'done') return;
+    holdPage(false);
+    opening = null;
+    flyerSeen = false;
+  };
+  /** The flyer opens over the world, out of the little one in Sam's hands; the world waits until it is closed. */
+  const flyerDialog = createFlyerDialog({
+    onOpen: () => {
+      paused = true;
+      pausedAt = clockNow();
+    },
+    onClose: () => {
+      lastInputAt = clockNow();
+      paused = false;
+      endOpening();
+    },
+  });
+  const openFlyer = () => {
+    if (!flyerDialog || !opening) {
+      endOpening();
+      return;
+    }
+    // the little flyer's box on screen: its 16 × 3 strip on the ground, art px to CSS px
+    const r = o.canvas.getBoundingClientRect();
+    const u = r.width / vp.bw;
+    const cx = opening.flyer.landX - (timeline.X - sx);
+    const top = F + FOOT_SINK - 1 - 3 - 4;
+    flyerDialog.show(new DOMRect(r.left + (cx - 8) * u, r.top + top * u, 16 * u, 3 * u));
+  };
 
   // ── HUD wiring, and the Player 1 bonus line in the Register window at 12/12 ──
   const bonus = document.getElementById('bonus');
@@ -939,7 +993,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   //    window's title bar as the pin releases, at whole device px per art px again. In flight his box stays
   //    on the perch and a transform carries him, so the page never lays anything out again: no layout shift.
   const perch = queryPerch();
-  /** Agent Sam's line on the Register window: typed out once he lands (the full line stays for screen readers). */
+  /** Sam's line on the Register window: typed out once he lands (the full line stays for screen readers). */
   const landingTyped = document.querySelector<HTMLElement>('[data-landing-typed]');
   let landingLine = '';
   let landingSince = -1;
@@ -954,7 +1008,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
   // Back on the Register window from the page, he says something new: an invitation, typed out as before (the
   // full line for screen readers too).
   const RETURN_LINE = "Come say hi at Booth\u00A0630. I'll save you a seat."; // the booth's number kept with it
-  /** Agent Sam types a new line on the Register window (the full line for screen readers too). */
+  /** Sam types a new line on the Register window (the full line for screen readers too). */
   const sayOnPerch = (line: string) => {
     if (!landingTyped) return;
     landingLine = line;
@@ -992,7 +1046,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
             console.error('[journey] Sam stays on the Register window', err);
             return null;
           });
-        // Agent Sam's line on the Register window types out as his lines in the game do
+        // Sam's line on the Register window types out as his lines in the game do
         if (landingTyped) {
           if (nextLine) {
             sayOnPerch(nextLine);
@@ -1093,6 +1147,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     root.classList.add('is-playing');
     syncLengths();
     const resume = saved ? tlOf(saved) : null;
+    // back in past the start of the run: the flyer was read before the Exit
+    if (resume !== null && resume > 0.002) flyerSeen = true;
     allowQ = saved?.q ?? 0;
     scrollCracks = false;
     lastPushAt = -Infinity;
@@ -1246,6 +1302,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
    */
   const exitPlay = () => {
     if (mode !== 'play' || regDialog?.open || exiting) return;
+    cancelOpening();
     const tl = timeline.t;
     const q = qAt(tl);
     if (wantBreakout && q >= BREAKOUT.shatter[0]) return;
@@ -1385,6 +1442,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       const away = clockNow() - pausedAt;
       if (playing && playing.t0 >= 0) playing.t0 += away;
       if (breakPlay && breakPlay.t0 >= 0) breakPlay.t0 += away;
+      if (opening && opening.phase !== 'done') {
+        opening.t0 += away;
+        opening.flyer.shift(away);
+      }
       lastInputAt = clockNow();
       paused = false;
       input.enabled = mode === 'play';
@@ -1564,6 +1625,35 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       else if (qT > 0 && input.dir < 0) pullTo(0);
     }
     // Keys / d-pad: Sam runs with real velocity and the page follows him.
+    // The opening: the flyer falls; Sam waits, then walks to it and picks it up (the page follows him, as with the keys).
+    if (opening && opening.phase !== 'done' && live) {
+      const op = opening;
+      const fl = op.flyer;
+      fl.tick(now);
+      if (op.phase === 'fall' && fl.landed(now)) {
+        op.phase = 'walk';
+        op.t0 = now + LOOK_MS;
+      }
+      if (op.phase === 'walk' && now >= op.t0) {
+        const target = fl.landX - SAM_CELL / 2;
+        const X1 = Math.min(target, timeline.X + WALK_SPEED * dt);
+        timeline.drive(X1, X1 < target ? WALK_SPEED : 0, 'auto');
+        scrollToX(X1);
+        if (X1 >= target) {
+          op.phase = 'pickup';
+          op.t0 = now;
+        }
+      }
+      if (op.phase === 'pickup') {
+        const k = (now - op.t0) / PICKUP_MS;
+        fl.raise = Math.round(Math.min(1, k) * 4);
+        if (k >= 1) {
+          fl.taken = true;
+          op.phase = 'read';
+          openFlyer();
+        }
+      }
+    }
     const held = input.active && now >= scrollOverrideUntil && !heroUp && !playing && !inBreak && !breakPlay ? input.dir : 0;
     if (held !== 0) lastInputAt = now;
     // While the visual is still easing after a scroll, keys move the target (the page) from where
@@ -1740,6 +1830,13 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // headed: a fast scroll's target can be past the plaza while the picture still runs (on review
     // 2026-11-10 he stood still there with the world sliding under him).
     sam.update(dt, timeline.t > 0 && !inBreakout ? timeline.speed : 0, now, catchingUp ? 0 : held, !catchingUp && motion.skidding);
+    // Sam watches the flyer come down: he turns to whichever side of him it is (with a little slack, so he never flickers).
+    if (opening && (opening.phase === 'fall' || (opening.phase === 'walk' && now < opening.t0))) {
+      const fx = opening.flyer.pose(now).x;
+      const c = timeline.X + SAM_CELL / 2;
+      if (fx > c + 6) sam.facing = 1;
+      else if (fx < c - 6) sam.facing = -1;
+    }
 
     const X = t * W;
     const camLeft = X - sx;
@@ -1747,7 +1844,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     prevSamX = X;
 
     if (input.active) {
-      const view = { t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, range: viewport, span: screen.rect, now, sky: skyAt(t), sam, coins, dust };
+      const flyer = opening && !opening.flyer.taken ? opening.flyer : null;
+      const view = { t, X, camLeft, sx, F, bw: vp.bw, bh: vp.bh, range: viewport, span: screen.rect, now, sky: skyAt(t), sam, coins, dust, flyer };
       // The enter segment, a pure function of p: the copy and PRESS START go first, then the whole
       // opening hands over to the canvas world under it — only the top layer fades, over an opaque world.
       const fade = d ? 1 - smooth(heroP, ENTER.handover) : 0;
@@ -1831,6 +1929,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
 
       // The game's overlays come in at the end of the enter segment.
       const inGame = mode === 'play' && !exiting && (!d || heroP >= ENTER.overlays);
+      // The world is in view and the run has not begun: the flyer drops (once a visit).
+      if (inGame && live && !flyerSeen && !opening && !playing && timeline.t < 0.002) startOpening(now);
       // While the run fills a phone's screen, Safari 26's bars show the world: the pinned section is hidden
       // from Safari (World.astro), so behind the clock it shows the page as it scrolls — the sky's colour;
       // under the bottom bar it extends the floor strip, the ground's colour read off the canvas' bottom row.
@@ -1856,7 +1956,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
           floorStrip.style.backgroundColor = floor;
         }
       }
-      if (tint && showWorld && now - skylineReadAt > SKYLINE_READ_MS) {
+      // (not while the flyer crosses the top rows: its colours would stripe the page up behind the clock)
+      const flyerUp = opening?.phase === 'fall' && now - opening.t0 < 900;
+      if (tint && showWorld && !flyerUp && now - skylineReadAt > SKYLINE_READ_MS) {
         skylineReadAt = now;
         const sky = skyline();
         if (sky !== lastSkyline) {
@@ -1865,32 +1967,9 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
         }
       }
       o.hud?.classList.toggle('is-visible', inGame);
-      // Session windows: Level 1 from 0.08 until the gate, Level 2 once the street has started.
-      for (const el of o.sessions) {
-        const level = el.dataset.session;
-        el.classList.toggle('is-visible', inGame && (level === '1' ? t >= 0.08 && t < 0.34 : level === '2' ? t >= 0.36 && t < 0.6 : level === '3' ? t >= 0.62 && t < 0.83 : false));
-      }
-      o.hint?.classList.toggle('is-visible', inGame && t < 0.14);
-      // The rail: each stop done, current or next by t.
-      o.rail?.classList.toggle('is-visible', inGame);
-      const current = railStops.find((s) => t >= s.from && t < s.to)?.id ?? '';
-      if (current !== railCurrent) {
-        railCurrent = current;
-        let passed = true;
-        for (const btn of o.railStops) {
-          const isCurrent = btn.dataset.rail === current;
-          if (isCurrent) passed = false;
-          btn.dataset.state = isCurrent ? 'current' : passed ? 'done' : 'next';
-          if (isCurrent) btn.setAttribute('aria-current', 'step');
-          else btn.removeAttribute('aria-current');
-        }
-      }
-      if (o.hudLevel) {
-        const lvl = levelLabel(t);
-        if (o.hudLevel.textContent !== lvl) o.hudLevel.textContent = lvl;
-      }
-      // Agent Sam: the line for this stretch types out once it starts; screen readers get it whole.
-      const line = inGame ? (samLines.find((l) => t >= l.from && t < l.to) ?? null) : null;
+      o.hint?.classList.toggle('is-visible', inGame && !openingHolds() && t < 0.14);
+      // Sam: the line for this stretch types out once it starts; screen readers get it whole.
+      const line = inGame && !openingHolds() ? (samLines.find((l) => t >= l.from && t < l.to) ?? null) : null;
       if (line !== samLine) {
         samLine = line;
         samSince = now;
@@ -1971,6 +2050,10 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       },
       get finale() {
         return finale;
+      },
+      /** The opening's phase and the flyer's pose now (dev: the fall's measurements). */
+      opening(now: number) {
+        return opening ? { phase: opening.phase, t0: opening.t0, pose: opening.flyer.pose(now), samX: timeline.X, facing: sam.facing } : null;
       },
       get gate() {
         return { allowQ, wheel: gateWheelOn, glassT0 };

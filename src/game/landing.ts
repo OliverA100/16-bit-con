@@ -84,7 +84,7 @@ export function drawCell(canvas: HTMLCanvasElement, strip: Strip, frame: number,
 }
 
 /**
- * Sam away from the Register window (out on the page: src/game/journey.ts): his perch and Agent Sam's
+ * Sam away from the Register window (out on the page: src/game/journey.ts): his perch and Sam's
  * bubble hide, so there is only ever one Sam; back on it, both return ('returned': the line types again).
  */
 export function setAway(perch: Perch, away: boolean): void {

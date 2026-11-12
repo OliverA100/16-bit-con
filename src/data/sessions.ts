@@ -1,7 +1,6 @@
 /**
- * The schedule. The brief's three sessions are Oct 3, copy used as-is (`brief: true`); the Oct 4–5
- * sessions were added for the drawer. Kept in time order, the brief's three first, so the game's
- * Levels (World.astro) still read sessions[0..2].
+ * The schedule. The brief's three sessions are Oct 3, copy used as-is; the Oct 4–5 sessions were
+ * added for the drawer. Kept in time order.
  */
 export type Day = 'Oct 3' | 'Oct 4' | 'Oct 5';
 
@@ -19,17 +18,12 @@ export interface Session {
   place: string;
   blurb: string;
   scene: SceneId;
-  /** One of the brief's three sessions (the game's Levels 1–3). */
-  brief?: true;
-  level?: 1 | 2 | 3;
 }
 
 export const sessions: Session[] = [
   {
     id: 'opening-keynote',
     day: 'Oct 3',
-    level: 1,
-    brief: true,
     time: '10:00 AM',
     title: 'Opening Keynote: The Future of Retro',
     tab: 'Opening Keynote',
@@ -40,8 +34,6 @@ export const sessions: Session[] = [
   {
     id: 'pixel-art-ai',
     day: 'Oct 3',
-    level: 2,
-    brief: true,
     time: '2:00 PM',
     title: 'Panel: Pixel Art in the Age of AI',
     tab: 'Pixel Art & AI',
@@ -52,8 +44,6 @@ export const sessions: Session[] = [
   {
     id: 'after-party',
     day: 'Oct 3',
-    level: 3,
-    brief: true,
     time: '6:00 PM',
     title: 'Vega After Party — Booth 630',
     tab: 'After Party',

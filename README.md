@@ -69,7 +69,7 @@ Under `npm run dev`, `/dev/sound` plays each sound, picks the crack sounds and s
 | `src/schedule/` | The schedule drawer's behaviour, the scene runner and the nine folder scenes |
 | `src/game/` | The canvas world: timeline, stages, Sam, input, night palettes and their worker, the plaza and the landing; `sound.ts` for the game's sound |
 | `src/monitor/` | The three.js monitor: model, CRT shader, poster and breakout |
-| `src/data/` | World keyframes, the sprite manifest, sessions, the progress rail, Agent Sam's lines and the pixel icons |
+| `src/data/` | World keyframes, the sprite manifest, sessions, Sam's lines and the pixel icons |
 | `public/sounds/` | The crack and shatter recordings, used as they are |
 | `src/dev/` | The sound tuning page (dev only) |
 | `public/sprites/` | Vega's art, untouched; `SOURCES.md` lists where each file comes from and the new art drawn for this page |
@@ -78,9 +78,9 @@ Under `npm run dev`, `/dev/sound` plays each sound, picks the crack sounds and s
 
 - The opening paints in one go with no image request: the wordmark is inline SVG, so the largest contentful paint is the hero's text (its tagline), and the world's art and the 3D load after it.
 - Measured during the build: 60 fps through the zoom and the breakout with the CPU throttled 4×, no long tasks or layout shifts, and Lighthouse 100 on mobile and desktop.
-- All the event information lives in the DOM sections and is reachable without playing; the canvases are `aria-hidden`. Closed schedule folders use `hidden="until-found"`, so find-in-page reaches their text and opens the folder; each tab is a button with `aria-expanded` whose name starts with its visible label. By default nothing in the game (HUD, rail, d-pad, Exit game) is in the tab order.
+- All the event information lives in the DOM sections and is reachable without playing; the canvases are `aria-hidden`. Closed schedule folders use `hidden="until-found"`, so find-in-page reaches their text and opens the folder; each tab is a button with `aria-expanded` whose name starts with its visible label. By default nothing in the game (HUD, Skip, d-pad, Exit game) is in the tab order.
 - The pin is created only when the game starts and removed when it ends, with the scroll adjusted in the same frame, so neither adds a layout shift.
-- Semantic HTML with real buttons and links, and one visible focus state everywhere: pixel corner brackets in Green 900 round whatever has keyboard focus. The registration dialog is a native modal `<dialog>` that traps focus and returns it to the link that opened it. Starting, closing and finishing the game are announced, as are Agent Sam's lines, through polite live regions.
+- Semantic HTML with real buttons and links, and one visible focus state everywhere: pixel corner brackets in Green 900 round whatever has keyboard focus. The registration dialog is a native modal `<dialog>` that traps focus and returns it to the link that opened it. Starting, closing and finishing the game are announced, as are Sam's lines, through polite live regions.
 
 ## Assets and licences
 

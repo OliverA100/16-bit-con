@@ -8,17 +8,19 @@
  * beside it, so an h1 made of it still has real text.
  */
 interface Props {
-  size?: 'hero' | 'nav' | 'og' | 'ticket';
+  size?: 'hero' | 'nav' | 'og' | 'ticket' | 'flyer';
+  /** `flyer`: Yellow 600 letters in a Green 900 outline, as printed on the flyer (FlyerDialog.astro). */
+  tone?: 'ink' | 'flyer';
   as?: 'h1' | 'span' | 'div';
   id?: string;
   class?: string;
   /** Vega's daisy after "CON" (the default), or the letters alone. */
   daisy?: boolean;
 }
-const { size = 'hero', as: Tag = 'span', id, class: className, daisy = true } = Astro.props;
+const { size = 'hero', tone = 'ink', as: Tag = 'span', id, class: className, daisy = true } = Astro.props;
 ---
 
-<Tag class:list={['wm', `wm--${size}`, { 'wm--daisy': daisy }, className]} id={id}>
+<Tag class:list={['wm', `wm--${size}`, { 'wm--daisy': daisy, 'wm--tone-flyer': tone === 'flyer' }, className]} id={id}>
   {
     daisy ? (
       <svg class="wm__art" xmlns="http://www.w3.org/2000/svg" viewBox="18.59 -10.69 818.38 126.82" fill="currentColor" aria-hidden="true" focusable="false">
@@ -73,5 +75,28 @@ const { size = 'hero', as: Tag = 'span', id, class: className, daisy = true } = 
   /* On the ticket: about 20 px tall with the daisy */
   .wm--ticket {
     --wm-w: 129px;
+  }
+
+  /* On the flyer: across its inner column */
+  .wm--flyer {
+    --wm-w: 100%;
+  }
+
+  /* Printed on the flyer: Yellow 600 in a 2 px Green 900 outline (drawn under the fill, so it shows outside
+     only), round at the joins like a print's trap. */
+  .wm--tone-flyer {
+    color: var(--color-yellow-600);
+  }
+
+  .wm--tone-flyer .wm__art {
+    overflow: visible;
+  }
+
+  .wm--tone-flyer .wm__art path {
+    stroke: var(--color-green-900);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+    paint-order: stroke fill;
+    vector-effect: non-scaling-stroke;
   }
 </style>
