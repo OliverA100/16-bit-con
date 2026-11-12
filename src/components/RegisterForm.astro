@@ -39,6 +39,7 @@ const passes = [
         maxlength="80"
         placeholder="Sam the Mole"
         aria-describedby="reg-name-error"
+        aria-required="true"
       />
       <p class="field__msg" id="reg-name-error" aria-live="polite"></p>
     </div>
@@ -56,17 +57,18 @@ const passes = [
         autocapitalize="off"
         placeholder="sam@vega.io"
         aria-describedby="reg-email-error"
+        aria-required="true"
       />
       <p class="field__msg" id="reg-email-error" aria-live="polite"></p>
     </div>
 
-    <fieldset class="field register__passes" data-field="pass" aria-describedby="reg-pass-error">
+    <fieldset class="field register__passes" data-field="pass" aria-describedby="reg-pass-error" aria-required="true" role="radiogroup">
       <legend>Pass</legend>
       <div class="register__options">
         {
           passes.map((t) => (
             <label class="option ui-button">
-              <input type="radio" name="pass" value={t.value} />
+              <input type="radio" name="pass" value={t.value} aria-describedby="reg-pass-error" />
               <span class="option__label">{t.label}</span>
               <span class="option__meta">{t.meta}</span>
             </label>

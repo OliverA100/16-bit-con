@@ -208,6 +208,44 @@ p {
   content: none;
 }
 
+/* Touch targets: on a touch screen every control answers within 44 px, whatever its drawn size. An unseen
+   box centred on it, never smaller than the control itself; nothing is drawn larger. (Text fields are 40 px
+   and keep their label as part of their target; the Schedule's tabs reach down over the drawer instead.) */
+@media (pointer: coarse) {
+  /* (no weight of its own: a control that places itself, like the skip link, keeps its place) */
+  :where(.ui-button, .window__close, .nav__brand, .site-footer a, .check) {
+    position: relative;
+  }
+
+  :is(.ui-button, .window__close, .nav__brand, .site-footer a, .check)::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+}
+
+/* The skip link: the first stop for the keyboard, out of sight until it has focus. */
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 30;
+}
+
+.skip-link:not(:focus-visible) {
+  translate: 0 -300%;
+}
+
+/* A section reached by a link lands clear of the fixed nav. */
+:target,
+#register {
+  scroll-margin-top: calc(var(--nav-h) + var(--space-4));
+}
+
 /* Type roles (tokens.css) as classes, for the roles markup applies directly (titles, headings and subheadings
    take theirs in their components; the lead is 20/30, 18/28 on phones). Sentence case everywhere. */
 .t-eyebrow {

@@ -3,6 +3,7 @@ import '../styles/tokens.css';
 import '../styles/fonts.css';
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
+import Button from '../components/Button.astro';
 
 interface Props {
   title?: string;
@@ -11,6 +12,8 @@ interface Props {
   footer?: boolean;
   /** Keep the page out of search results. */
   noindex?: boolean;
+  /** Where the skip link goes, and what it says: past the game on the home page, to the content elsewhere. */
+  skip?: { href: string; label: string };
   /** The browser bar's colour: the page's surface, or the sky on the page that is all sky (the hex of --surface, --sky). */
   themeColor?: string;
   /** The font files the first screen sets type in, preloaded (file names in public/fonts, without .woff2). */
@@ -25,6 +28,7 @@ const {
   noindex = false,
   fonts = ['Signifier-Variable', 'GeistMono-Variable', 'Geist-Variable'],
   themeColor = '#FFFAEB',
+  skip = { href: '#main', label: 'Skip to content' },
 } = Astro.props;
 ---
 
@@ -102,6 +106,7 @@ const {
     </script>
   </head>
   <body>
+    <Button href={skip.href} class="skip-link">{skip.label}</Button>
     <Nav />
     <main id="main" tabindex="-1">
       <slot />
