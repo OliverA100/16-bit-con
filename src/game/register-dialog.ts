@@ -22,6 +22,19 @@ export function createRegisterDialog(hooks: { onOpen(): void; onClose(): void })
 
   /** Close with its 150 ms step out (at once with reduced motion); Esc, the close square and a click outside all come here. */
   let closing = false;
+  let timer = 0;
+  /** The step out has played (or its time is up): close for real. */
+  const finish = () => {
+    if (!closing) return;
+    closing = false;
+    window.clearTimeout(timer);
+    dialog.classList.remove('is-closing');
+    dialog.close();
+  };
+  // the dialog's own step out, not an animation ending inside it (the form's)
+  dialog.addEventListener('animationend', (e) => {
+    if (e.target === dialog) finish();
+  });
   const close = () => {
     if (!dialog.open || closing) return;
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -30,14 +43,7 @@ export function createRegisterDialog(hooks: { onOpen(): void; onClose(): void })
     }
     closing = true;
     dialog.classList.add('is-closing');
-    const finish = () => {
-      if (!closing) return;
-      closing = false;
-      dialog.classList.remove('is-closing');
-      dialog.close();
-    };
-    dialog.addEventListener('animationend', finish, { once: true });
-    window.setTimeout(finish, 400);
+    timer = window.setTimeout(finish, 400);
   };
   win.querySelector<HTMLButtonElement>('[data-window-close]')?.addEventListener('click', close);
   // Esc: the same step out (a second Esc while it runs closes it at once, as the browser decides)
@@ -52,6 +58,7 @@ export function createRegisterDialog(hooks: { onOpen(): void; onClose(): void })
 
   dialog.addEventListener('close', () => {
     closing = false;
+    window.clearTimeout(timer);
     dialog.classList.remove('is-closing');
     if (marker) {
       marker.replaceWith(win);

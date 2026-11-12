@@ -15,7 +15,7 @@ export type FieldName = 'name' | 'email' | 'pass';
 export const MESSAGES = {
   name: 'Enter your name.',
   emailEmpty: 'Enter your email address.',
-  emailInvalid: 'Enter a valid email address, like name@example.com.',
+  emailInvalid: 'Enter a valid email address, like sam@vega.io.',
   pass: 'Choose a pass.',
 } as const;
 
@@ -160,8 +160,12 @@ export function initRegisterForm(hooks: FormHooks): RegisterFormApi | null {
     };
     submit.removeAttribute('aria-disabled');
     submitText.textContent = 'Register now';
-    busy = false;
-    await hooks.onRegistered(registration);
+    // still busy until the form has given way to the pass: a second Enter meanwhile must not register again
+    try {
+      await hooks.onRegistered(registration);
+    } finally {
+      busy = false;
+    }
   });
 
   // aria-disabled keeps the button focusable while it waits; a click on it then does nothing

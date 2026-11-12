@@ -38,10 +38,11 @@
   --color-blue-700: #2189E5;
   --color-blue-900: #0072D6;
 
-  /* Two tokens outside the brand palette. The close red from Vega's own game UI (vega.io's notepad.exe):
-     the dialogs' close squares. The flyer's paper, the cream of Vega's poster art (as in the flyer mock):
-     the flyer, in the world and opened. */
+  /* Tokens outside the brand palette. The close red from Vega's own game UI (vega.io's notepad.exe):
+     the dialogs' close squares, and the darker red is that square on hover. The flyer's paper, the cream
+     of Vega's poster art (as in the flyer mock): the flyer, in the world and opened. */
   --color-close: #C74842;
+  --color-close-hover: #A22D2C;
   --color-paper: #FFE9B8;
 
   /* Semantic aliases: colour by role, nothing else.

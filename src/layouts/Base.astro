@@ -11,6 +11,8 @@ interface Props {
   footer?: boolean;
   /** Keep the page out of search results. */
   noindex?: boolean;
+  /** The font files the first screen sets type in, preloaded (file names in public/fonts, without .woff2). */
+  fonts?: string[];
 }
 
 const {
@@ -19,6 +21,7 @@ const {
     'The retro gaming convention for people who never stopped playing. Talks, workshops and tournaments at the Javits Center, New York. Find Vega at Booth 630.',
   footer = true,
   noindex = false,
+  fonts = ['Signifier-Variable', 'GeistMono-Variable', 'Geist-Variable'],
 } = Astro.props;
 ---
 
@@ -33,9 +36,7 @@ const {
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="preload" href="/fonts/Signifier-Variable.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    {fonts.map((font) => <link rel="preload" href={`/fonts/${font}.woff2`} as="font" type="font/woff2" crossorigin />)}
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#FFFAEB" />
     <meta property="og:type" content="website" />
@@ -60,8 +61,14 @@ const {
         if (location.hash) return;
         var top = function () { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); };
         top();
-        window.addEventListener('DOMContentLoaded', top, { once: true });
-        window.addEventListener('load', top, { once: true });
+        // ...and again as the page settles, unless the reader has already begun to scroll: never pull them back
+        var touched = false;
+        ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (type) {
+          window.addEventListener(type, function () { touched = true; }, { once: true, passive: true });
+        });
+        var again = function () { if (!touched) top(); };
+        window.addEventListener('DOMContentLoaded', again, { once: true });
+        window.addEventListener('load', again, { once: true });
       })();
     </script>
     <script is:inline>
@@ -69,10 +76,17 @@ const {
       // in src/game/scale.ts: k = clamp(round(deviceH / 540), 2, 6), 240 px width floor.
       (function () {
         var root = document.documentElement;
+        // The height is held through a height-only resize on a touch screen (the toolbar showing or hiding, a
+        // keyboard opening), as the game holds its own: Sam and the footer's field never change size under a thumb.
+        var touch = navigator.maxTouchPoints > 0 || matchMedia('(pointer: coarse)').matches;
+        var lastW = window.innerWidth;
+        var heldH = window.innerHeight;
         function fit() {
+          if (window.innerWidth !== lastW || !touch) heldH = window.innerHeight;
+          lastW = window.innerWidth;
           var dpr = window.devicePixelRatio || 1;
           var devW = Math.round(window.innerWidth * dpr);
-          var devH = Math.round(window.innerHeight * dpr);
+          var devH = Math.round(heldH * dpr);
           var k = Math.min(6, Math.max(2, Math.round(devH / 540)));
           if (Math.ceil(devW / k) < 240) k = Math.max(2, k - 1);
           root.style.setProperty('--px', String(k / dpr));

@@ -83,6 +83,18 @@ import SectionHeader from '../components/SectionHeader.astro';
     gap: var(--head-to-content);
   }
 
+  /* Without JavaScript nothing draws Sam, so his perch (he and his line) is not shown, and the gap is the
+     headers' own. */
+  @media (scripting: none) {
+    .landing {
+      gap: var(--head-to-content);
+    }
+
+    .landing__perch {
+      display: none;
+    }
+  }
+
   .landing__window {
     position: relative;
     width: min(100%, 36rem);

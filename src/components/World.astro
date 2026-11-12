@@ -552,6 +552,12 @@ const monitorLabel = 'A yellow late-80s computer monitor with the 16-Bit Con gam
     visibility: hidden;
   }
 
+  /* The prompt keeps its box while it steps out, so it gives up its taps instead: on a phone it stands on
+     the HUD's row, and unseen it would lie over Exit game and the sound button. */
+  .world--live .world__prompt:not(.is-visible) {
+    pointer-events: none;
+  }
+
   /* By default the page is a landing page: nothing of the game is there, nothing in it focusable. */
   :global(:root:not(.is-playing)) :is(.world__hud, .world__hint, .world__touch, .world__sam, .world__prompt) {
     display: none !important;

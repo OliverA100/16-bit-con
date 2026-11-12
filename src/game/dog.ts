@@ -49,8 +49,10 @@ export async function startDog(o: DogOptions): Promise<{ wake(): void } | null> 
   canvas.width = SAM_CELL;
   canvas.height = SAM_CELL;
   el.append(canvas);
-  Object.assign(el.style, { position: 'absolute', left: '0', top: '0', zIndex: '6', pointerEvents: 'none', display: 'none' });
-  Object.assign(canvas.style, { display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated' });
+  // A band as wide as the page that clips what it holds, like the page's sky: the dog trots in from past the
+  // right edge, and a box out there on its own would make the page wider than the screen.
+  Object.assign(el.style, { position: 'absolute', left: '0', top: '0', width: '100%', overflow: 'hidden', zIndex: '6', pointerEvents: 'none', display: 'none' });
+  Object.assign(canvas.style, { display: 'block', imageRendering: 'pixelated' });
   document.body.append(el);
 
   let phase: Phase = 'away';
@@ -172,9 +174,11 @@ export async function startDog(o: DogOptions): Promise<{ wake(): void } | null> 
     const dpr = window.devicePixelRatio || 1;
     const size = SAM_CELL * s;
     const y = footerGroundY(scene) - (SAM_CELL - FOOT_SINK) * s;
-    el.style.width = `${size}px`;
     el.style.height = `${size}px`;
-    el.style.transform = `translate(${Math.round(x * dpr) / dpr}px, ${Math.round(y * dpr) / dpr}px)`;
+    el.style.transform = `translateY(${Math.round(y * dpr) / dpr}px)`;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    canvas.style.transform = `translateX(${Math.round(x * dpr) / dpr}px)`;
     el.style.display = '';
     return true;
   };

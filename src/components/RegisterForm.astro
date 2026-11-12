@@ -53,7 +53,7 @@ const passes = [
         inputmode="email"
         spellcheck="false"
         autocapitalize="off"
-        placeholder="you@example.com"
+        placeholder="sam@vega.io"
         aria-describedby="reg-email-error"
       />
       <p class="field__msg" id="reg-email-error" aria-live="polite"></p>
@@ -161,8 +161,8 @@ const passes = [
     gap: var(--rhythm-block);
   }
 
-  /* The email's longest message ("Enter a valid email address, like name@example.com.") needs 420 px on one
-     line. Where the form is narrower (phones), that field keeps two lines for it, so it still never moves. */
+  /* The email's longest message ("Enter a valid email address, like sam@vega.io.") runs to two lines on a
+     narrow form (phones), so there that field keeps two lines for it and still never moves. */
   @container register-form (max-width: 419px) {
     [data-field='email'] .field__msg {
       min-height: calc(2 * var(--leading-ui));

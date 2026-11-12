@@ -21,7 +21,7 @@ interface Props {
   as?: Tag;
   tone?: 'light' | 'dark';
   size?: 'full' | 'compact';
-  /** No title bar (the title stays for assistive tech). */
+  /** No title bar (the title stays as the frame's name for assistive tech). */
   bare?: boolean;
   id?: string;
   class?: string;
@@ -56,13 +56,12 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
 <Element
   class:list={['window', `window--${tone}`, `window--${size}`, { 'window--flush': flush, 'window--bare': bare, 'window--title-start': titleStart }, className]}
   id={id}
-  aria-labelledby={titleId}
+  aria-labelledby={bare ? undefined : titleId}
+  aria-label={bare ? title : undefined}
   {...rest}
 >
   {
-    bare ? (
-      <span class="sr-only" id={titleId}>{title}</span>
-    ) : (
+    bare ? null : (
       <div class="window__bar">
         <span class="window__title" id={titleId}>{title}</span>
         <span class="window__squares" aria-hidden="true">
@@ -172,6 +171,11 @@ const titleStart = (titleAlign ?? (size === 'compact' ? 'center' : 'start')) ===
   .window__close svg {
     display: block;
     fill: var(--color-close);
+    transition: fill var(--dur-lift) var(--ease-lift);
+  }
+
+  .window__close:hover svg {
+    fill: var(--color-close-hover);
   }
 
   :global(dialog) .window__close {

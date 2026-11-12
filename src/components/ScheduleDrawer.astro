@@ -9,6 +9,7 @@
  * The folder is Vega's folder frame (public/sprites/ui/frames/folder.svg) drawn in CSS and two
  * fixed slant pieces, so the tab's angle never changes with its label.
  */
+import Window from './Window.astro';
 import { days } from '../data/sessions';
 
 const OPEN = 'opening-keynote'; // open by default: the brief's sessions read at once
@@ -131,6 +132,30 @@ const plate = 'Files · Oct 3–5';
   </div>
 </div>
 
+<!-- Without JavaScript nothing can open a folder or change the day, so the drawer gives way (the style below)
+     to every session laid out, a window a day. -->
+<noscript>
+  <div class="plain">
+    {
+      panels.map((p) => (
+        <Window as="section" title={p.long}>
+          <ol class="plain__sessions">
+            {p.folders.map((f) => (
+              <li>
+                <p class="folder__meta mono">
+                  {f.time} · {f.place}
+                </p>
+                <h3 class="folder__title">{f.title}</h3>
+                <p class="folder__blurb">{f.blurb}</p>
+              </li>
+            ))}
+          </ol>
+        </Window>
+      ))
+    }
+  </div>
+</noscript>
+
 <script>
   import { bootDrawer } from '../schedule/drawer';
 
@@ -139,6 +164,25 @@ const plate = 'Files · Oct 3–5';
 </script>
 
 <style>
+  /* Without JavaScript: the sessions as plain windows instead of the drawer. */
+  .plain {
+    display: grid;
+    gap: var(--space-6);
+    width: min(100%, 36rem);
+    text-align: left;
+  }
+
+  .plain__sessions {
+    display: grid;
+    gap: var(--rhythm-block);
+    padding: 0;
+    list-style: none;
+  }
+
+  .plain .folder__title {
+    text-align: left;
+  }
+
   /* ── Geometry. Top to bottom: the day tabs, the back card (the room an open folder lifts into, then
         the day's three folders, each --step below the one before), the drawer front. The open folder
         and the folders behind it lift by --rise, so its whole body shows above the folder in front,
@@ -646,6 +690,13 @@ const plate = 'Files · Oct 3–5';
     .folder__text,
     .folder__canvas[data-drawn='fade'] {
       transition: none;
+    }
+  }
+
+  /* Last, so it wins over the drawer's own display: without JavaScript the windows above stand in for it. */
+  @media (scripting: none) {
+    .drawer {
+      display: none;
     }
   }
 </style>

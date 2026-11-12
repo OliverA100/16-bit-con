@@ -17,6 +17,7 @@ export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void; /** 
 
   let closing = false;
   let shown = false;
+  let timer = 0;
   /**
    * Everything after it has closed, once. Called right after close() as well as from the close event: Chrome
    * can close a modal without firing that event (seen after focus had left it and come back), and the game
@@ -26,6 +27,7 @@ export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void; /** 
     if (!shown) return;
     shown = false;
     closing = false;
+    window.clearTimeout(timer);
     dialog.classList.remove('is-closing');
     document.documentElement.classList.remove('is-reading');
     hooks.onClose();
@@ -51,7 +53,7 @@ export function createFlyerDialog(hooks: { onOpen(): void; onClose(): void; /** 
     }
     closing = true;
     dialog.classList.add('is-closing');
-    window.setTimeout(finish, 400);
+    timer = window.setTimeout(finish, 400);
   };
   go.addEventListener('click', close);
   dialog.addEventListener('cancel', (e) => {

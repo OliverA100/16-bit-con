@@ -717,7 +717,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // the sound's context is made here, inside the click: browsers allow sound only after a gesture
     sound.unlock();
     if (mode === 'default') enterPlay();
-    else if (mode === 'play' && !paused && !zoom) start();
+    else if (mode === 'play' && !paused && !zoom && !playing) start();
   });
 
   let hero3d: Hero | null = null;
@@ -817,6 +817,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       pendingHit = true;
     });
   }
+  let breakoutAsk = 0;
   const layoutHero = () => {
     if (!d || !hero3d) return;
     const b = slotBox(d);
@@ -842,8 +843,12 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     const centre = h.screenUV(left + SAM_CELL / 2, top + SAM_CELL / 2);
     samOnScreen = { centre, size: Math.abs(h.screenUV(left, top)[1] - h.screenUV(left, top + SAM_CELL)[1]) };
     // The crack pattern starts from him: laid out (and uploaded) in idle time, never on a scroll frame.
+    // Only the latest: a drag-resize asks many times, and each earlier centre is already stale.
     const w = window as IdleWindow;
-    (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200)))(() => hero3d?.prepareBreakout(centre));
+    const ask = ++breakoutAsk;
+    (w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200)))(() => {
+      if (ask === breakoutAsk) hero3d?.prepareBreakout(centre);
+    });
   };
   /** No 3D after all (no WebGL 2, an error, too slow): the powered-on poster, PRESS START on it. */
   const toStatic = (why: unknown) => {
@@ -1348,7 +1353,8 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
    * itself out in ~2.4 s) Esc does nothing.
    */
   const exitPlay = () => {
-    if (mode !== 'play' || regDialog?.open || exiting) return;
+    // (not in the middle of Skip's fade either: its jump would land in the zoom out)
+    if (mode !== 'play' || regDialog?.open || exiting || skipFade) return;
     cancelOpening();
     const tl = timeline.t;
     const q = qAt(tl);
@@ -1489,6 +1495,7 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
       const away = clockNow() - pausedAt;
       if (playing && playing.t0 >= 0) playing.t0 += away;
       if (breakPlay && breakPlay.t0 >= 0) breakPlay.t0 += away;
+      if (zoom && zoom.t0 >= 0) zoom.t0 += away;
       if (opening && opening.phase !== 'done') {
         opening.t0 += away;
         opening.flyer.shift(away);
@@ -1896,14 +1903,15 @@ export async function bootWorld(section: HTMLElement): Promise<void> {
     // frozen where it is); the monitor at rest on the page, showing the game where the player left it.
     let zoomEnded = false;
     let heroP = inBreakout ? 1 - clamp01(q / BREAKOUT.pullBack[1]) : p;
-    if (zoom) {
+    // (held under the Register dialog like every other play: the camera waits where it was)
+    if (zoom && !(paused && zoom.t0 < 0)) {
       if (zoom.t0 < 0) {
         zoom.t0 = now;
         const lag = frameLag(now);
         cueFor(zoom, zoom.p1 > zoom.p0 ? sound.enter(Math.min(PLAY.dive, playMs(zoom.p1)), lag, glassMs()) : sound.exit(playMs(zoom.p0), lag));
       }
       const dir = zoom.p1 >= zoom.p0 ? 1 : -1;
-      const zp = playP(playMs(zoom.p0) + dir * (now - zoom.t0));
+      const zp = playP(playMs(zoom.p0) + dir * Math.max(0, (paused ? pausedAt : now) - zoom.t0));
       heroP = dir > 0 ? Math.min(zp, zoom.p1) : Math.max(zp, zoom.p1);
       zoomEnded = heroP === zoom.p1;
     } else if (mode === 'default') heroP = 0;

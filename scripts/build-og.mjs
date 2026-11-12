@@ -5,7 +5,7 @@
  * The pixel art is composed here on a 600 × 315 art grid and doubled nearest-neighbour. The
  * recolour and the hills' seam patch are the page's own code (remap, patchTileSeam from
  * src/game/palette.ts), run against a minimal stand-in canvas. Headless Chrome then sets the type
- * in Geist Mono and draws the wordmark from src/components/Wordmark.astro over that picture.
+ * in Geist Mono and draws the wordmark from src/data/wordmark.ts over that picture.
  * Text antialiasing is snapped to 32 steps between sky and ink so the PNG stays indexed and small.
  *
  * Run with `npm run og`. Needs Google Chrome (or set CHROME to a Chromium binary).
@@ -150,13 +150,11 @@ for (let y = 0; y < big.height; y++) {
 
 // ── The type, set by Chrome over the art ──────────────────────────────────────────────
 
-const svg = /<svg class="wm__art"[^>]*viewBox="([\d.\s-]+)"[\s\S]*?<\/svg>/.exec(text('src/components/Wordmark.astro'));
-if (!svg) throw new Error('wordmark svg not found');
-const [, , vbW, vbH] = svg[1].trim().split(/\s+/).map(Number);
-if (!svg[0].includes('818.38')) throw new Error('the first wordmark svg is not the one with the daisy');
+const { WORDMARK_LETTERS, WORDMARK_DAISY, WORDMARK_DAISY_AT, WORDMARK_VIEW: view } = await import('../src/data/wordmark.ts');
+const wordmark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${view.x} ${view.y} ${view.w} ${view.h}" fill="currentColor"><path fill-rule="evenodd" d="${WORDMARK_LETTERS}"/><path fill-rule="evenodd" transform="translate(${WORDMARK_DAISY_AT.x} ${WORDMARK_DAISY_AT.y})" d="${WORDMARK_DAISY}"/></svg>`;
 const WM_W = 760;
 const WM_TOP = 100;
-const URL_TOP = Math.round(WM_TOP + (WM_W * vbH) / vbW + 26);
+const URL_TOP = Math.round(WM_TOP + (WM_W * view.h) / view.w + 26);
 /** Chrome sets Geist Mono 2 px higher in its line box than the mock's layout did; this puts the ink where the mock has it. */
 const MONO_NUDGE = 2;
 
@@ -166,14 +164,13 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 html, body { margin: 0; width: ${W * SCALE}px; height: ${H * SCALE}px; overflow: hidden; }
 body { position: relative; color: ${INK}; background: url(data:image/png;base64,${b64(encodePng(big))}) 0 0 / ${W * SCALE}px ${H * SCALE}px no-repeat; }
 p { position: absolute; left: 0; width: 100%; margin: 0; text-align: center; font: 500 26px/normal 'Geist Mono'; }
-p { box-sizing: border-box; } /* padding-left = letter-spacing: the last letter's trailing space, so the ink centres */
-.date { top: ${48 + MONO_NUDGE}px; text-transform: uppercase; letter-spacing: 2px; padding-left: 2px; }
-.url { top: ${URL_TOP + MONO_NUDGE}px; letter-spacing: 1px; padding-left: 1px; }
+.date { top: ${48 + MONO_NUDGE}px; }
+.url { top: ${URL_TOP + MONO_NUDGE}px; }
 .wm { position: absolute; left: ${(W * SCALE - WM_W) / 2}px; top: ${WM_TOP}px; width: ${WM_W}px; }
 .wm svg { display: block; width: 100%; height: auto; }
 </style></head><body>
-<p class="date">OCT 3–5, 2026 · JAVITS CENTER, NEW YORK</p>
-<div class="wm">${svg[0]}</div>
+<p class="date">October 3–5, 2026 · Javits Center, New York</p>
+<div class="wm">${wordmark}</div>
 <p class="url">vega.io/16-bit-con</p>
 </body></html>`;
 

@@ -238,7 +238,18 @@ export function bootDrawer(drawer: HTMLElement): void {
   };
   snap();
   new ResizeObserver(snap).observe(document.body);
-  matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`).addEventListener('change', snap);
+  // A query for the pixel ratio as it is now hears only the change away from it, so each change sets the next.
+  const watchRatio = () => {
+    matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`).addEventListener(
+      'change',
+      () => {
+        snap();
+        watchRatio();
+      },
+      { once: true },
+    );
+  };
+  watchRatio();
 
   // Every folder holds a frame of its scene (out of sight while it is closed, below its clear strip); the
   // open one plays. The server drew the opening state; the scenes fade in as they are drawn.

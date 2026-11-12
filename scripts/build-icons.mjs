@@ -4,7 +4,7 @@
  *   public/favicon.ico          16, 32, 48 px rendered from that SVG, for browsers without SVG favicons
  *   public/apple-touch-icon.png 180 px, the same picture square, yellow to every edge (iOS rounds it itself)
  *
- * The glyphs are the first three subpaths of the no-daisy wordmark in src/components/Wordmark.astro
+ * The glyphs are the first three subpaths of the wordmark's letters in src/data/wordmark.ts
  * (the 1, the 6 and the 6's hole), copied as they are. They are scaled so the "16" spans 72 % of the
  * icon, centred, then nudged 1.5 units right so the slant reads as centred. Colours are the tokens.
  *
@@ -35,12 +35,8 @@ const NUDGE_X = 1.5;
 
 // ── The "16" from the wordmark ────────────────────────────────────────────────────────
 
-const svgs = [...text('src/components/Wordmark.astro').matchAll(/<svg class="wm__art"[\s\S]*?<\/svg>/g)].map((m) => m[0]);
-const letters = svgs.find((s) => !s.includes('818.38')); // the one without the daisy
-if (!letters) throw new Error('no-daisy wordmark svg not found');
-const d = /<path fill-rule="evenodd" d="([^"]+)"/.exec(letters)?.[1];
-if (!d) throw new Error('wordmark path not found');
-const subpaths = d.match(/M[^M]*/g);
+const { WORDMARK_LETTERS } = await import('../src/data/wordmark.ts');
+const subpaths = WORDMARK_LETTERS.match(/M[^M]*/g);
 if (!subpaths || subpaths.length < 3) throw new Error('wordmark path has fewer than three subpaths');
 const sixteen = subpaths.slice(0, 3).join('').trim();
 if (/[^MLCZ\d\s.,-]/.test(sixteen)) throw new Error('unexpected path command: the bounds below read absolute M/L/C/Z only');

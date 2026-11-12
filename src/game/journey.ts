@@ -2,9 +2,9 @@
  * Sam out on the page, once he has broken out of the game and landed on the Register window.
  *
  * Wide screens: Vega's beanstalk grows from the footer's field up past the top of the page
- * (src/game/stalk.ts). Once the Register window's title bar passes a line a little above the middle of the
- * screen (LINE), Sam jumps onto the stalk and climbs toward that line wherever the page goes: down as it scrolls
- * down, up as it scrolls up. He has his own pace (CLIMB_PACE): a fast scroll leaves him behind and he
+ * (src/game/stalk.ts). Sam stays on the Register window for as long as he and his bubble have room there under
+ * the nav. Once its title bar comes nearer the nav than that, he jumps onto the stalk and climbs toward a line a
+ * little above the middle of the screen (LINE) wherever the page goes: down as it scrolls down, up as it scrolls up. He has his own pace (CLIMB_PACE): a fast scroll leaves him behind and he
  * catches up, his climb's frames following his own movement. Near the end of the page he climbs down to the
  * footer's field, jumps off, takes a few steps and smokes; back up, he walks back, jumps on and climbs, and
  * he climbs to the window's height and jumps back onto it. Scrolled up past the window (its title bar under
@@ -28,7 +28,7 @@ import { startSky } from './sky';
 import { startDog } from './dog';
 import { CLIMB_HANDS } from '../schedule/kit';
 
-/** The line he climbs toward, as a fraction of the screen's height (above it, the Register window lets him go). */
+/** The line he climbs toward on the stalk, as a fraction of the screen's height. */
 const LINE = 0.45;
 /** Scrolling up: once the Register window's title bar sinks under this line, he leaves it and climbs up the stalk. */
 const LINE_LOW = 0.9;
@@ -95,7 +95,7 @@ interface Geo {
   L: number;
   /** The footer's ground line, page px. */
   G: number;
-  /** He leaves the window past scroll sA; the ground is his from sG. */
+  /** He leaves the window past scroll sA (no room left for him under the nav); the ground is his from sG. */
   sA: number;
   /** Above the window: scrolled up past sB (its title bar under LINE_LOW), he climbs up the stalk instead. */
   sB: number;
@@ -183,11 +183,16 @@ export async function startJourney(o: JourneyOptions): Promise<{ debug(): unknow
     const vh = window.innerHeight;
     const pr = pageRect(perch.root);
     const reg = document.getElementById('register');
-    // a little above the middle of the screen: he leaves the window once its title bar passes it
     const L = LINE * vh;
     const G = footerGroundY(scene!);
     const sMax = Math.max(0, document.documentElement.scrollHeight - vh);
-    const sA = pr.bottom - L;
+    // He leaves the window once its title bar is too near the nav for him and his bubble to stand clear of it
+    // (never later than his own line on the stalk, on a screen too short for both).
+    const navFoot = document.querySelector('.nav-slot')?.getBoundingClientRect().bottom ?? 0;
+    const bubble = perch.root.querySelector<HTMLElement>('[data-landing-bubble]');
+    // (his bubble stands 24 art px over the bar: index.astro .landing__bubble)
+    const room = Math.max((SAM_CELL - FOOT_SINK) * a, bubble ? 24 * a + bubble.offsetHeight : 0);
+    const sA = pr.bottom - Math.min(L, navFoot + room);
     const sB = pr.bottom - LINE_LOW * vh;
     const sG = Math.max(sA + 1, Math.min(G - vh + 32, sMax - GROUND_SLACK));
     // The stalk in the middle of the left margin: his body never nearer than EDGE_GAP to the screen's edge or
@@ -544,6 +549,7 @@ export async function startJourney(o: JourneyOptions): Promise<{ debug(): unknow
     } else if (stalk) stalk.layout(geo.G, geo.stemLeft, o.paused);
   };
   const relayout = () => {
+    if (raf < 0) return; // reduced motion came on: Sam is back on the Register window for good
     geo = measure();
     syncStalk(false);
     placed = '';

@@ -9,7 +9,13 @@ import Base from '../layouts/Base.astro';
 import Button from '../components/Button.astro';
 ---
 
-<Base title="Level not found — 16-Bit Con" description="This level doesn't exist. The page you're looking for isn't on the map." footer={false} noindex>
+<Base
+  title="Level not found — 16-Bit Con"
+  description="This level doesn't exist. The page you're looking for isn't on the map."
+  footer={false}
+  noindex
+  fonts={['PPMondwest-Regular', 'GeistMono-Variable', 'Geist-Variable']}
+>
   <section class="lost" aria-labelledby="lost-title">
     <div class="lost__scene" aria-hidden="true" data-lost-scene>
       <canvas class="lost__canvas" data-lost-canvas></canvas>
@@ -62,10 +68,14 @@ import Button from '../components/Button.astro';
     background-image: none;
   }
 
+  /* The scene's size from the first paint (the script then sets it in whole art pixels), so nothing moves
+     when the sky draws. */
   .lost__canvas {
     position: absolute;
     bottom: 0;
     left: 0;
+    width: 100%;
+    height: 100%;
     image-rendering: pixelated;
   }
 
